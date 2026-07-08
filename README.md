@@ -1,187 +1,169 @@
-# youtube-webos-cobalt
+# YouTube webOS Cobalt AdFree
 
-YouTube App built with [Cobalt](https://cobalt.googlesource.com/cobalt/) with extended functionalities.
+Unofficial Cobalt-based YouTube app modification for LG webOS TVs with ad blocking and SponsorBlock support.
 
-This project is built on top of [youtube-webos](https://github.com/webosbrew/youtube-webos).
+This project patches the webOS YouTube application by replacing or modifying the Cobalt runtime used by YouTube TV on webOS. The goal is to keep the original YouTube TV experience while adding ad blocking, SponsorBlock support and related improvements.
 
-Cobalt [only support a subset of HTML tags](https://cobalt.dev/development/reference/supported-features.html),
-youtube-webos had to be reworked to only use `div` tag.
-
-![Configuration Screen](./screenshots/1_sm.jpg)
-![Segment Skipped](./screenshots/2_sm.jpg)
-![Spped Configuration](./screenshots/3_sm.jpg)
+> This project is unofficial and is not affiliated with YouTube, Google, LG or webOS.
 
 ## Features
 
-Same as the default youtube application:
-- Speed management
+* YouTube for LG webOS TVs
+* Cobalt-based runtime modification
+* Advertisement blocking
+* SponsorBlock support
+* Playback speed support
+* Optional autostart integration
+* Installable as patched `.ipk` package
 
-Same as youtube-webos:
-- Advertisements blocking
-- [SponsorBlock](https://sponsor.ajay.app/) integration
-- [Autostart](#autostart)
+The configuration screen can be opened with the **GREEN** button on the LG remote.
 
+## Requirements
 
-**Note:** Configuration screen can be opened by pressing 🟩 GREEN button on the remote.
-
-## Pre-requisites
-
-- Official YouTube app needs to be uninstalled before installation.
-
-## Installation
-
-- Use [webOS Homebrew Channel](https://github.com/webosbrew/webos-homebrew-channel) - app is published in official webosbrew repo
-- Use [Device Manager app](https://github.com/webosbrew/dev-manager-desktop) - see [Releases](https://github.com/webosbrew/youtube-webos/releases) for a
-  prebuilt `.ipk` binary file
-- Use official webOS/webOS OSE SDK: `ares-install youtube...ipk` (for webOS SDK configuration
-  see below)
-
-## Configuration
-
-Configuration screen can be opened by pressing 🟩 GREEN button on the remote.
-
-### Autostart
-
-In order to autostart an application the following command needs to be executed
-via SSH or Telnet:
-
-```sh
-luna-send-pub -n 1 'luna://com.webos.service.eim/addDevice' '{"appId":"youtube.leanback.v4","pigImage":"","mvpdIcon":""}'
-```
-
-This will make "YouTube AdFree" display as an eligible input application (next
-to HDMI/Live TV, etc...), and, if it was the last selected input, it will be
-automatically launched when turning on the TV.
-
-This will also greatly increase startup performance, since it will be runnning
-constantly in the background, at the cost of increased idle memory usage.
-(so far, relatively unnoticable in normal usage)
-
-In order to disable autostart run this:
-
-```sh
-luna-send -n 1 'luna://com.webos.service.eim/deleteDevice' '{"appId":"youtube.leanback.v4"}'
-```
-
-## Patching your IPK
-
-- Install docker:
-
-Follow instructions on https://docs.docker.com/engine/install/
-
-Make sure to install all docker components like `docker-buildx-plugin` and `docker-compose-plugin`.
-
-- Install tools
+* LG TV with webOS
+* Homebrew Channel, Developer Mode or root access
+* Docker
+* Git
+* Linux or macOS build environment
+* Required tools:
 
 ```sh
 sudo apt install jq git patch sed binutils squashfs-tools rename findutils xz-utils
 ```
 
+The official YouTube app should be uninstalled before installing the patched package.
 
-- Clone the repository
+## Installation
+
+Download a release `.ipk` package and install it using one of the following methods.
+
+### Install via webOS Device Manager
+
+Use the webOS Device Manager and install the downloaded `.ipk` package.
+
+### Install via ares-cli
 
 ```sh
-git clone https://github.com/GuillaumeSmaha/youtube-webos-cobalt.git
+ares-install youtube.leanback.v4_*.ipk
 ```
 
-- Enter the folder and you can patch your YouTube ipk
-```sh
-cd youtube-webos-cobalt
+### Install via SSH on rooted/Homebrew webOS
 
+Copy the `.ipk` to the TV and install it via SSH:
+
+```sh
+opkg install /path/to/youtube.leanback.v4_*.ipk
+```
+
+Example:
+
+```sh
+opkg install /home/root/youtube.leanback.v4_0.5.3_all.ipk
+```
+
+## Patch an official YouTube IPK
+
+Clone the repository:
+
+```sh
+git clone https://github.com/RF1705/youtube-webos-cobalt-adfree.git
+cd youtube-webos-cobalt-adfree
+```
+
+Patch your official YouTube IPK:
+
+```sh
 make PACKAGE=./your-tv-youtube.ipk
 ```
 
-Customize package name:
-`PACKAGE_NAME` can be defined to change the package name
+To use a custom package name:
+
 ```sh
 make PACKAGE=./your-tv-youtube.ipk PACKAGE_NAME=youtube-free.leanback.v4
 ```
 
+The patched IPK will be created next to the original package.
+
+## Autostart
+
+Autostart can make the app appear as an input source next to HDMI/Live TV.
+
+Enable autostart:
+
+```sh
+luna-send-pub -n 1 'luna://com.webos.service.eim/addDevice' '{"appId":"youtube.leanback.v4","pigImage":"","mvpdIcon":""}'
+```
+
+Disable autostart:
+
+```sh
+luna-send -n 1 'luna://com.webos.service.eim/deleteDevice' '{"appId":"youtube.leanback.v4"}'
+```
+
+Autostart may improve startup time because the app can stay loaded in the background. This can increase idle memory usage.
+
 ## Build Cobalt
 
-If you don't trusted, pre-compiled version stored in `cobalt-bin`, you can build them yourself.
+The repository may include prebuilt Cobalt binaries in `cobalt-bin`.
 
-The building process is:
-- Clone cobalt repository
-- Apply the patch defined in `cobalt-patches` directory to inject AdBlock javascript after the document is loaded.
-- Build libcobalt.so using docker-compose method.
+To build Cobalt yourself, the build process clones Cobalt, applies the patches from `cobalt-patches`, builds `libcobalt.so`, and packages the result.
 
-This process is handled by the following commands:
-- Clone the repo, enter the folder and call the build command, this will generate libcobalt.so file for the given versions.
-`make cobalt-bin/<COBALT_VERSION>-<SB_API_VERSION>/libcobalt.so cobalt-bin/<COBALT_VERSION>-<SB_API_VERSION>.xz`
+Example:
 
-For example: for Cobalt 23.lts.4 and SB Api version 12:
 ```sh
-git clone https://github.com/FriedChickenButt/youtube-webos.git
-
-cd youtube-webos-cobalt
-
 make cobalt-bin/23.lts.4-12/libcobalt.so cobalt-bin/23.lts.4-12.xz
 ```
 
-### Building issue
+If the build fails after updating the repository, try cleaning old Docker images and Cobalt output:
 
-If you already built the package, update the repo and got an error like `node-gyp not found`:
-
-Try to clean docker image used to build.
 ```sh
 docker image rm cobalt-build-evergreen cobalt-build-linux cobalt-build-base cobalt-base
-```
-
-Try to clean old Cobalt builds:
-```sh
 rm -fr cobalt/out/
 make cobalt-clean
 ```
 
 ## Development TV setup
 
-### Configuring @webosose/ares-cli with Developer Mode App
+### Developer Mode App
 
-This is partially based on: https://webostv.developer.lge.com/develop/app-test/using-devmode-app/
+Install the Developer Mode app on the TV, enable Developer Mode and enable the keyserver. Then download the private key:
 
-- Install Developer Mode app from Content Store
-- Enable developer mode, enable keyserver
-- Download TV's private key: `http://TV_IP:9991/webos_rsa`
-- Configure the device using `ares-setup-device` (`-a` may need to be replaced with `-m` if device named `webos` is already configured)
-  - `PASSPHRASE` is the 6-character passphrase printed on screen in developer mode app
+```text
+http://TV_IP:9991/webos_rsa
+```
+
+Configure the TV:
 
 ```sh
-ares-setup-device -a webos -i "username=prisoner" -i "privatekey=/path/to/downloaded/webos_rsa" -i "passphrase=PASSPHRASE" -i "host=TV_IP" -i "port=9922"
+ares-setup-device -a webos \
+  -i "username=prisoner" \
+  -i "privatekey=/path/to/webos_rsa" \
+  -i "passphrase=PASSPHRASE" \
+  -i "host=TV_IP" \
+  -i "port=9922"
 ```
 
-### Configuring @webosose/ares-cli with Homebrew Channel / root
+### Homebrew Channel / root access
 
-- Enable sshd in Homebrew Channel app
-- Generate ssh key on developer machine (`ssh-keygen`)
-- Copy the public key (`id_rsa.pub`) to `/home/root/.ssh/authorized_keys` on TV
-- Configure the device using `ares-setup-device` (`-a` may need to be replaced with `-m` if device named `webos` is already configured)
+Enable SSH in the Homebrew Channel app, copy your public SSH key to the TV, then configure the device:
 
 ```sh
-ares-setup-device -a webos -i "username=root" -i "privatekey=/path/to/id_rsa" -i "passphrase=SSH_KEY_PASSPHRASE" -i "host=TV_IP" -i "port=22"
+ares-setup-device -a webos \
+  -i "username=root" \
+  -i "privatekey=/path/to/id_rsa" \
+  -i "passphrase=SSH_KEY_PASSPHRASE" \
+  -i "host=TV_IP" \
+  -i "port=22"
 ```
 
-**Note:** @webosose/ares-cli doesn't need to be installed globally - you can use a package installed locally after `cd youtube-webos && npm install` in this repo by just prefixing above commands with local path, like so: `node_modules/.bin/ares-setup-device ...`
+## Project status
 
-## Installation
+This project is community maintained. YouTube TV, Cobalt and webOS can change at any time. Ad blocking, SponsorBlock, login behavior or playback features may break after updates from YouTube or LG.
 
-```
-cd youtube-webos
-npm run deploy
-```
+## Credits
 
-## Launching
+This project builds on research and work from the webOS Homebrew, Cobalt and YouTube TV modification communities.
 
-- The app will be available in the TV's app list or launch it using ares-cli.
+## License
 
-```sh
-cd youtube-webos
-npm run launch
-```
-
-To jump immediately into some specific video use:
-
-```sh
-cd youtube-webos
-npm run launch -- -p '{"contentTarget":"v=F8PGWLvn1mQ"}'
-```
+See the included license files for details.
