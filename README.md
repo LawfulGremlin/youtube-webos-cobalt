@@ -64,16 +64,20 @@ ares-install com.cobalt.youtube.adfree_*.ipk
 
 ### Install via SSH on rooted/Homebrew webOS
 
-Copy the `.ipk` to the TV and install it via SSH:
+Download the release package to `/media/developer/temp` and install it through
+the webOS app install service:
 
 ```sh
-opkg install /path/to/com.cobalt.youtube.adfree_*.ipk
+mkdir -p /media/developer/temp
+cd /media/developer/temp
+wget https://github.com/RF1705/youtube-webos-cobalt-adfree/releases/download/v1.0.0/com.cobalt.youtube.adfree_1.1.7_arm.ipk
+luna-send-pub -i 'luna://com.webos.appInstallService/dev/install' '{"id":"com.ares.defaultName","ipkUrl":"/media/developer/temp/com.cobalt.youtube.adfree_1.1.7_arm.ipk","subscribe":true}'
 ```
 
-Example:
+After installation, the downloaded package can be removed:
 
 ```sh
-opkg install /home/root/com.cobalt.youtube.adfree_1.1.7_arm.ipk
+rm /media/developer/temp/com.cobalt.youtube.adfree_1.1.7_arm.ipk
 ```
 
 ## Patch an official YouTube IPK
