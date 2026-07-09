@@ -6,15 +6,16 @@ MAKEFILE_PATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 CURRENT_DIR := $(dir $(MAKEFILE_PATH))
 
 PACKAGE?=
-PACKAGE_TARGET?=$(basename $(PACKAGE))-patched.ipk
 PACKAGE_NAME_OFFICIAL=youtube.leanback.v4
 PACKAGE_NAME?=com.cobalt.youtube.adfree
 PACKAGE_NAME_TARGET=$(PACKAGE_NAME)
 PACKAGE_DISPLAY_NAME?=YouTube Cobalt AdFree
+PROJECT_VERSION?=1.0.0
 PACKAGE_COBALT_VERSION?=23.lts.4
-PACKAGE_SB_API_VERSION?=$(shell strings $(WORKDIR)/image/usr/palm/applications/$(PACKAGE_NAME_OFFICIAL)/cobalt | grep sb_api | jq -r '.sb_api_version' | grep -v null || strings $(WORKDIR)/package/usr/palm/applications/$(PACKAGE_NAME_OFFICIAL)/cobalt | grep sb_api | jq -r '.sb_api_version' | grep -v null)
-PACKAGE_VERSION?=$(shell jq -r '.version' < $(WORKDIR)/package/usr/palm/applications/$(PACKAGE_NAME_OFFICIAL)/appinfo.json)
+PACKAGE_VERSION?=$(PROJECT_VERSION)
 PACKAGE_IPK_BUILD=$(PACKAGE_NAME_TARGET)_$(PACKAGE_VERSION)_arm.ipk
+PACKAGE_TARGET?=$(PACKAGE_IPK_BUILD)
+PACKAGE_SB_API_VERSION?=$(shell strings $(WORKDIR)/image/usr/palm/applications/$(PACKAGE_NAME_OFFICIAL)/cobalt | grep sb_api | jq -r '.sb_api_version' | grep -v null || strings $(WORKDIR)/package/usr/palm/applications/$(PACKAGE_NAME_OFFICIAL)/cobalt | grep sb_api | jq -r '.sb_api_version' | grep -v null)
 OFFICAL_YOUTUBE_IPK?=ipks-official/2023-07-30-youtube.leanback.v4-1.1.7.ipk
 
 WORKDIR?=workdir
@@ -105,7 +106,7 @@ $(WORKDIR)/ipk/content/app/cobalt/content/web/adblock: $(WEBAPP_OUTPUT_FILES)
 	rm -f $(WORKDIR)/ipk/drm.nfz
 	sed -i.bak 's/YouTube/$(PACKAGE_DISPLAY_NAME)/g' $(WORKDIR)/ipk/appinfo.json
 	rm -f $(WORKDIR)/ipk/appinfo.json.bak
-	jq 'del(.fileSystemType)' < $(WORKDIR)/ipk/appinfo.json > $(WORKDIR)/ipk/appinfo2.json
+	jq --arg version "$(PACKAGE_VERSION)" 'del(.fileSystemType) | .version = $$version' < $(WORKDIR)/ipk/appinfo.json > $(WORKDIR)/ipk/appinfo2.json
 	mv $(WORKDIR)/ipk/appinfo2.json $(WORKDIR)/ipk/appinfo.json
 
 	cp assets/icon.png $(WORKDIR)/ipk/$$(jq -r '.icon' < $(WORKDIR)/ipk/appinfo.json)
@@ -166,8 +167,7 @@ $(PACKAGE_TARGET): $(WORKDIR)/image/usr/palm/applications/$(PACKAGE_NAME_OFFICIA
 
 .PHONY: docker-make.%
 docker-make.%:
-	docker run --rm -ti -u $$(id -u):$$(id -g) -v $$PWD:/app -w /app node:18 make $*
-
+	docker run --rm -i -u $$(id -u):$$(id -g) -e HOME=/app -e npm_config_cache=/app/.npm -v "$$PWD:/app" -w /app node:18 sh -lc 'mkdir -p /app/.webos /app/.npm && make $*'
 .PHONY: npm
 npm:
 	( \
