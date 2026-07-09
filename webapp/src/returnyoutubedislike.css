@@ -1,0 +1,44 @@
+/* Return YouTube Dislike button states
+   Initial state: no class yet, native text hidden until the API result is known.
+*/
+[idomkey="dislike-button"] yt-formatted-string {
+    visibility: hidden !important;
+}
+
+/* API loaded but no count: show YouTube's native label again. */
+[idomkey="dislike-button"].ytaf-ryd-show-native yt-formatted-string {
+    visibility: visible !important;
+}
+
+/* Count available: collapse native label text and show the injected count span. */
+[idomkey="dislike-button"].ytaf-ryd-show-count yt-formatted-string {
+    visibility: visible !important;
+    font-size: 0 !important;
+    line-height: 0 !important;
+    white-space: nowrap !important;
+}
+
+[idomkey="dislike-button"].ytaf-ryd-show-count yt-formatted-string>.ytaf-ryd-count-span {
+    visibility: visible !important;
+    font-size: 24px !important;
+    line-height: 28px !important;
+    white-space: nowrap !important;
+    pointer-events: none !important;
+}
+
+/* Dislike factoid in the opened video description. */
+ytLr-structured-description-content-renderer .ytLrVideoDescriptionHeaderRendererFactoidContainer.ytaf-ryd-ready,
+ytLr-structured-description-content-renderer .rznqCe.ytaf-ryd-ready,
+ytlr-structured-description-content-renderer .ytLrVideoDescriptionHeaderRendererFactoidContainer.ytaf-ryd-ready,
+ytlr-structured-description-content-renderer .rznqCe.ytaf-ryd-ready {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    justify-content: center !important;
+    gap: 1rem !important;
+    height: auto !important;
+    overflow: visible !important;
+}
+
+#ytaf-ryd-description-dislikes {
+    flex: 0 0 auto !important;
+}
