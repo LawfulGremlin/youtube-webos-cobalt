@@ -34,30 +34,6 @@ function summarizeElementChain(element) {
   return chain.length ? chain.join(' < ') : 'none';
 }
 
-function getPointProbeSummary() {
-  if (!document.elementFromPoint) return 'unsupported';
-
-  const points = [
-    [0.16, 0.84],
-    [0.5, 0.84],
-    [0.84, 0.84],
-    [0.16, 0.9],
-    [0.5, 0.9],
-    [0.84, 0.9]
-  ];
-
-  return points
-    .map(([x, y]) => {
-      const px = Math.round(window.innerWidth * x);
-      const py = Math.round(window.innerHeight * y);
-      return `${px},${py}=${summarizeElementChain(
-        document.elementFromPoint(px, py)
-      )}`;
-    })
-    .join(' | ')
-    .substring(0, 620);
-}
-
 function getLowerBarProbeSummary() {
   const candidates = Array.prototype.slice
     .call(document.querySelectorAll('div, ytlr-progress-bar, ytlr-player-bar'))
@@ -122,8 +98,8 @@ function updateDebugPanel() {
       'time',
       video
         ? `${video.currentTime.toFixed(1)} / ${Number(video.duration || 0).toFixed(
-            1
-          )} speed=${video.playbackRate.toFixed(2)}`
+          1
+        )} speed=${video.playbackRate.toFixed(2)}`
         : 'no video'
     ),
     debugLine(
@@ -142,8 +118,8 @@ function updateDebugPanel() {
       'SB details',
       sb
         ? `segments=${sb.segments.length} next=${sb.lastSkipText} slicer=${shortElementSummary(
-            sb.lastSlicerText
-          )}`
+          sb.lastSlicerText
+        )}`
         : 'n/a'
     ),
     debugLine(
@@ -885,9 +861,9 @@ class SponsorBlockHandler {
       marker.setAttribute(
         'data-ytaf-left-percent',
         `${Math.max(
-        0,
-        Math.min(100, (start / duration) * 100)
-      )}`
+          0,
+          Math.min(100, (start / duration) * 100)
+        )}`
       );
       marker.style.backgroundColor = this.isSegmentSkippable(segment)
         ? '#ffff00'
@@ -1030,9 +1006,8 @@ class SponsorBlockHandler {
     const rect = element.getBoundingClientRect();
     if (rect.width < 220 || rect.height < 4 || rect.height > 90) return false;
     if (rect.bottom < window.innerHeight * 0.35) return false;
-    const text = `${element.id || ''} ${element.className || ''} ${
-      element.tagName || ''
-    }`;
+    const text = `${element.id || ''} ${element.className || ''} ${element.tagName || ''
+      }`;
     const idomkey =
       element.getAttribute && element.getAttribute('idomkey')
         ? element.getAttribute('idomkey')
