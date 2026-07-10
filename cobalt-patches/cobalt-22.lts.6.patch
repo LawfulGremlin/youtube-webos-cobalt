@@ -127,6 +127,16 @@ diff --git a/docker-compose.yml b/docker-compose.yml
 index b3ef1ce67..9fe5250ac 100644
 --- a/docker-compose.yml
 +++ b/docker-compose.yml
+@@ -31,8 +31,7 @@ x-build-volumes: &build-volumes
+     - ${STARBOARD_TOOLCHAINS_DIR:-container-starboard-toolchains}:/root/starboard-toolchains
+ 
+ x-build-common-definitions: &build-common-definitions
+-  <<: *common-definitions
+-  <<: *build-volumes
++  <<: [*common-definitions, *build-volumes]
+   depends_on:
+     - build-base
+ 
 @@ -349,7 +349,8 @@ services:
      depends_on: [ build-evergreen ]
      environment:
@@ -145,7 +155,13 @@ index f7e49f23e..e972833a5 100644
  
  ENV PYTHONUNBUFFERED 1
  
-+RUN sed -i -e 's|http://security.debian.org|http://archive.debian.org/debian-security|' -e 's|http://httpredir.debian.org|http://archive.debian.org|' -e 's|deb http://archive.debian.org/debian stretch-updates|# deb http://archive.debian.org/debian stretch-updates|' /etc/apt/sources.list
++RUN printf 'Acquire::Check-Valid-Until "false";\n' > /etc/apt/apt.conf.d/99archive \
++    && sed -i \
++        -e 's|http://security.debian.org|http://archive.debian.org/debian-security|' \
++        -e 's|http://httpredir.debian.org|http://archive.debian.org|' \
++        -e 's|http://deb.debian.org/debian|http://archive.debian.org/debian|' \
++        -e 's|deb http://archive.debian.org/debian stretch-updates|# deb http://archive.debian.org/debian stretch-updates|' \
++        /etc/apt/sources.list
 +
  # === Install common dependencies
  RUN apt update -qqy \
