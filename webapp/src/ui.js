@@ -7,54 +7,81 @@ import './ui.css';
 
 import { configRead, configWrite } from './config.js';
 import { checkboxTools } from './checkboxTools.js';
+import { text as languageText } from './languages/index.js';
 
 let lastTabIndex = 0;
 
-function isGerman() {
-  return /^de\b/i.test(navigator.language || '');
-}
-
 function text(key) {
-  const german = {
-    title: 'YouTube webOS Cobalt AdFree',
-    adblock: 'Werbung blockieren',
-    sponsorblock: 'SponsorBlock aktivieren',
-    ryd: 'Dislike-Zahlen anzeigen',
-    sponsor: 'Sponsor-Segmente überspringen',
-    intro: 'Intro überspringen',
-    outro: 'Outro überspringen',
-    interaction: 'Abo-/Like-Hinweise überspringen',
-    selfpromo: 'Eigenwerbung überspringen',
-    musicOfftopic: 'Musik/off-topic überspringen',
-    preview: 'Vorschau/Rückblick überspringen',
-    filler: 'Füller/Abschweifung überspringen',
-    hook: 'Hook/Begrüßung überspringen',
-    openHint: 'Grün drücken für YouTube-Extras'
-  };
-  const english = {
-    title: 'YouTube webOS Cobalt AdFree',
-    adblock: 'Enable AdBlocking',
-    sponsorblock: 'Enable SponsorBlock',
-    ryd: 'Show dislike counts',
-    sponsor: 'Skip Sponsor Segments',
-    intro: 'Skip Intro Segments',
-    outro: 'Skip Outro Segments',
-    interaction: 'Skip Interaction Reminders',
-    selfpromo: 'Skip Self Promotion',
-    musicOfftopic: 'Skip Music/Off-topic',
-    preview: 'Skip Preview/Recap',
-    filler: 'Skip Filler/Tangent',
-    hook: 'Skip Hook/Greeting',
-    openHint: 'Press [GREEN] for YouTube extras'
-  };
-  return (isGerman() ? german : english)[key];
+  return languageText('ui', key);
 }
 
 export function userScriptStartUI() {
+  console.info('[ytaf] userScriptStartUI() called');
   // We handle key events ourselves.
+  if (!window.__spatialNavigation__) {
+    window.__spatialNavigation__ = {};
+  }
   window.__spatialNavigation__.keyMode = 'NONE';
 
   const ARROW_KEY_CODE = { 37: 'left', 38: 'up', 39: 'right', 40: 'down' };
+
+  function getDirectionFromEvent(evt) {
+    const key = (evt.key || '').toLowerCase();
+    const code = (evt.code || '').toLowerCase();
+    const keyCode = evt.keyCode ?? evt.which ?? evt.charCode;
+
+    if (code === 'arrowup' || key === 'arrowup' || key === 'up' || keyCode === 38) {
+      return 'up';
+    }
+    if (code === 'arrowdown' || key === 'arrowdown' || key === 'down' || keyCode === 40) {
+      return 'down';
+    }
+    if (code === 'arrowleft' || key === 'arrowleft' || key === 'left' || keyCode === 37) {
+      return 'left';
+    }
+    if (code === 'arrowright' || key === 'arrowright' || key === 'right' || keyCode === 39) {
+      return 'right';
+    }
+
+    return null;
+  }
+
+  function getRemoteKeyCode(evt) {
+    return evt.keyCode || evt.which || evt.charCode || 0;
+  }
+
+  function isGreenKey(evt) {
+    const keyCode = getRemoteKeyCode(evt);
+    return keyCode === 404 || keyCode === 172;
+  }
+
+  function moveFocus(dir) {
+    const focusableItems = Array.from(
+      uiContainer.querySelectorAll('[tabindex]')
+    ).filter((item) => item.tabIndex > 0);
+
+    if (focusableItems.length === 0) {
+      return;
+    }
+
+    const current = document.activeElement;
+    const currentIndex = focusableItems.findIndex((item) => item === current);
+    let nextIndex = currentIndex;
+
+    if (currentIndex === -1) {
+      nextIndex = 0;
+    } else if (dir === 'down' || dir === 'right') {
+      nextIndex = (currentIndex + 1) % focusableItems.length;
+    } else if (dir === 'up' || dir === 'left') {
+      nextIndex = (currentIndex - 1 + focusableItems.length) % focusableItems.length;
+    }
+
+    const nextItem = focusableItems[nextIndex];
+    if (nextItem) {
+      nextItem.focus();
+      lastTabIndex = nextItem.tabIndex;
+    }
+  }
 
   const uiContainer = document.createElement('div');
   uiContainer.classList.add('ytaf-ui-container');
@@ -64,9 +91,14 @@ export function userScriptStartUI() {
     'focus',
     () => {
       console.info('uiContainer focused!');
-      const tabIndex = document.querySelector(':focus').tabIndex;
-      if (tabIndex !== null) {
-        lastTabIndex = tabIndex;
+      const focusedElement = document.activeElement;
+      if (
+        focusedElement &&
+        focusedElement !== uiContainer &&
+        focusedElement.tabIndex !== null &&
+        focusedElement.tabIndex > 0
+      ) {
+        lastTabIndex = focusedElement.tabIndex;
       }
     },
     true
@@ -77,33 +109,8 @@ export function userScriptStartUI() {
     true
   );
 
-  uiContainer.addEventListener(
-    'keydown',
-    (evt) => {
-      console.info(
-        'uiContainer key event:',
-        evt.type,
-        evt.charCode,
-        evt.keyCode
-      );
-      if (evt.charCode !== 404 && evt.charCode !== 172) {
-        if (evt.keyCode in ARROW_KEY_CODE) {
-          if (uiContainer.offsetParent !== null) {
-            navigate(ARROW_KEY_CODE[evt.keyCode]);
-          }
-        } else if (evt.keyCode === 13 || evt.keyCode === 32) {
-          // "OK" button
-          checkboxTools.toggleCheck(document.querySelector(':focus').id);
-        } else if (evt.keyCode === 27) {
-          // Back button
-          closeContainer();
-        }
-        evt.preventDefault();
-        evt.stopPropagation();
-      }
-    },
-    true
-  );
+  // Key handling is done globally in the document handler to ensure a single
+  // interception point and avoid duplicate handling across capture/bubble phases.
 
   const callbackConfig = (configName) => {
     return (newState) => {
@@ -113,7 +120,9 @@ export function userScriptStartUI() {
 
   const divTitle = document.createElement('div');
   divTitle.classList.add('center');
-  divTitle.innerHTML = `<h1>${text('title')}</h1>`;
+  const title = document.createElement('h1');
+  title.textContent = text('title');
+  divTitle.appendChild(title);
   uiContainer.appendChild(divTitle);
 
   uiContainer.appendChild(
@@ -126,18 +135,18 @@ export function userScriptStartUI() {
   );
   uiContainer.appendChild(
     checkboxTools.add(
-      '__sponsorblock',
-      text('sponsorblock'),
-      configRead('enableSponsorBlock'),
-      callbackConfig('enableSponsorBlock')
-    )
-  );
-  uiContainer.appendChild(
-    checkboxTools.add(
       '__return_youtube_dislike',
       text('ryd'),
       configRead('enableReturnYouTubeDislike'),
       callbackConfig('enableReturnYouTubeDislike')
+    )
+  );
+  uiContainer.appendChild(
+    checkboxTools.add(
+      '__sponsorblock',
+      text('sponsorblock'),
+      configRead('enableSponsorBlock'),
+      callbackConfig('enableSponsorBlock')
     )
   );
 
@@ -220,27 +229,82 @@ export function userScriptStartUI() {
   document.querySelector('body').appendChild(uiContainer);
 
   let latestFocus = null;
+
+  function focusMenuItem(preferredTabIndex = lastTabIndex) {
+    const focusableItems = Array.from(
+      uiContainer.querySelectorAll('[tabindex]')
+    ).filter((item) => item.tabIndex > 0);
+
+    let target = null;
+    if (preferredTabIndex > 0) {
+      target =
+        focusableItems.find((item) => item.tabIndex === preferredTabIndex) ||
+        focusableItems[0];
+    } else {
+      target = focusableItems[0];
+    }
+
+    if (target) {
+      target.focus();
+      if (target.tabIndex !== null && target.tabIndex > 0) {
+        lastTabIndex = target.tabIndex;
+      }
+      return true;
+    }
+
+    uiContainer.focus();
+    return false;
+  }
+
   function openContainer() {
     console.info('Container: Showing & Focusing!');
     uiContainer.style.display = 'block';
-    latestFocus = document.querySelector(':focus');
-    document.querySelector('[tabindex="' + lastTabIndex + '"]').focus();
+    latestFocus =
+      document.activeElement && document.activeElement !== document.body
+        ? document.activeElement
+        : null;
+
+    window.requestAnimationFrame(() => {
+      focusMenuItem(1);
+    });
     keepContainerFocus();
   }
 
   function keepContainerFocus() {
     if (uiContainer.offsetParent !== null) {
-      if (
-        !uiContainer.matches(':focus') &&
-        uiContainer.querySelector(':focus') == null
-      ) {
-        latestFocus = document.querySelector(':focus');
+      const activeElement = document.activeElement;
+      const hasFocusInside = Boolean(
+        activeElement &&
+        (activeElement === uiContainer || uiContainer.contains(activeElement))
+      );
+
+      if (!hasFocusInside) {
+        latestFocus = activeElement;
         console.info('Container: Not have focus: Focusing!');
-        document.querySelector('[tabindex="' + lastTabIndex + '"]').focus();
+        focusMenuItem();
       }
 
-      setTimeout(keepContainerFocus, 100);
+      setTimeout(keepContainerFocus, 120);
     }
+  }
+
+  function menuHasFocus() {
+    return Boolean(
+      document.activeElement &&
+      (document.activeElement === uiContainer || uiContainer.contains(document.activeElement))
+    );
+  }
+
+  function captureMenuFocus() {
+    if (uiContainer.style.display === 'none' || menuHasFocus()) {
+      return;
+    }
+
+    const activeElement = document.activeElement;
+    if (activeElement && activeElement !== document.body) {
+      latestFocus = activeElement;
+    }
+    focusMenuItem();
   }
 
   function closeContainer() {
@@ -253,14 +317,58 @@ export function userScriptStartUI() {
   }
 
   const eventHandler = (evt) => {
-    console.info(
-      'Key event:',
-      evt.type,
-      evt.charCode,
-      evt.keyCode,
-      evt.defaultPrevented
-    );
-    if (evt.charCode == 404 || evt.charCode == 172) {
+    const menuOpen = uiContainer.style.display !== 'none';
+    const focusInsideMenu = menuOpen && menuHasFocus();
+
+    if (evt.type === 'keydown' && menuOpen) {
+      if (!focusInsideMenu) {
+        evt.preventDefault();
+        evt.stopPropagation();
+        captureMenuFocus();
+        return false;
+      }
+
+      const direction = getDirectionFromEvent(evt);
+      if (direction) {
+        evt.preventDefault();
+        evt.stopPropagation();
+        moveFocus(direction);
+        return false;
+      }
+
+      if (
+        evt.key === 'Enter' ||
+        evt.key === ' ' ||
+        evt.code === 'Space' ||
+        evt.keyCode === 13 ||
+        evt.keyCode === 32 ||
+        evt.which === 13 ||
+        evt.which === 32
+      ) {
+        evt.preventDefault();
+        evt.stopPropagation();
+        const focusedElement = document.querySelector(':focus');
+        if (focusedElement && focusedElement.id) {
+          // prevent the synthetic click from toggling again
+          const wrapper = focusedElement.parentElement;
+          if (wrapper) {
+            wrapper.dataset.ytafSkipClick = '1';
+            setTimeout(() => delete wrapper.dataset.ytafSkipClick, 300);
+          }
+          checkboxTools.toggleCheck(focusedElement.id);
+        }
+        return false;
+      }
+
+      if (evt.key === 'Escape' || evt.keyCode === 27) {
+        evt.preventDefault();
+        evt.stopPropagation();
+        closeContainer();
+        return false;
+      }
+    }
+
+    if (isGreenKey(evt)) {
       console.info('Taking over!');
       evt.preventDefault();
       evt.stopPropagation();
@@ -314,7 +422,7 @@ export function showNotification(text, time = 3000, variant = 'yellow') {
 
   const elm = document.createElement('div');
   const elmInner = document.createElement('div');
-  elmInner.innerHTML = text;
+  elmInner.textContent = text;
   elmInner.classList.add('message');
   elmInner.classList.add(`message-${variant}`);
   elmInner.classList.add('message-hidden');

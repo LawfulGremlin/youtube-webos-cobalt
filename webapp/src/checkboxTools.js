@@ -33,7 +33,7 @@ function add(name, label, checked = false, callback = null) {
 
   const divabel = document.createElement('div');
   divabel.classList.add('desc');
-  divabel.innerHTML = label;
+  divabel.textContent = label;
 
   wrapper.appendChild(checkboxSliderDiv);
   wrapper.appendChild(divabel);
@@ -55,10 +55,21 @@ function add(name, label, checked = false, callback = null) {
   wrapper.addEventListener(
     'click',
     (evt) => {
+      // If a keyboard handler just toggled this control, ignore the synthesized click
+      if (wrapper.dataset.ytafSkipClick === '1') {
+        delete wrapper.dataset.ytafSkipClick;
+        return;
+      }
       cb(evt);
     },
     true
   );
+  checkboxSliderDiv.addEventListener('focus', () => {
+    wrapper.classList.add('ytaf-focused');
+  });
+  checkboxSliderDiv.addEventListener('blur', () => {
+    wrapper.classList.remove('ytaf-focused');
+  });
 
   checkboxTabIndex += 1;
 

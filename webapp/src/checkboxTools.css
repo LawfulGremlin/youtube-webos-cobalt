@@ -1,18 +1,25 @@
 /* Checkbox */
 .toggler-wrapper {
   cursor: pointer;
-  margin: 4px 6px;
+  margin: 3px 0;
+  padding: 8px 10px;
   display: flex;
   align-items: center;
-  gap: 9px;
-  min-height: 26px;
+  gap: 12px;
+  min-height: 34px;
+  box-sizing: border-box;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.035);
+  transition: background-color 160ms ease, border-color 160ms ease,
+    box-shadow 160ms ease, transform 160ms ease;
 }
 
 .toggler-wrapper div[type='checkbox'] {
   display: block;
-  flex: 0 0 36px;
-  width: 36px;
-  height: 18px;
+  flex: 0 0 42px;
+  width: 42px;
+  height: 22px;
   position: relative;
 }
 
@@ -30,7 +37,7 @@
 */
 
 .toggler-wrapper .toggler-slider {
-  background-color: #ccc;
+  background-color: rgba(255, 255, 255, 0.22);
   position: absolute;
   border-radius: 100px;
   width: 100%;
@@ -39,19 +46,31 @@
   transition: all 300ms ease;
 
   display: inline-block;
-  width: 32px;
-  height: 18px;
-  left: 2px;
+  width: 40px;
+  height: 22px;
+  left: 1px;
   top: 0;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.12),
+    inset 0 2px 8px rgba(0, 0, 0, 0.28);
+}
+
+.toggler-wrapper.ytaf-focused {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(68, 204, 102, 0.82);
+  box-shadow: 0 0 0 2px rgba(68, 204, 102, 0.2);
+  transform: translateX(2px);
 }
 
 .toggler-wrapper [type='checkbox']:focus .toggler-slider {
-  outline: 2px rgba(255, 255, 255, 0.9) solid;
-  outline-offset: 2px;
+  outline: 0;
 }
 
 .toggler-wrapper [type='checkbox'][checked='checked'] .toggler-slider {
-  background-color: #44cc66;
+  background: linear-gradient(180deg, #5dea82, #2bbd52);
+  box-shadow:
+    0 0 16px rgba(68, 204, 102, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.32);
 }
 
 /* .ytaf-ui-container .toggler-slider:focus {
@@ -72,7 +91,7 @@
   [type='checkbox'][checked='checked']
   .toggler-slider
   .toggler-knob {
-  left: 18px;
+  left: 20px;
 }
 
 /*
@@ -82,17 +101,19 @@
 */
 
 .toggler-wrapper .toggler-knob {
-  width: 15px;
-  height: 15px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
-  left: 1.5px;
-  top: 1.5px;
+  left: 2px;
+  top: 2px;
   background-color: #fff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.36);
 }
 
 .toggler-wrapper .desc {
   display: block;
   padding-left: 0;
-  font-size: 0.86rem;
-  line-height: 1.15;
+  font-size: 0.88rem;
+  line-height: 1.22;
+  color: rgba(255, 255, 255, 0.9);
 }

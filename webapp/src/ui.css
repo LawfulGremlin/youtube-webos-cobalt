@@ -1,22 +1,29 @@
 /* Global */
 .ytaf-ui-container {
   position: fixed;
-  top: 9vh;
-  left: 7vw;
-  width: 42vw;
+  top: 8vh;
+  left: 6vw;
+  width: 44vw;
   max-width: 780px;
   max-height: 78vh;
   box-sizing: border-box;
-  background: rgba(8, 10, 12, 0.88);
+  background:
+    linear-gradient(145deg, rgba(27, 31, 36, 0.96), rgba(8, 10, 13, 0.94)),
+    rgba(8, 10, 12, 0.92);
   color: white;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 10px;
-  box-shadow: 0 18px 56px rgba(0, 0, 0, 0.45);
-  padding: 14px 18px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  box-shadow:
+    0 28px 74px rgba(0, 0, 0, 0.62),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  padding: 18px 20px 16px;
   font-size: 0.9rem;
   z-index: 10000;
   display: none;
-  overflow: hidden;
+  overflow: auto;
+  animation: ytaf-menu-in 0.18s ease-out;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
 }
 
 .ytaf-ui-container :focus {
@@ -24,7 +31,10 @@
 }
 
 .ytaf-ui-container div.center {
-  text-align: center;
+  text-align: left;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 .ytaf-ui-container div.small {
@@ -35,15 +45,29 @@
 
 .ytaf-ui-container div.center h1 {
   margin: 0;
-  margin-bottom: 0.32em;
-  text-align: center;
-  font-size: 1.15rem;
-  font-weight: 600;
+  text-align: left;
+  font-size: 1.04rem;
+  font-weight: 700;
+  line-height: 1.15;
 }
 
 .ytaf-ui-container div.blockquote {
-  margin: 4px 0 0 24px;
-  padding-left: 0;
+  margin: 8px 0 0;
+  padding: 8px 0 0 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.09);
+  border-left: 2px solid rgba(68, 204, 102, 0.58);
+}
+
+@keyframes ytaf-menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 /* Notification */
