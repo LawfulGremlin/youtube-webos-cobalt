@@ -103,7 +103,7 @@ By default the patched package uses:
 
 ```text
 App ID: com.cobalt.youtube.adfree
-Name:   YouTube Cobalt AdFree
+Name:   YouTube webOS Cobalt AdFree
 ```
 
 To overwrite the official YouTube app instead:
