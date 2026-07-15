@@ -167,7 +167,7 @@ make standalone-package \
 ```
 
 For a compatibility proof of concept that uses the extracted webOS starter with
-the matching `22.lts.6-12` runtime:
+the matching `23.lts.4-12` runtime:
 
 ```sh
 make standalone-poc-package
