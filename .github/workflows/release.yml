@@ -1,0 +1,83 @@
+name: Build & Release
+
+# Manual, at-will release: builds the IPK from the current main source
+# (patching the checked-in official YouTube IPK with the prebuilt Cobalt
+# binaries from cobalt-bin/), publishes a GitHub release v<version> with
+# the IPK + webosbrew manifest, and regenerates repo.json on main.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (semver triplet, e.g. 1.0.1 — becomes the app version and tag v<version>)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq squashfs-tools binutils xz-utils make
+
+      - name: Build IPK
+        run: |
+          make package \
+            PACKAGE=ipks-official/2023-07-30-youtube.leanback.v4-1.1.7.ipk \
+            PACKAGE_NAME=com.cobalt.youtube.adfree \
+            PACKAGE_DISPLAY_NAME='YouTube Cobalt AdFree' \
+            PROJECT_VERSION='${{ inputs.version }}'
+
+      - name: Generate repo.json and webosbrew manifest
+        env:
+          REPO_NAME: ${{ github.repository }}
+          TAG_NAME: v${{ inputs.version }}
+        run: |
+          cp output/com.cobalt.youtube.adfree_${{ inputs.version }}_arm.ipk .
+          node tools/gen-repo-json.cjs
+
+      - name: Create release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: v${{ inputs.version }}
+          commit: ${{ github.sha }}
+          name: v${{ inputs.version }}
+          allowUpdates: true
+          artifacts: 'com.cobalt.youtube.adfree_${{ inputs.version }}_arm.ipk,com.cobalt.youtube.adfree.manifest.json'
+
+      - name: Commit and push repo.json to main
+        run: |
+          set -e
+          git config user.name  'GitHub Actions'
+          git config user.email 'actions@github.com'
+          git add repo.json
+          if git diff --staged --quiet; then
+            echo "repo.json unchanged — nothing to push."
+            exit 0
+          fi
+          git commit -m "Update repo.json for v${{ inputs.version }}"
+          # Retry-on-race: if main moved while we were building, rebase the
+          # single repo.json commit onto the new tip and try again.
+          for attempt in 1 2 3; do
+            git fetch origin main
+            if git push origin HEAD:main; then
+              echo "repo.json pushed to main on attempt $attempt."
+              exit 0
+            fi
+            git rebase origin/main || {
+              git rebase --abort || true
+              echo "Rebase failed; aborting."
+              exit 1
+            }
+          done
+          echo "Failed to push repo.json after 3 attempts."
+          exit 1

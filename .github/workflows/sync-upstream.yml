@@ -1,0 +1,90 @@
+name: Sync with Upstream
+
+# Pull-only shadow-fork sync: fetches upstream and merges it into main.
+# This workflow never pushes to, or opens anything against, upstream.
+
+on:
+  schedule:
+    - cron: '0 6 1,15 * *'   # biweekly: 1st and 15th of each month at 06:00 UTC
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          ref: main
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure git
+        run: |
+          git config user.name  'GitHub Actions'
+          git config user.email 'actions@github.com'
+          # Required for `merge=ours` attributes in .gitattributes to take effect.
+          git config merge.ours.driver true
+
+      - name: Fetch upstream
+        run: |
+          git remote add upstream https://github.com/RF1705/youtube-webos-cobalt-adfree.git
+          git fetch upstream main
+
+      - name: Check whether upstream has new commits
+        id: check
+        run: |
+          BEHIND=$(git rev-list --count HEAD..upstream/main)
+          echo "behind=$BEHIND" >> "$GITHUB_OUTPUT"
+          echo "main is $BEHIND commit(s) behind upstream/main."
+
+      - name: Attempt merge
+        if: steps.check.outputs.behind != '0'
+        id: merge
+        run: |
+          git checkout -B sync/upstream
+          if git merge upstream/main --no-edit; then
+            echo "result=clean" >> "$GITHUB_OUTPUT"
+          else
+            echo "result=conflict" >> "$GITHUB_OUTPUT"
+            git add -A
+            git commit --no-verify -m "Sync upstream/main (CONFLICTS — resolve markers before merging)"
+          fi
+
+      - name: Fast-forward main on clean merge
+        if: steps.merge.outputs.result == 'clean'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git checkout main
+          git merge --ff-only sync/upstream
+          git push origin main
+          # If a prior conflict left a sync PR open, it no longer reflects reality — close it.
+          gh pr close sync/upstream --delete-branch --comment "Superseded by a later clean sync." 2>/dev/null || true
+
+      - name: Push conflicts to sync branch and open PR
+        if: steps.merge.outputs.result == 'conflict'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          git push -f origin sync/upstream
+          # Filter on state=open explicitly: `gh pr view <branch>` also matches
+          # long-closed PRs, which would make this skip creating a needed PR.
+          OPEN_COUNT=$(gh pr list --head sync/upstream --state open --json number --jq 'length')
+          if [ "$OPEN_COUNT" -gt 0 ]; then
+            echo "Existing sync PR refreshed with latest upstream conflicts."
+          else
+            if ! gh pr create \
+              --base main \
+              --head sync/upstream \
+              --title "Sync upstream/main — manual conflict resolution required" \
+              --body "Automatic upstream sync produced conflicts. Resolve the conflict markers in this branch, then merge.
+
+              Fork-owned files (\`merge=ours\` in \`.gitattributes\`) are kept as-is automatically — any remaining conflicts are real content overlaps."; then
+              echo "::error::Failed to open sync PR — conflict commit is stranded on sync/upstream. Open the PR manually or rerun this workflow."
+              exit 1
+            fi
+          fi

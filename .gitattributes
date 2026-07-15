@@ -1,0 +1,9 @@
+# Fork-owned files: always keep our version when merging upstream.
+# Requires `git config merge.ours.driver true` on the runner (set in
+# .github/workflows/sync-upstream.yml).
+.gitattributes merge=ours
+FORK.md merge=ours
+repo.json merge=ours
+.github/workflows/sync-upstream.yml merge=ours
+.github/workflows/release.yml merge=ours
+tools/gen-repo-json.cjs merge=ours
