@@ -19,7 +19,7 @@ module.exports = (env) => {
     {
       mode: env.production ? 'production' : 'development',
 
-      target: 'browserslist',
+      target: ['web', 'es5'],
 
       // Builds with devtool support (development) contain very big eval chunks,
       // which seem to cause segfaults (at least) on nodeJS v0.12.2 used on webOS 3.x.
@@ -29,14 +29,28 @@ module.exports = (env) => {
 
       optimization: {
         minimize: env.production ? true : false,
-        runtimeChunk: false
+        runtimeChunk: false,
+        minimizer: [
+          '...',
+        ]
       },
 
       entry: {
         adblockMain: './src/adblock-main.js'
       },
       output: {
-        path: outputPath
+        path: outputPath,
+        environment: {
+          arrowFunction: false,
+          bigIntLiteral: false,
+          const: false,
+          destructuring: false,
+          dynamicImport: false,
+          forOf: false,
+          module: false,
+          optionalChaining: false,
+          templateLiteral: false
+        }
       },
       resolve: {
         extensions: ['.ts', '.js']

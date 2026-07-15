@@ -11,19 +11,8 @@ module.exports = (api) => {
         '@babel/plugin-transform-runtime',
         {
           regenerator: false,
+          helpers: true,
           version: require('./package.json').dependencies['@babel/runtime']
-        }
-      ],
-      [
-        'polyfill-corejs3',
-        {
-          method: 'usage-pure'
-        }
-      ],
-      [
-        'polyfill-regenerator',
-        {
-          method: 'usage-pure'
         }
       ]
     ],
@@ -31,7 +20,11 @@ module.exports = (api) => {
       [
         '@babel/preset-env',
         {
-          bugfixes: true
+          bugfixes: false,
+          modules: false,
+          targets: {
+            chrome: '63'
+          }
         }
       ]
     ]
