@@ -49,8 +49,10 @@ jobs:
             echo "result=clean" >> "$GITHUB_OUTPUT"
           else
             echo "result=conflict" >> "$GITHUB_OUTPUT"
-            git add -A
-            git commit --no-verify -m "Sync upstream/main (CONFLICTS — resolve markers before merging)"
+            # Never commit conflict markers. Publish the upstream tip as-is
+            # on the sync branch; a human resolves the merge locally.
+            git merge --abort
+            git reset --hard upstream/main
           fi
 
       - name: Fast-forward main on clean merge
@@ -81,9 +83,19 @@ jobs:
               --base main \
               --head sync/upstream \
               --title "Sync upstream/main — manual conflict resolution required" \
-              --body "Automatic upstream sync produced conflicts. Resolve the conflict markers in this branch, then merge.
+              --body "Automatic upstream sync produced conflicts, so nothing was merged. This branch is a clean snapshot of upstream \`main\` (no conflict markers committed).
 
-              Fork-owned files (\`merge=ours\` in \`.gitattributes\`) are kept as-is automatically — any remaining conflicts are real content overlaps."; then
+              Resolve locally on \`main\`:
+
+              \`\`\`
+              git checkout main && git pull
+              git config merge.ours.driver true
+              git remote add upstream https://github.com/RF1705/youtube-webos-cobalt-adfree.git 2>/dev/null || true
+              git fetch upstream main
+              git merge upstream/main   # resolve conflicts, commit, push
+              \`\`\`
+
+              Fork-owned files (\`merge=ours\` in \`.gitattributes\`) are kept as-is automatically — any remaining conflicts are real content overlaps. Close this PR once main is synced (the next clean sync run also closes it)."; then
               echo "::error::Failed to open sync PR — conflict commit is stranded on sync/upstream. Open the PR manually or rerun this workflow."
               exit 1
             fi

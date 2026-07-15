@@ -18,11 +18,22 @@ permissions:
 jobs:
   build-and-release:
     runs-on: ubuntu-latest
+    # Workflow inputs are attacker-influenced text: never interpolate
+    # ${{ inputs.version }} into run: scripts — reference $VERSION instead.
+    env:
+      VERSION: ${{ inputs.version }}
     steps:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
           ref: main
+
+      - name: Validate version
+        run: |
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+            echo "::error::version must be a semver triplet like 1.0.1, got: $VERSION"
+            exit 1
+          }
 
       - name: Install build tools
         run: |
@@ -35,14 +46,14 @@ jobs:
             PACKAGE=ipks-official/2023-07-30-youtube.leanback.v4-1.1.7.ipk \
             PACKAGE_NAME=com.cobalt.youtube.adfree \
             PACKAGE_DISPLAY_NAME='YouTube Cobalt AdFree' \
-            PROJECT_VERSION='${{ inputs.version }}'
+            PROJECT_VERSION="$VERSION"
 
       - name: Generate repo.json and webosbrew manifest
         env:
           REPO_NAME: ${{ github.repository }}
           TAG_NAME: v${{ inputs.version }}
         run: |
-          cp output/com.cobalt.youtube.adfree_${{ inputs.version }}_arm.ipk .
+          cp "output/com.cobalt.youtube.adfree_${VERSION}_arm.ipk" .
           node tools/gen-repo-json.cjs
 
       - name: Create release
@@ -64,7 +75,7 @@ jobs:
             echo "repo.json unchanged — nothing to push."
             exit 0
           fi
-          git commit -m "Update repo.json for v${{ inputs.version }}"
+          git commit -m "Update repo.json for v${VERSION}"
           # Retry-on-race: if main moved while we were building, rebase the
           # single repo.json commit onto the new tip and try again.
           for attempt in 1 2 3; do
