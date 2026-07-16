@@ -40,17 +40,27 @@ adding features itself.
   `sponsorblock.js` that stops outro skips from looping the video. These are the
   deliberate upstream-file edits, each marked with a `fork:` comment:
   - `sponsorblock.js` — the outro-loop clamp above.
-  - `ui.js` — `ensureFocusVisible()`: Cobalt doesn't auto-scroll a focused element
-    into view, so the settings menu (now 25 rows with the shortcut registry added)
-    left focus moving off-screen with no feedback. Found on first real-hardware test.
-  - `ui.js` / `fork/index.js` — `navigation-checkbox.js` polyfills a global
-    `window.navigate(dir)` for native browser spatial navigation; nothing in this
-    codebase calls it, so on hardware that provides it natively, a single D-pad
-    press drove it AND `ui.js`'s own `moveFocus()` in parallel, silently skipping
-    every other row. `fork/index.js` wraps `window.navigate` to no-op while our
-    menu is open, logging `[ytaf-fork] wrapped window.navigate...` /
-    `suppressed window.navigate...` so a failed fix is diagnosable from
-    `logread` without another blind guess.
+  - `ui.js` — the settings menu (25 rows once the shortcut registry landed) has
+    two hardware-confirmed fixes: (1) `maxHeight`/`maxWidth` were `80vh`/`80vw` —
+    Cobalt appears not to evaluate those units, so the box never actually
+    constrained its content, `overflow: auto` never engaged, and focus could
+    move off-screen with nothing to scroll; both are now computed in JS from
+    `window.innerWidth/innerHeight` and set as plain pixels. (2)
+    `moveFocus()` re-derived "current position" from `document.activeElement`
+    every call — on hardware, down/up skipped a row every time. Root cause
+    unconfirmed (see the `window.navigate` note below), but the fix doesn't
+    need to know: `currentFocusIndex` now tracks position ourselves, advanced
+    only by our own calls, so it can't inherit an extra step from anything
+    else that might also be moving focus for the same keypress.
+  - `fork/index.js` — `navigation-checkbox.js` polyfills a global
+    `window.navigate(dir)` for native browser spatial navigation; nothing in
+    this codebase calls it, so if it's real, only the platform calls it. This
+    was the first (unverified, possibly-no-op) attempt at the row-skip fix
+    above — kept only as a secondary mitigation in case it has other native
+    side effects, with logging (`[ytaf-fork] wrapped window.navigate...` /
+    `suppressed window.navigate...`) to confirm from `logread` whether it
+    does anything at all. The `currentFocusIndex` fix in `ui.js` is what
+    actually closes the bug, regardless.
 - Shortcut keys: the settings menu has a binding row per bindable remote key —
   red/yellow/blue color buttons (green opens the menu itself) and number keys 0-9.
   Enter/left/right on a row cycles its action: None, Frame Step Forward/Backward,

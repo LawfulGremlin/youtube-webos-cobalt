@@ -90,12 +90,17 @@ function isMenuOpen() {
 
 // fork: navigation-checkbox.js installs a global window.navigate(dir) as a
 // polyfill for native browser-engine spatial navigation — nothing in this
-// codebase calls it, so the only caller is Cobalt/YouTube-TV-chrome itself.
-// That means a single D-pad press drives BOTH the native/polyfilled
-// navigate() AND ui.js's own moveFocus() independently, each moving focus
-// one step — net effect: our settings menu skips every other row. Suppress
-// the call only while our menu owns the screen; leave it untouched
-// elsewhere so the rest of the app's own navigation isn't affected.
+// codebase calls it, so if it exists, only the platform itself is calling
+// it. Whether that's real, and whether the platform re-reads window.navigate
+// per call (so overwriting it here actually takes effect), is UNVERIFIED —
+// hence this is a secondary mitigation, not the fix for the settings-menu
+// row-skip bug. That fix is currentFocusIndex in ui.js's moveFocus(), which
+// tracks its own position instead of re-deriving it from
+// document.activeElement, so it can't inherit an extra step regardless of
+// whether this wrap does anything. This block stays only in case
+// window.navigate has other native side effects (sound, animation) worth
+// suppressing while our menu is open; the logging lets a real hardware
+// pass confirm whether it does anything at all.
 console.info('[ytaf-fork] window.navigate at fork init: ' + typeof window.navigate);
 if (typeof window.navigate === 'function') {
   const nativeNavigate = window.navigate;

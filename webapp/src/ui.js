@@ -55,6 +55,18 @@ export function userScriptStartUI() {
     return keyCode === 404 || keyCode === 172;
   }
 
+  // fork: authoritative focus index for moveFocus(), updated ONLY by our
+  // own focus placements (here and in focusMenuItem) — never re-derived
+  // from document.activeElement mid-navigation. On this hardware, some
+  // other mechanism (possibly native platform spatial navigation — see
+  // window.navigate in navigation-checkbox.js/fork/index.js) was also
+  // moving DOM focus for the very same keypress, and re-reading
+  // activeElement here silently inherited that extra step, doubling every
+  // move ("down" skipped a row every time). Advancing from our own
+  // tracked position instead makes each move exactly one step no matter
+  // what else does or doesn't also react to the keypress.
+  let currentFocusIndex = -1;
+
   function moveFocus(dir) {
     const focusableItems = Array.from(
       uiContainer.querySelectorAll('[tabindex]')
@@ -64,19 +76,18 @@ export function userScriptStartUI() {
       return;
     }
 
-    const current = document.activeElement;
-    const currentIndex = focusableItems.findIndex((item) => item === current);
-    let nextIndex = currentIndex;
-
-    if (currentIndex === -1) {
-      nextIndex = 0;
-    } else if (dir === 'down' || dir === 'right') {
-      nextIndex = (currentIndex + 1) % focusableItems.length;
-    } else if (dir === 'up' || dir === 'left') {
-      nextIndex = (currentIndex - 1 + focusableItems.length) % focusableItems.length;
+    if (currentFocusIndex < 0 || currentFocusIndex >= focusableItems.length) {
+      const domIndex = focusableItems.findIndex((item) => item === document.activeElement);
+      currentFocusIndex = domIndex === -1 ? 0 : domIndex;
     }
 
-    const nextItem = focusableItems[nextIndex];
+    if (dir === 'down' || dir === 'right') {
+      currentFocusIndex = (currentFocusIndex + 1) % focusableItems.length;
+    } else if (dir === 'up' || dir === 'left') {
+      currentFocusIndex = (currentFocusIndex - 1 + focusableItems.length) % focusableItems.length;
+    }
+
+    const nextItem = focusableItems[currentFocusIndex];
     if (nextItem) {
       nextItem.focus();
       lastTabIndex = nextItem.tabIndex;
@@ -256,6 +267,14 @@ export function userScriptStartUI() {
   }
 
   function applyVisibleContainerStyles() {
+    // fork: 80vh/80vw never actually constrained the box on hardware —
+    // Cobalt's minimal CSS engine appears not to evaluate vh/vw, so
+    // maxHeight had no effect, content never "overflowed" it, overflow:auto
+    // never engaged, and scrollTop became a silent no-op. Compute the same
+    // 80% bound in JS and set plain pixels instead.
+    const maxWidthPx = Math.round(window.innerWidth * 0.8) + 'px';
+    const maxHeightPx = Math.round(window.innerHeight * 0.8) + 'px';
+
     Object.assign(uiContainer.style, {
       position: 'fixed',
       display: 'block',
@@ -266,8 +285,8 @@ export function userScriptStartUI() {
       right: 'auto',
       bottom: 'auto',
       width: '720px',
-      maxWidth: '80vw',
-      maxHeight: '80vh',
+      maxWidth: maxWidthPx,
+      maxHeight: maxHeightPx,
       boxSizing: 'border-box',
       overflow: 'auto',
       zIndex: '2147483647',
@@ -304,6 +323,9 @@ export function userScriptStartUI() {
       if (target.tabIndex !== null && target.tabIndex > 0) {
         lastTabIndex = target.tabIndex;
       }
+      // fork: keep moveFocus()'s own index in sync with this explicit,
+      // known focus placement (see currentFocusIndex above).
+      currentFocusIndex = focusableItems.indexOf(target);
       ensureFocusVisible(target);
       return true;
     }
