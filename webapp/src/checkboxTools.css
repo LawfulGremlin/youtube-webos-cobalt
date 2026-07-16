@@ -117,3 +117,17 @@
   line-height: 1.22;
   color: rgba(255, 255, 255, 0.9);
 }
+
+/* fork: SponsorBlock category colour key — matches the timeline markers.
+   margin-left:auto pushes it to the row's right edge; the row is a flex
+   container, so it stays put regardless of how long the label is. */
+.toggler-wrapper .ytaf-swatch {
+  flex: 0 0 auto;
+  margin-left: auto;
+  width: 26px;
+  height: 6px;
+  border-radius: 3px;
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.35),
+    0 0 6px rgba(0, 0, 0, 0.3);
+}

@@ -39,43 +39,60 @@ adding features itself.
   LawfulGremlin/youtube-webos fork-extensions), and an end-of-video clamp in
   `sponsorblock.js` that stops outro skips from looping the video. These are the
   deliberate upstream-file edits, each marked with a `fork:` comment:
-  - `sponsorblock.js` — the outro-loop clamp above, and a second, separately
-    hardware-confirmed fix: **marker rendering (colored progress-bar segments)
-    was completely broken**, unconditionally, regardless of whether a video
-    actually had SponsorBlock data. Root cause, found via live CDP debugging:
-    `findProgressBarParts()` required an `idomkey="segment"` child inside the
-    progress bar (used only to steal its className/cssText for visual
-    styling — positioning was always computed independently), but YouTube's
-    current TV client no longer renders that element at all — confirmed zero
-    matches on every progress bar, live, during real playback. Its absence
-    was treated as "no progress bar found," so `markerStatus` stuck on
-    `waiting-for-progress-bar` forever and `drawOverlay()` never ran. Fixed
-    by making `progressSegment` optional throughout, with a hardcoded
-    fallback style (`position: absolute; pointer-events: none;`) when no
-    reference element exists. Skip logic itself was independently verified
-    working correctly the whole time (it's purely `segments` data +
-    `video.currentTime`, no DOM dependency) — confirmed live by injecting a
-    fake segment into the running controller and watching the video actually
-    seek past it. Verified end-to-end via CDP (progress bar found without a
-    segment reference, injected-segment marker rendered with correct
-    geometry and category color, stable across continued playback) before
-    ever touching hardware.
+  - `sponsorblock.js` — the outro-loop clamp above, plus a rewrite of the
+    marker path: **timeline markers never appeared at all**, on any video,
+    regardless of whether it had SponsorBlock data. Skips always worked
+    (they're purely `segments` + `video.currentTime`, no DOM), which is what
+    made this look like a data problem for so long. Four separate causes, each
+    found by inspecting the live DOM over CDP — none were guessable from the
+    source, and each one hid the next:
+    1. **A reference element that no longer exists.** `findProgressBarParts()`
+       required an `idomkey="segment"` child of the progress bar, used only to
+       copy its className/cssText. YouTube's TV client doesn't render it any
+       more (zero matches anywhere, live, during playback), and its absence
+       was treated as "no progress bar found" — so `markerStatus` stuck on
+       `waiting-for-progress-bar` forever and `drawOverlay()` never ran.
+    2. **The anchor was not stable.** With (1) fixed, markers rendered and
+       were then *silently deleted*: YouTube's Incremental DOM prunes any
+       foreign node inside the player subtree. Probe nodes placed as a sibling
+       of `ytlr-progress-bar` (the anchor this code called stable) and one
+       level above were both gone within seconds of playback resuming, while
+       an identical probe on `<body>` survived. `drawOverlay()` also calls
+       `stopMarkerObserver()` on success, so nothing was watching to notice.
+       Markers now live on `<body>`, `position: fixed`, driven off the bar's
+       viewport rect — and `maintainMarkers()` (on the existing 250ms skip
+       poller) re-attaches them if they're removed anyway.
+    3. **The wrong element was measured.** `[idomkey="progress-bar"]` is the
+       whole 1728x102 control block; the visible track is its
+       `[idomkey="slider"]` child (1728x9). Measuring the former drew a
+       102px-tall slab over the video instead of a line on the timeline.
+    4. **Nothing local says "hidden".** The TV client fades its transport
+       controls with `opacity: 0` on an *ancestor* of the bar: with controls
+       away, the slider still reports `opacity: 1` and a full-size rect, so
+       neither its own opacity nor its geometry reveals anything — only the
+       product of the whole chain does (`getEffectiveOpacity()`). Since the
+       overlay hangs off `<body>` it inherits none of that, so it has to
+       mirror it manually or it sits on screen permanently.
 
-    A second, related fix landed alongside it: `clearOverlay()` now actually
-    removes the marker container from the DOM instead of just nulling the JS
-    reference (previously scattered as `this.overlay = null` across
-    `reset()`/`destroy()`/`loadVideo()`/`checkForProgressBar()`).
-    `findExistingOverlay()` only ever matches the *current* videoID, so a
-    prior video's leftover container was never found again and just
-    accumulated as a permanent sibling of the stable anchor on every video
-    change — harmless while marker rendering was broken outright, but a real
-    bug once the fix above made rendering actually happen. Verified live via
-    CDP without needing real playback: injected a synthetic
-    `ytlr-progress-bar`/`idomkey="progress-bar"` pair directly into the DOM,
-    drove `drawOverlay()` to create a real marker node, then called
-    `loadVideo()` with a different ID to simulate a video switch and
-    confirmed the old node's `parentNode` is `null` and zero
-    `data-ytaf-video-id` nodes remain anywhere in the document.
+    Two lifecycle bugs in the same path, both only reachable once markers
+    actually rendered: `clearOverlay()` removes the container from the DOM
+    rather than just nulling the reference (it used to be a bare
+    `this.overlay = null` in four places, and since `findExistingOverlay()`
+    only matches the *current* videoID, each video change stranded another
+    container forever); and `hideOverlay()` covers the bar vanishing outright
+    (leaving a video for the browse UI) — `syncOverlayWithSegment()` can't,
+    because it early-returns once `progressBar` is null and never reaches its
+    own hide path, which left markers painted over whatever was on screen.
+
+    Upstream has no visibility handling of any kind here — it only ever worked
+    by sitting inside the player subtree and inheriting the controls' fade,
+    which is the same placement that gets pruned. There was nothing to borrow.
+
+    All of it verified live via CDP before touching hardware, mostly without
+    needing real playback: inject a synthetic `ytlr-progress-bar`/`slider`
+    pair, drive `checkForProgressBar()`, then assert on the result (marker
+    geometry and category colour; `parentNode === null` after a simulated
+    video switch; `display: none` once the bar is removed).
   - `ui.js` — one hardware-confirmed fix stands: `moveFocus()` re-derived
     "current position" from `document.activeElement` every call — on
     hardware, down/up skipped a row every time. Root cause unconfirmed (see
@@ -114,6 +131,16 @@ adding features itself.
     `suppressed window.navigate...`) to confirm from `logread` whether it
     does anything at all. The `currentFocusIndex` fix in `ui.js` is what
     actually closes the bug, regardless.
+- SponsorBlock category rows in the settings menu each carry a colour swatch
+  matching the marker drawn on the timeline. `categoryColors` is exported from
+  `sponsorblock.js` and read by `ui.js` so there's one source of truth for the
+  colours; `checkboxTools.add()` takes an optional trailing `color` argument
+  (rows that don't pass one are unchanged). This makes `ui.js` import
+  `sponsorblock.js` while `sponsorblock.js` imports `showNotification` from
+  `ui.js` — a cycle, but a safe one: `showNotification` is a hoisted function
+  declaration and `categoryColors` is only read at menu-build time, never at
+  module top level. Confirmed live (all nine swatches render in the right
+  colours, `window.sponsorblock` still initialises).
 - Shortcut keys: the settings menu has a binding row per bindable remote key —
   red/yellow/blue color buttons (green opens the menu itself) and number keys 0-9.
   Enter/left/right on a row cycles its action: None, Frame Step Forward/Backward,

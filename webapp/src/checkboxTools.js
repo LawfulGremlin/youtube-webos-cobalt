@@ -4,7 +4,10 @@ let checkboxTabIndex = 1;
 
 let callbacks = {};
 
-function add(name, label, checked = false, callback = null) {
+// fork: `color` is optional — pass one and the row gets a swatch at its right
+// edge in that colour, so the SponsorBlock category rows show which colour
+// their markers are drawn in on the timeline. Rows without it are unchanged.
+function add(name, label, checked = false, callback = null, color = null) {
   /*
   <div class="toggler-wrapper" for="adblock">
     <div type="checkbox" tabindex="1" checked="checked">
@@ -13,6 +16,7 @@ function add(name, label, checked = false, callback = null) {
       </div>
     </div>
     <div class="desc">Enable AdBlocking</div>
+    <div class="ytaf-swatch"></div>
   </div>
   */
 
@@ -37,6 +41,13 @@ function add(name, label, checked = false, callback = null) {
 
   wrapper.appendChild(checkboxSliderDiv);
   wrapper.appendChild(divabel);
+
+  if (color) {
+    const swatch = document.createElement('div');
+    swatch.classList.add('ytaf-swatch');
+    swatch.style.backgroundColor = color;
+    wrapper.appendChild(swatch);
+  }
 
   if (checked) {
     checkboxSliderDiv.setAttribute('checked', 'checked');

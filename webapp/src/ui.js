@@ -8,6 +8,7 @@ import './ui.css';
 import { configRead, configWrite } from './config.js';
 import { checkboxTools } from './checkboxTools.js';
 import { text as languageText } from './languages/index.js';
+import { categoryColors } from './sponsorblock.js';
 
 let lastTabIndex = 0;
 
@@ -223,7 +224,8 @@ export function userScriptStartUI() {
       '__sponsorblock_sponsor',
       text('sponsor'),
       configRead('enableSponsorBlockSponsor'),
-      callbackConfig('enableSponsorBlockSponsor')
+      callbackConfig('enableSponsorBlockSponsor'),
+      categoryColors.sponsor
     )
   );
   sponsorBlock.appendChild(
@@ -231,7 +233,8 @@ export function userScriptStartUI() {
       '__sponsorblock_intro',
       text('intro'),
       configRead('enableSponsorBlockIntro'),
-      callbackConfig('enableSponsorBlockIntro')
+      callbackConfig('enableSponsorBlockIntro'),
+      categoryColors.intro
     )
   );
   sponsorBlock.appendChild(
@@ -239,7 +242,8 @@ export function userScriptStartUI() {
       '__sponsorblock_outro',
       text('outro'),
       configRead('enableSponsorBlockOutro'),
-      callbackConfig('enableSponsorBlockOutro')
+      callbackConfig('enableSponsorBlockOutro'),
+      categoryColors.outro
     )
   );
   sponsorBlock.appendChild(
@@ -247,7 +251,8 @@ export function userScriptStartUI() {
       '__sponsorblock_interaction',
       text('interaction'),
       configRead('enableSponsorBlockInteraction'),
-      callbackConfig('enableSponsorBlockInteraction')
+      callbackConfig('enableSponsorBlockInteraction'),
+      categoryColors.interaction
     )
   );
   sponsorBlock.appendChild(
@@ -255,7 +260,8 @@ export function userScriptStartUI() {
       '__sponsorblock_selfpromo',
       text('selfpromo'),
       configRead('enableSponsorBlockSelfPromo'),
-      callbackConfig('enableSponsorBlockSelfPromo')
+      callbackConfig('enableSponsorBlockSelfPromo'),
+      categoryColors.selfpromo
     )
   );
   sponsorBlock.appendChild(
@@ -263,7 +269,8 @@ export function userScriptStartUI() {
       '__sponsorblock_music_offtopic',
       text('musicOfftopic'),
       configRead('enableSponsorBlockMusicOfftopic'),
-      callbackConfig('enableSponsorBlockMusicOfftopic')
+      callbackConfig('enableSponsorBlockMusicOfftopic'),
+      categoryColors.music_offtopic
     )
   );
   sponsorBlock.appendChild(
@@ -271,7 +278,8 @@ export function userScriptStartUI() {
       '__sponsorblock_preview',
       text('preview'),
       configRead('enableSponsorBlockPreview'),
-      callbackConfig('enableSponsorBlockPreview')
+      callbackConfig('enableSponsorBlockPreview'),
+      categoryColors.preview
     )
   );
   sponsorBlock.appendChild(
@@ -279,7 +287,8 @@ export function userScriptStartUI() {
       '__sponsorblock_filler',
       text('filler'),
       configRead('enableSponsorBlockFiller'),
-      callbackConfig('enableSponsorBlockFiller')
+      callbackConfig('enableSponsorBlockFiller'),
+      categoryColors.filler
     )
   );
   sponsorBlock.appendChild(
@@ -287,7 +296,8 @@ export function userScriptStartUI() {
       '__sponsorblock_hook',
       text('hook'),
       configRead('enableSponsorBlockHook'),
-      callbackConfig('enableSponsorBlockHook')
+      callbackConfig('enableSponsorBlockHook'),
+      categoryColors.hook
     )
   );
   uiContainer.appendChild(sponsorBlock);

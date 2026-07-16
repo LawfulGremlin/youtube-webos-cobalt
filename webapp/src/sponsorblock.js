@@ -30,7 +30,9 @@ const categoryConfig = {
   hook: 'enableSponsorBlockHook'
 };
 
-const categoryColors = {
+// fork: exported so the settings menu can show each category's swatch in the
+// same colour the marker is drawn in, without a second copy of these values.
+export const categoryColors = {
   sponsor: '#00d400',
   intro: '#00ffff',
   outro: '#0202ed',
@@ -183,85 +185,79 @@ function isOnlySponsorBlockMarkerAddition(mutation) {
   );
 }
 
-function getClosest(element, selector) {
-  if (!element || element.nodeType !== 1) return null;
-  if (element.closest) return element.closest(selector);
+// fork: markers live in <body>, not next to the player bar. YouTube's
+// Incremental DOM prunes any foreign node inside the player subtree —
+// confirmed live via CDP: probe nodes appended as a sibling of
+// ytlr-progress-bar (the "stable anchor" this file used to pick) and one
+// level above it were both gone within seconds of playback resuming, while
+// an identical probe appended to <body> survived. That pruning is what made
+// markers invisible: drawOverlay() reported "rendered 1", then the container
+// was silently detached — and since drawOverlay() also stops the mutation
+// observer once it succeeds, nothing ever noticed or redrew it. <body> is
+// the only host that survives, so the overlay is position:fixed and follows
+// the bar's viewport rect instead (see syncOverlayWithSegment /
+// maintainMarkers, which also keep it alive if it's ever removed anyway).
+function getMarkerHost() {
+  return document.body || document.documentElement || null;
+}
 
-  const matches =
-    element.matches ||
-    element.webkitMatchesSelector ||
-    element.mozMatchesSelector ||
-    element.msMatchesSelector;
+// fork: the overlay hangs off <body>, so it does not inherit whatever the
+// player does to hide its controls — it has to mirror it manually. YouTube's
+// TV client fades the transport controls out with opacity:0 on an ANCESTOR of
+// the bar (confirmed live via CDP: with controls away, the slider itself still
+// reports opacity 1 and a perfectly valid 1728x9 rect, while YTLR-PROGRESS-BAR
+// and YT-FOCUS-CONTAINER above it sit at opacity 0). So neither the slider's
+// own opacity nor its size can tell us whether it is on screen — only the
+// product of the whole chain can. Returns 0 as soon as anything hides it.
+function getEffectiveOpacity(element) {
+  let opacity = 1;
+  let node = element;
 
-  let current = element;
-  while (current && current.nodeType === 1) {
-    if (matches && matches.call(current, selector)) return current;
-    current = current.parentNode;
+  while (node && node.nodeType === 1) {
+    const style = window.getComputedStyle(node);
+    if (style.display === 'none' || style.visibility === 'hidden') return 0;
+
+    const nodeOpacity = parseFloat(style.opacity);
+    if (Number.isFinite(nodeOpacity)) opacity *= nodeOpacity;
+    if (opacity <= 0.01) return 0;
+
+    node = node.parentNode;
   }
 
-  return null;
+  return opacity;
 }
 
-function getStableMarkerAnchor(progressBar) {
-  if (!progressBar) return { anchor: null, parent: null };
-
-  // Die innere progress-bar wird auf webOS laufend durch Incremental DOM
-  // neu geschrieben. Deshalb previewbar nicht darin, sondern als Geschwister-
-  // element des stabileren ytlr-progress-bar einfügen.
-  const anchor = getClosest(progressBar, 'ytlr-progress-bar') || progressBar;
-  return { anchor, parent: anchor.parentNode || null };
-}
-
-function findProgressBarParts() {
+function findProgressBar() {
+  // fork: prefer the "slider" element — it is the visible track (1728x9 on a
+  // 1080p panel), while progress-bar is the whole 1728x102 control block.
+  // Measuring progress-bar drew a 102px-tall slab over the video instead of
+  // a thin line along the timeline. The old idomkey="segment" reference this
+  // code used to copy geometry/style from no longer exists in YouTube's TV
+  // client at all (confirmed live: zero matches during real playback).
   const selectors = [
+    'ytlr-progress-bar [idomkey="slider"]',
+    '[idomkey="slider"]',
     'ytlr-multi-markers-player-bar-renderer [idomkey="progress-bar"]',
     '[idomkey="progress-bar"].afTAdb',
     '[idomkey="progress-bar"]'
   ];
 
-  const visited = [];
   let fallback = null;
 
   for (let selectorIndex = 0; selectorIndex < selectors.length; selectorIndex += 1) {
-    const progressBars = document.querySelectorAll(selectors[selectorIndex]);
+    const candidates = document.querySelectorAll(selectors[selectorIndex]);
 
-    for (let barIndex = 0; barIndex < progressBars.length; barIndex += 1) {
-      const progressBar = progressBars[barIndex];
-      if (visited.includes(progressBar)) continue;
-      visited.push(progressBar);
+    for (let index = 0; index < candidates.length; index += 1) {
+      const candidate = candidates[index];
+      const rect = candidate.getBoundingClientRect();
 
-      // fork: a "segment" idomkey child used to sit inside progress-bar and
-      // was used only to steal its className/cssText for our own overlay's
-      // visual style (positioning is computed independently — see
-      // syncOverlayWithSegment). YouTube's TV client no longer renders this
-      // element at all (confirmed live: zero idomkey="segment" nodes
-      // anywhere, on any progress bar, during real playback) — treating its
-      // absence as "no progress bar" broke marker rendering unconditionally,
-      // regardless of whether a video actually had segments. segment is now
-      // optional: found gets a nicer visual match, not found still works
-      // with a hardcoded fallback style.
-      let segment = null;
-      const children = progressBar.children || [];
-      for (let childIndex = 0; childIndex < children.length; childIndex += 1) {
-        if (children[childIndex].getAttribute?.('idomkey') === 'segment') {
-          segment = children[childIndex];
-          break;
-        }
-      }
-      if (!segment) {
-        segment = progressBar.querySelector('[idomkey="segment"]');
-      }
-
-      const rect = progressBar.getBoundingClientRect();
-      const result = { progressBar, segment };
-
-      if (!fallback) fallback = result;
+      if (!fallback) fallback = candidate;
 
       if (
-        (progressBar.offsetWidth || rect.width) > 0 &&
-        (progressBar.offsetHeight || rect.height) > 0
+        (candidate.offsetWidth || rect.width) > 0 &&
+        (candidate.offsetHeight || rect.height) > 0
       ) {
-        return result;
+        return candidate;
       }
     }
   }
@@ -285,7 +281,6 @@ class SponsorBlockController {
   markerStatus = 'none';
   domObserver = null;
   progressBar = null;
-  progressSegment = null;
   overlay = null;
   markerCheckFrame = null;
   isProcessing = false;
@@ -315,7 +310,6 @@ class SponsorBlockController {
       this.markerCheckFrame = null;
     }
     this.progressBar = null;
-    this.progressSegment = null;
     this.clearOverlay();
 
     if (this.nextSkipTimeout) {
@@ -373,7 +367,6 @@ class SponsorBlockController {
     this.markerStatus = 'none';
     this.clearOverlay();
     this.progressBar = null;
-    this.progressSegment = null;
     this.skipped = {};
 
     if (this.domObserver) {
@@ -459,36 +452,57 @@ class SponsorBlockController {
   syncOverlayWithSegment() {
     if (!this.overlay || !this.progressBar) return;
 
-    // fork: progressSegment is optional now (see findProgressBarParts) —
-    // copy its look when present, otherwise fall back to a plain absolute
-    // overlay. Either way, position/size below is computed independently.
-    if (this.progressSegment) {
-      this.overlay.className = this.progressSegment.className;
-      this.overlay.style.cssText = this.progressSegment.style.cssText;
-    } else {
-      this.overlay.className = '';
-      this.overlay.style.cssText = 'position: absolute; pointer-events: none;';
-    }
-
-    // Da previewbar außerhalb der laufend neu geschriebenen progress-bar liegt,
-    // muss nur ihre einmalige Geometrie auf die echte Leiste übertragen werden.
-    const { parent } = getStableMarkerAnchor(this.progressBar);
-    if (!parent) return;
-
-    const parentStyle = window.getComputedStyle(parent);
-    if (parentStyle.position === 'static') {
-      parent.style.position = 'relative';
-    }
-
+    // Hide with the controls instead of leaving markers stranded on top of the
+    // video. Size alone is not enough to detect that — see getEffectiveOpacity.
     const barRect = this.progressBar.getBoundingClientRect();
-    const parentRect = parent.getBoundingClientRect();
-    const rootFontSize =
-      parseFloat(window.getComputedStyle(document.documentElement).fontSize) || 16;
+    const barOpacity = getEffectiveOpacity(this.progressBar);
+    if (barRect.width <= 0 || barRect.height <= 0 || barOpacity <= 0.01) {
+      this.overlay.style.display = 'none';
+      return;
+    }
 
-    this.overlay.style.left = `${(barRect.left - parentRect.left) / rootFontSize}rem`;
-    this.overlay.style.top = `${(barRect.top - parentRect.top) / rootFontSize}rem`;
-    this.overlay.style.width = `${barRect.width / rootFontSize}rem`;
-    this.overlay.style.height = `${barRect.height / rootFontSize}rem`;
+    // The overlay is position:fixed on <body> (see getMarkerHost), so the
+    // bar's viewport rect is already the coordinate space we need — no
+    // offset-parent math, and it re-syncs as the controls animate in and out
+    // (the bar slides on a transform, which getBoundingClientRect accounts
+    // for). Mirroring the opacity rather than snapping to visible lets the
+    // markers fade along with the controls instead of popping in.
+    this.overlay.style.display = 'block';
+    this.overlay.style.opacity = String(barOpacity);
+    this.overlay.style.left = `${barRect.left}px`;
+    this.overlay.style.top = `${barRect.top}px`;
+    this.overlay.style.width = `${barRect.width}px`;
+    this.overlay.style.height = `${barRect.height}px`;
+  }
+
+  // fork: drawOverlay() calls stopMarkerObserver() as soon as it succeeds, so
+  // once YouTube prunes our container (it always does — see getMarkerHost)
+  // nothing was left watching to put it back. The skip poller already ticks
+  // every 250ms for unrelated reasons; piggyback on it to re-attach when the
+  // node is gone and to keep geometry/visibility in step otherwise. Redrawing
+  // only when actually detached keeps this from flickering.
+  maintainMarkers() {
+    if (!this.active || !this.segments.length) return;
+
+    const host = getMarkerHost();
+    if (!host) return;
+
+    if (!this.overlay || !host.contains(this.overlay)) {
+      this.clearOverlay();
+      this.checkForProgressBar();
+      return;
+    }
+
+    const bar = findProgressBar();
+    if (!bar) {
+      this.progressBar = null;
+      this.markerStatus = 'waiting-for-progress-bar';
+      this.hideOverlay();
+      return;
+    }
+
+    this.progressBar = bar;
+    this.syncOverlayWithSegment();
   }
 
   // fork: this.overlay = null (previously scattered across reset/destroy/
@@ -505,8 +519,19 @@ class SponsorBlockController {
     this.overlay = null;
   }
 
-  findExistingOverlay(progressBar) {
-    const { parent } = getStableMarkerAnchor(progressBar);
+  // fork: the overlay outlives the bar it describes. It hangs off <body>, so
+  // when the bar goes away entirely (leaving the video for the browse UI) the
+  // markers would otherwise stay painted over whatever is on screen now:
+  // syncOverlayWithSegment() can't help, since it early-returns once
+  // progressBar is null and never reaches its hide path. Keep the node —
+  // findExistingOverlay() reuses it if the same video's bar comes back — and
+  // just take it off screen.
+  hideOverlay() {
+    if (this.overlay) this.overlay.style.display = 'none';
+  }
+
+  findExistingOverlay() {
+    const parent = getMarkerHost();
     if (!parent) return null;
 
     const children = parent.children || [];
@@ -524,18 +549,17 @@ class SponsorBlockController {
   }
 
   checkForProgressBar() {
-    const parts = findProgressBarParts();
-    if (!parts) {
+    const progressBar = findProgressBar();
+    if (!progressBar) {
       this.progressBar = null;
-      this.progressSegment = null;
       this.markerStatus = 'waiting-for-progress-bar';
+      this.hideOverlay();
       return;
     }
 
-    this.progressBar = parts.progressBar;
-    this.progressSegment = parts.segment;
+    this.progressBar = progressBar;
 
-    const existingOverlay = this.findExistingOverlay(this.progressBar);
+    const existingOverlay = this.findExistingOverlay();
     if (existingOverlay) {
       this.overlay = existingOverlay;
       this.syncOverlayWithSegment();
@@ -604,7 +628,6 @@ class SponsorBlockController {
     this.markerStatus = 'none';
     this.clearOverlay();
     this.progressBar = null;
-    this.progressSegment = null;
 
     const categoryParams = enabledCategories()
       .map((category) => `category=${encodeURIComponent(category)}`)
@@ -653,7 +676,7 @@ class SponsorBlockController {
       return;
     }
 
-    const existingOverlay = this.findExistingOverlay(this.progressBar);
+    const existingOverlay = this.findExistingOverlay();
     if (existingOverlay) {
       this.overlay = existingOverlay;
       this.syncOverlayWithSegment();
@@ -668,27 +691,29 @@ class SponsorBlockController {
       return;
     }
 
-    const markerContainer = document.createElement('div');
-    markerContainer.id = 'previewbar';
-    markerContainer.setAttribute(markerContainerAttribute, 'true');
-    markerContainer.setAttribute('data-ytaf-video-id', this.videoID || '');
-    if (this.progressSegment) {
-      markerContainer.className = this.progressSegment.className;
-      markerContainer.style.cssText = this.progressSegment.style.cssText;
-    } else {
-      markerContainer.className = '';
-      markerContainer.style.cssText = 'position: absolute; pointer-events: none;';
-    }
-
     const barRect = this.progressBar.getBoundingClientRect();
     const barWidth = this.progressBar.offsetWidth || barRect.width;
-    const rootFontSize =
-      parseFloat(window.getComputedStyle(document.documentElement).fontSize) || 16;
 
     if (!barWidth) {
       this.markerStatus = 'missing-progress-bar-width';
       return;
     }
+
+    const host = getMarkerHost();
+    if (!host) {
+      this.markerStatus = 'waiting-for-marker-host';
+      return;
+    }
+
+    const markerContainer = document.createElement('div');
+    markerContainer.id = 'previewbar';
+    markerContainer.setAttribute(markerContainerAttribute, 'true');
+    markerContainer.setAttribute('data-ytaf-video-id', this.videoID || '');
+    // fork: own the container's style outright. It used to copy className /
+    // cssText off a player-internal element, which is both impossible now
+    // (that element is gone) and wrong for a body-anchored fixed overlay.
+    markerContainer.style.cssText =
+      'position: fixed; pointer-events: none; z-index: 9999; display: block;';
 
     let renderedCount = 0;
 
@@ -699,13 +724,13 @@ class SponsorBlockController {
 
       const marker = document.createElement('div');
       marker.setAttribute(markerAttribute, 'true');
-      marker.className = 'Mj9Xhb ox5idb';
 
-      const leftRem = ((start / duration) * barWidth) / rootFontSize;
-      const widthRem = (((end - start) / duration) * barWidth) / rootFontSize;
+      const left = (start / duration) * barWidth;
+      const width = ((end - start) / duration) * barWidth;
 
-      marker.style.left = `${leftRem}rem`;
-      marker.style.width = `${Math.max(widthRem, 0.03)}rem`;
+      marker.style.cssText = 'position: absolute; top: 0; height: 100%;';
+      marker.style.left = `${left}px`;
+      marker.style.width = `${Math.max(width, 2)}px`;
       marker.style.backgroundColor = categoryColors[segmentData.category] || '#ffff00';
       marker.title = categoryLabel(segmentData.category);
       markerContainer.appendChild(marker);
@@ -717,21 +742,7 @@ class SponsorBlockController {
       return;
     }
 
-    // Nicht innerhalb von progress-bar einfügen: Cobalt/YouTube schreibt deren
-    // Kinder während der Wiedergabe laufend neu. Als Geschwisterelement des
-    // äußeren ytlr-progress-bar bleibt previewbar stabil und flackert nicht.
-    const { anchor, parent } = getStableMarkerAnchor(this.progressBar);
-    if (!anchor || !parent) {
-      this.markerStatus = 'waiting-for-stable-anchor';
-      return;
-    }
-
-    const nextSibling = anchor.nextSibling;
-    if (nextSibling) {
-      parent.insertBefore(markerContainer, nextSibling);
-    } else {
-      parent.appendChild(markerContainer);
-    }
+    host.appendChild(markerContainer);
 
     this.overlay = markerContainer;
     this.syncOverlayWithSegment();
@@ -859,6 +870,7 @@ class SponsorBlockController {
     this.skipPollInterval = window.setInterval(() => {
       try {
         this.scheduleSkip();
+        this.maintainMarkers();
       } catch (err) {
         console.warn('[SponsorBlock] skip poll failed:', err);
       }
