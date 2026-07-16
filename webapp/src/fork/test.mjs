@@ -156,43 +156,64 @@ assert.equal(stepTarget(0, undefined, -1), 0);
   const data = {
     playerOverlays: {
       playerOverlayRenderer: {
-        merchandiseShelfRenderer: { title: 'Rippling Muscles T-shirt' },
+        shoppingTimelyActionRenderer: { title: 'Rippling Muscles T-shirt' },
         decoratedPlayerBarRenderer: { keep: true }
       }
     }
   };
   assert.equal(filterTvResponse(data, { removeAds: true }), 1);
   assert.equal(
-    data.playerOverlays.playerOverlayRenderer.merchandiseShelfRenderer,
+    data.playerOverlays.playerOverlayRenderer.shoppingTimelyActionRenderer,
     undefined
   );
   assert.ok(data.playerOverlays.playerOverlayRenderer.decoratedPlayerBarRenderer);
 }
 
-// Shopping overlay carried as an array item is dropped too.
+// The whole timely action goes, not just its shopping payload — otherwise the
+// card's dismiss X and chrome are left behind as an empty shell.
 {
-  const data = { contents: [{ tileRenderer: { videoId: 'keep' } }, { productShelfRenderer: {} }] };
+  const data = {
+    timelyActions: [
+      { timelyActionRenderer: { content: { shoppingTimelyActionRenderer: { qr: true } } } },
+      { timelyActionRenderer: { content: { someOtherActionRenderer: { keep: true } } } }
+    ]
+  };
+  assert.equal(filterTvResponse(data, { removeAds: true }), 1);
+  assert.equal(data.timelyActions.length, 1, 'non-shopping timely actions survive');
+  assert.ok(data.timelyActions[0].timelyActionRenderer.content.someOtherActionRenderer);
+}
+
+// Shopping overlay carried as a plain array item is dropped too.
+{
+  const data = { contents: [{ tileRenderer: { videoId: 'keep' } }, { shoppingTimelyActionRenderer: {} }] };
   assert.equal(filterTvResponse(data, { removeAds: true }), 1);
   assert.equal(data.contents.length, 1);
   assert.ok(data.contents[0].tileRenderer);
 }
 
+// Sign-in QR codes must survive: hiding qrCodeRenderer would lock the user out.
+{
+  const data = { signInPage: { qrCodeRenderer: { url: 'https://youtube.com/activate' } } };
+  assert.equal(filterTvResponse(data, { removeAds: true }), 0);
+  assert.ok(data.signInPage.qrCodeRenderer, 'sign-in QR must never be removed');
+}
+
 // Shopping removal rides the adblock toggle: off means untouched.
 {
-  const data = { playerOverlays: { merchandiseShelfRenderer: { a: 1 } } };
+  const data = { playerOverlays: { shoppingTimelyActionRenderer: { a: 1 } } };
   assert.equal(filterTvResponse(data, { removeAds: false, removeShorts: true }), 0);
-  assert.ok(data.playerOverlays.merchandiseShelfRenderer);
+  assert.ok(data.playerOverlays.shoppingTimelyActionRenderer);
 }
 
 // Diagnostic: shopping-shaped keys we do NOT know are reported, never removed —
 // this is what names the real renderer if the guessed list misses it.
 {
   resetUnmatchedShoppingKeys();
-  const data = { playerOverlays: { someUnknownShoppingThingRenderer: { a: 1 }, productListRenderer: {} } };
+  const data = { playerOverlays: { someUnknownShoppingThingRenderer: { a: 1 }, shoppingTimelyActionRenderer: {} } };
   filterTvResponse(data, { removeAds: true });
   assert.deepEqual(getUnmatchedShoppingKeys(), ['someUnknownShoppingThingRenderer']);
   assert.ok(data.playerOverlays.someUnknownShoppingThingRenderer, 'unknown keys must survive');
-  assert.equal(data.playerOverlays.productListRenderer, undefined, 'known keys are removed');
+  assert.equal(data.playerOverlays.shoppingTimelyActionRenderer, undefined, 'known keys are removed');
   resetUnmatchedShoppingKeys();
 }
 

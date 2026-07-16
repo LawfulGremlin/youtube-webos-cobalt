@@ -5,23 +5,26 @@
 // Predicates ported from LawfulGremlin/youtube-webos src/adblock.js so both
 // forks drop the same renderer shapes.
 
-// fork: the in-video shopping/merch overlay (a QR card, e.g. "Rippling Muscles
-// T-shirt / Limited delivery areas", with its own dismiss X) is not a feed ad —
-// it's a different renderer, which is why the adSlotRenderer path never touched
-// it. These are the plausible InnerTube names for it; the TV client's exact one
-// is unconfirmed, hence SHOPPING_KEY_HINT below, which reports anything
-// shopping-shaped that these names miss so the list can be corrected from real
-// data rather than guessed at again.
-const SHOPPING_RENDERER_KEYS = [
-  'merchandiseShelfRenderer',
-  'shoppingOverlayRenderer',
-  'productListRenderer',
-  'productShelfRenderer',
-  'productsInVideoOverlayRenderer',
-  'tvProductShelfRenderer',
-  'shoppingCarouselRenderer',
-  'ypcOfferRenderer'
-];
+// fork: the in-video shopping QR card ("Rippling Muscles T-shirt / Limited
+// delivery areas", with its own dismiss X) is not a feed ad — it's a "timely
+// action", YouTube's timed in-video overlay, which is why the adSlotRenderer
+// path never touched it. Confirmed from the live DOM rather than guessed:
+//
+//   YTLR-TIMELY-ACTION            [idomkey="timely-action"]
+//     └ YTLR-TIMELY-ACTION-RENDERER
+//         └ YTLR-SHOPPING-TIMELY-ACTION-RENDERER
+//             └ YTLR-QR-CODE-RENDERER [idomkey="productQrCode"]
+//
+// The TV client's tags mirror renderer names (ytlr-progress-bar ↔ progress-bar),
+// so the shopping card is shoppingTimelyActionRenderer inside a
+// timelyActionRenderer. Only the shopping variant is targeted — other timely
+// actions are left alone, and qrCodeRenderer is deliberately NOT matched: sign-in
+// uses a QR code too, and killing that would lock the user out of their account.
+const SHOPPING_RENDERER_KEYS = ['shoppingTimelyActionRenderer'];
+
+// A timely action wrapping a shopping card is dropped whole, so its dismiss X
+// and chrome go with it rather than being left behind as an empty shell.
+const TIMELY_ACTION_KEY = 'timelyActionRenderer';
 
 // Anything that looks commerce-y but isn't in the list above. Recorded, never
 // removed — removing on a loose regex would risk eating real content.
@@ -80,11 +83,31 @@ function isShortsTile(item) {
 // Feed-level ad items. Upstream adblock.js nulls the shallow ad keys
 // (adPlacements, adSlots, ...) but leaves ad *items* sitting inside feed
 // arrays; this removes them entirely, like youtube-webos does.
-// In-video shopping/merch overlay carried as a feed/array item.
+function hasShoppingRenderer(value, depth = 0) {
+  if (!value || typeof value !== 'object' || depth > 8) return false;
+
+  if (Array.isArray(value)) {
+    for (let i = 0; i < value.length; i++) {
+      if (hasShoppingRenderer(value[i], depth + 1)) return true;
+    }
+    return false;
+  }
+
+  const keys = Object.keys(value);
+  for (let i = 0; i < keys.length; i++) {
+    if (SHOPPING_RENDERER_KEYS.indexOf(keys[i]) !== -1) return true;
+    if (hasShoppingRenderer(value[keys[i]], depth + 1)) return true;
+  }
+  return false;
+}
+
+// In-video shopping overlay, either carried directly or wrapped in a timely
+// action (the shopping card's actual home — see SHOPPING_RENDERER_KEYS).
 function isShoppingItem(item) {
   for (let i = 0; i < SHOPPING_RENDERER_KEYS.length; i++) {
     if (item[SHOPPING_RENDERER_KEYS[i]]) return true;
   }
+  if (item[TIMELY_ACTION_KEY]) return hasShoppingRenderer(item[TIMELY_ACTION_KEY]);
   return false;
 }
 

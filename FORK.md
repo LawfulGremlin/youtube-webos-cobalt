@@ -259,6 +259,31 @@ patch". Fixed by recomputing every header's counts from its actual body; verify 
 `patch -p1 --dry-run < cobalt-patches/cobalt-23.lts.4.patch` against a clean clone
 before trusting a patch-file edit.
 
+## Engine quirks (Cobalt 23.lts.4)
+
+Found the hard way, each confirmed live over CDP. Check here before assuming a
+web API exists:
+
+- **No `Element.prototype.closest`** — walk `parentElement` manually.
+- **No `NodeList.forEach`** — index loops only.
+- **No `document.elementFromPoint`**, and the debug backend implements neither
+  `Page.captureScreenshot` nor `DOM.getNodeForLocation`, so **paint order and
+  anything visual cannot be checked from here** — prefer approaches that don't
+  depend on stacking, and expect to need the user's eyes otherwise.
+- **Synchronous XHR throws** — use async + `awaitPromise`.
+- **`max-height` is reported by `getComputedStyle` but not enforced as a layout
+  constraint** (`clientHeight` exceeded it), so it can't be used to clip a list.
+- **Dynamically injected `<style>` elements are silently ignored**: `.sheet`
+  stays null and the rules never apply — via `textContent`, `innerHTML`, or
+  `appendChild(createTextNode())`, and even for a plain class selector on a
+  `<div>`. Fork CSS must be a bundled stylesheet (`fork/fork.css`, folded into
+  `adblockMain.css` by webpack and loaded via `<link>`). Custom-tag type
+  selectors (`ytlr-shopping-timely-action-renderer`) *do* match from bundled CSS.
+- **`:has()` is unsupported** — a rule cannot select a parent by its contents.
+- **Incremental DOM prunes foreign nodes** inside the player subtree: next to
+  `ytlr-progress-bar` within seconds, inside the progress `slider` in under
+  100ms. Only `<body>` survives.
+
 ## Homebrew repository
 
 Add this URL to webOS Homebrew / Device Manager as a custom repository:

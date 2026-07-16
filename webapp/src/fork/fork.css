@@ -1,0 +1,24 @@
+/* Fork-owned styles (see FORK.md).
+ *
+ * fork: this MUST be a bundled stylesheet, not an injected <style>. Confirmed
+ * live on hardware: a dynamically created <style> element is silently ignored
+ * by this engine — its .sheet stays null and its rules never apply, whether the
+ * CSS is set via textContent, innerHTML, or appendChild(createTextNode()), and
+ * even for a plain class selector on a <div>. Webpack folds this import into
+ * adblockMain.css, which the app loads via <link> and which demonstrably works.
+ *
+ * Note :has() is also unsupported here (tested: no match), so a rule can't
+ * select a parent by its contents. Hence the shopping card's own subtree is
+ * targeted directly rather than its timely-action wrapper.
+ */
+
+/* fork: fallback for the in-video shopping QR card. The JSON filter in
+ * filters.mjs should remove it before it ever renders; this catches it if the
+ * inferred renderer key is wrong. Gated on a class rather than being
+ * unconditional, so it follows the AdBlock toggle live like everything else.
+ *
+ * ytlr-qr-code-renderer is deliberately NOT hidden: sign-in uses a QR code too.
+ */
+.ytaf-hide-shopping ytlr-shopping-timely-action-renderer {
+  display: none !important;
+}

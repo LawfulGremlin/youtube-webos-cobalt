@@ -3,6 +3,7 @@
 // lives under webapp/src/fork/ so upstream syncs merge cleanly.
 
 import { configRead, configWrite } from '../config.js';
+import './fork.css';
 import { checkboxTools } from '../checkboxTools.js';
 import { showNotification } from '../ui.js';
 import { filterTvResponse, getUnmatchedShoppingKeys } from './filters.mjs';
@@ -56,12 +57,30 @@ JSON.parse = function () {
   return result;
 };
 
-// fork: the in-video shopping/merch overlay's exact TV renderer name is
-// unconfirmed (the TV was off when it was reported, and it only appears
-// mid-playback). SHOPPING_RENDERER_KEYS is a best guess; this exposes whatever
-// shopping-shaped keys it did NOT match, so `window.ytafShoppingKeys()` over
-// the debug build's CDP names the real one instead of another guessing round.
+// fork: belt-and-braces for the in-video shopping QR card. The JSON filter above
+// keys off shoppingTimelyActionRenderer, which is *inferred* from the DOM tag
+// (ytlr-shopping-timely-action-renderer) via this client's tag↔renderer naming
+// convention — the element names are confirmed live, the InnerTube key isn't.
+// fork.css keys off the confirmed element name instead; this just gates it on
+// the AdBlock toggle, so it follows the setting live. If the JSON key is right,
+// the rule never has anything to hide.
+function syncShoppingCardHiding() {
+  const root = document.documentElement;
+  if (!root) return;
+  if (configRead('enableAdBlock')) {
+    root.classList.add('ytaf-hide-shopping');
+  } else {
+    root.classList.remove('ytaf-hide-shopping');
+  }
+}
+syncShoppingCardHiding();
+
+// fork: SHOPPING_RENDERER_KEYS above is inferred, not confirmed. This exposes
+// any shopping-shaped key it did NOT match, so `window.ytafShoppingKeys()` over
+// the debug build's CDP names the real one from real data if the inference is
+// wrong — rather than another round of guessing.
 window.ytafShoppingKeys = getUnmatchedShoppingKeys;
+window.ytafSyncShoppingCardHiding = syncShoppingCardHiding;
 
 // --- Shortcut actions -------------------------------------------------------
 
