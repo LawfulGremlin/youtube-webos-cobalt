@@ -22,6 +22,32 @@ up to date automatically.
   from the current source, publishes a GitHub release `v<version>` with the IPK + webosbrew
   manifest, and regenerates `repo.json` on `main`.
 
+## Feature policy
+
+Features are ported **on demand** (what users actually ask for in the wild, e.g.
+NicholasBly/youtube-webos#143), not for blanket parity with the WebView-based
+youtube-webos forks — Cobalt is a different runtime and upstream here is actively
+adding features itself.
+
+- Fork features live in `webapp/src/fork/` (fork-owned, `merge=ours`). The single
+  `import './fork/index.js'` line in `adblock-main.js` is the only wiring inside
+  upstream files. Pure logic goes in `filters.mjs` with node-runnable tests in
+  `test.mjs` (run by `fork-ci.yml`).
+- Current fork features: **Remove Shorts** toggle (shelves + tiles), **feed ad item
+  removal** (adSlotRenderer/reel ads, rides the existing AdBlock toggle), and an
+  end-of-video clamp in `sponsorblock.js` that stops outro skips from looping the
+  video (the one deliberate upstream-file edit, marked with a `fork:` comment).
+- Deliberately not ported: 4K/quality forcing (capped by the Cobalt binary + DRM,
+  not fixable in JS), auto-login (Cobalt's native account flow already works), UI
+  themes/OLED/cosmetic CSS (WebView-specific, poor fit for Cobalt's CSS subset).
+- If upstream ships its own version of a fork feature, delete ours in the same
+  sync PR.
+
+**Releases are hardware-verified**: the app is ARM-only — the x86 webOS emulator
+cannot run it. Do not run `release.yml` (it updates the public `repo.json`) until
+the build has been sideloaded and checked on a real TV
+(`ares-setup-device` + `ares-install`).
+
 ## Homebrew repository
 
 Add this URL to webOS Homebrew / Device Manager as a custom repository:

@@ -773,12 +773,21 @@ class SponsorBlockController {
         (latestEnd, activeSegment) => Math.max(latestEnd, activeSegment.segment[1]),
         end
       );
-      this.lastSkipText = `${activeSegments[0].category} ${start.toFixed(
-        1
-      )}-${skipEnd.toFixed(1)}`;
-      this.video.currentTime = skipEnd;
-      showNotification(`${text('sponsorBlock', 'skipping')} ${categoryLabel(activeSegments[0].category)}`, 1600, 'yellow');
-      this.scheduleSkip();
+      // fork: clamp skips away from the video end — seeking to the end makes
+      // Cobalt restart the video instead of ending it, which loops outro
+      // skips forever (NicholasBly/youtube-webos#143). Only seek when it
+      // moves playback forward; otherwise let the tail play out naturally.
+      const duration = getVideoDuration(this.video, this.segments);
+      const boundedEnd =
+        duration > 0 ? Math.min(skipEnd, Math.max(duration - 0.35, 0)) : skipEnd;
+      if (boundedEnd > this.video.currentTime + 0.05) {
+        this.lastSkipText = `${activeSegments[0].category} ${start.toFixed(
+          1
+        )}-${boundedEnd.toFixed(1)}`;
+        this.video.currentTime = boundedEnd;
+        showNotification(`${text('sponsorBlock', 'skipping')} ${categoryLabel(activeSegments[0].category)}`, 1600, 'yellow');
+        this.scheduleSkip();
+      }
     }, delay);
   }
 

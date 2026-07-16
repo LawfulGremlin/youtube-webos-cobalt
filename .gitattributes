@@ -6,4 +6,6 @@ FORK.md merge=ours
 repo.json merge=ours
 .github/workflows/sync-upstream.yml merge=ours
 .github/workflows/release.yml merge=ours
+.github/workflows/fork-ci.yml merge=ours
 tools/gen-repo-json.cjs merge=ours
+webapp/src/fork/** merge=ours

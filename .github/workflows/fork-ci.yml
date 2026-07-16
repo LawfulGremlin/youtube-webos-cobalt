@@ -1,0 +1,37 @@
+name: Fork CI
+
+# Tests the fork-owned feature module (webapp/src/fork/) and verifies the
+# webapp bundle still builds with it wired in. Kept separate from upstream's
+# ci.yml so upstream workflow changes never collide with it.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  fork-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: webapp/package-lock.json
+
+      - name: Fork filter self-test
+        run: node webapp/src/fork/test.mjs
+
+      - name: Build webapp with fork module
+        working-directory: webapp
+        run: |
+          npm ci
+          npm run build -- --env production --optimization-minimize
+
+      - name: Verify fork module is in the bundle
+        run: |
+          grep -q 'ytaf-fork' webapp/output/adblockMain.js
+          grep -q '__fork_remove_shorts' webapp/output/adblockMain.js
