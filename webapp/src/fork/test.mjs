@@ -3,7 +3,14 @@
 
 import assert from 'node:assert/strict';
 import { filterTvResponse } from './filters.mjs';
-import { framesForKey, stepTarget, FRAME_DURATION_SEC } from './frame-step.mjs';
+import { stepTarget, FRAME_DURATION_SEC } from './frame-step.mjs';
+import {
+  SLOTS,
+  registerShortcutAction,
+  getAction,
+  slotForKeyCode,
+  cycleActionKey
+} from './shortcut-registry.mjs';
 
 const BOTH = { removeShorts: true, removeAds: true };
 
@@ -94,13 +101,36 @@ assert.equal(filterTvResponse('"a string"', BOTH), 0);
 assert.equal(filterTvResponse([null, 42, 'x'], BOTH), 0);
 assert.equal(filterTvResponse({ a: { b: [null, { c: [] }] } }, BOTH), 0);
 
-// Frame step: key mapping (red back, blue forward incl. 191 alt, others inert)
-assert.equal(framesForKey(403), -1);
-assert.equal(framesForKey(406), 1);
-assert.equal(framesForKey(191), 1);
-assert.equal(framesForKey(404), 0); // green — settings menu, must stay untouched
-assert.equal(framesForKey(405), 0);
-assert.equal(framesForKey(undefined), 0);
+// Shortcut registry: slot mapping (green 404/172 must NOT be a slot — it
+// opens the settings menu)
+assert.equal(SLOTS.length, 13); // red, yellow, blue, keys 0-9
+assert.equal(slotForKeyCode(403).id, 'red');
+assert.equal(slotForKeyCode(405).id, 'yellow');
+assert.equal(slotForKeyCode(170).id, 'yellow');
+assert.equal(slotForKeyCode(406).id, 'blue');
+assert.equal(slotForKeyCode(191).id, 'blue');
+assert.equal(slotForKeyCode(49).id, 'key_1');
+assert.equal(slotForKeyCode(105).id, 'key_9');
+assert.equal(slotForKeyCode(404), null);
+assert.equal(slotForKeyCode(172), null);
+assert.equal(slotForKeyCode(13), null);
+
+// Shortcut registry: registration, validation, duplicates
+assert.throws(() => registerShortcutAction({ key: 'x' }), /handler/);
+registerShortcutAction({ key: 'act_a', label: 'A', handler: () => {} });
+registerShortcutAction({ key: 'act_b', label: 'B', scope: 'GLOBAL', handler: () => {}, burst: true });
+assert.throws(() => registerShortcutAction({ key: 'act_a', handler: () => {} }), /duplicate/);
+assert.equal(getAction('act_a').scope, 'VIDEO'); // default scope
+assert.equal(getAction('act_b').burst, true);
+assert.equal(getAction('none').handler, null);
+assert.equal(getAction('missing'), null);
+
+// Shortcut registry: cycling wraps both ways and recovers stale bindings
+assert.equal(cycleActionKey('none', 1), 'act_a');
+assert.equal(cycleActionKey('act_a', 1), 'act_b');
+assert.equal(cycleActionKey('act_b', 1), 'none');
+assert.equal(cycleActionKey('none', -1), 'act_b');
+assert.equal(cycleActionKey('deleted_action', 1), 'act_a'); // stale → treated as 'none'
 
 // Frame step: normal stepping math
 assert.ok(Math.abs(stepTarget(10, 100, 1) - (10 + FRAME_DURATION_SEC)) < 1e-9);
@@ -116,4 +146,4 @@ assert.equal(stepTarget(100, 100, 1), 100 - FRAME_DURATION_SEC);
 assert.ok(Math.abs(stepTarget(10, NaN, 1) - (10 + FRAME_DURATION_SEC)) < 1e-9);
 assert.equal(stepTarget(0, undefined, -1), 0);
 
-console.log('fork filters + frame step: all tests passed');
+console.log('fork filters + frame step + shortcut registry: all tests passed');

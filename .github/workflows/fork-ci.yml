@@ -35,3 +35,4 @@ jobs:
         run: |
           grep -q 'ytaf-fork' webapp/output/adblockMain.js
           grep -q '__fork_remove_shorts' webapp/output/adblockMain.js
+          grep -q 'forkShortcut_' webapp/output/adblockMain.js

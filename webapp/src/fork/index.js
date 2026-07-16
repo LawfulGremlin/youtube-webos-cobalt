@@ -6,12 +6,27 @@ import { configRead, configWrite } from '../config.js';
 import { checkboxTools } from '../checkboxTools.js';
 import { showNotification } from '../ui.js';
 import { filterTvResponse } from './filters.mjs';
-import { framesForKey, stepTarget } from './frame-step.mjs';
+import { stepTarget } from './frame-step.mjs';
+import {
+  SLOTS,
+  registerShortcutAction,
+  getAction,
+  slotForKeyCode,
+  cycleActionKey
+} from './shortcut-registry.mjs';
+
+function bindingConfigKey(slotId) {
+  return 'forkShortcut_' + slotId;
+}
 
 const FORK_DEFAULTS = {
-  forkRemoveShorts: false,
-  forkFrameStep: true
+  forkRemoveShorts: false
 };
+SLOTS.forEach((slot) => {
+  FORK_DEFAULTS[bindingConfigKey(slot.id)] = 'none';
+});
+FORK_DEFAULTS[bindingConfigKey('red')] = 'frame_step_back';
+FORK_DEFAULTS[bindingConfigKey('blue')] = 'frame_step_fwd';
 
 // Seed fork-only keys: upstream's defaultConfig doesn't know them, so an
 // unseeded configRead would return undefined forever.
@@ -41,36 +56,113 @@ JSON.parse = function () {
   return result;
 };
 
-// Frame stepping on the red/blue remote keys (watch context only, and never
-// while the settings menu is open). Registered in capture phase before
-// upstream's handlers; red/blue don't collide with them (ui.js uses green).
-function onFrameStepKey(evt) {
-  const frames = framesForKey(evt.keyCode || evt.which || 0);
-  if (!frames) return;
-  if (!configRead('forkFrameStep')) return;
+// --- Shortcut actions -------------------------------------------------------
 
-  const menu = document.querySelector('.ytaf-ui-container');
-  if (menu && menu.style.display !== 'none') return;
-  if (!/[?&#]v=/.test(String(window.location.href) + String(window.location.hash))) return;
-
+// Frame stepping, ported from LawfulGremlin/youtube-webos fork-extensions.
+function performFrameStep(frames) {
   const video = document.querySelector('video');
   if (!video || !isFinite(video.currentTime)) return;
+  if (!video.paused) video.pause();
+  video.currentTime = stepTarget(video.currentTime, video.duration, frames);
+  const abs = Math.abs(frames);
+  const suffix = abs !== 1 ? 's' : '';
+  showNotification(
+    frames > 0 ? '►| +' + abs + ' Frame' + suffix : '|◄ -' + abs + ' Frame' + suffix,
+    1000
+  );
+}
+
+registerShortcutAction({ key: 'frame_step_fwd', label: 'Frame Step Forward', scope: 'VIDEO', handler: () => performFrameStep(1), burst: true });
+registerShortcutAction({ key: 'frame_step_back', label: 'Frame Step Backward', scope: 'VIDEO', handler: () => performFrameStep(-1), burst: true });
+registerShortcutAction({ key: 'frame_skip_fwd', label: 'Skip 15 Frames Forward', scope: 'VIDEO', handler: () => performFrameStep(15), burst: true });
+registerShortcutAction({ key: 'frame_skip_back', label: 'Skip 15 Frames Backward', scope: 'VIDEO', handler: () => performFrameStep(-15), burst: true });
+
+// --- Key dispatch ------------------------------------------------------------
+
+function isWatchContext() {
+  return /[?&#]v=/.test(String(window.location.href) + String(window.location.hash));
+}
+
+function isMenuOpen() {
+  const menu = document.querySelector('.ytaf-ui-container');
+  return Boolean(menu && menu.style.display !== 'none');
+}
+
+// Binding rows in the settings menu: Enter/left/right cycle the focused
+// slot's action. Registered at import time, which is before ui.js installs
+// its document handlers, so this capture listener wins for these keys while
+// a binding row is focused; up/down fall through to ui.js focus movement.
+function onMenuKey(evt) {
+  if (!isMenuOpen()) return;
+  const el = document.activeElement;
+  if (!el || !el.dataset || !el.dataset.forkSlot) return;
+
+  const key = evt.keyCode || evt.which || 0;
+  let delta = 0;
+  if (key === 13 || key === 32 || key === 39) delta = 1; // Enter/Space/right
+  else if (key === 37) delta = -1; // left
+  else return;
 
   evt.preventDefault();
   evt.stopPropagation();
 
-  if (!video.paused) video.pause();
-  video.currentTime = stepTarget(video.currentTime, video.duration, frames);
-
-  const abs = Math.abs(frames);
-  showNotification(
-    frames > 0 ? '►| +' + abs + ' Frame' : '|◄ -' + abs + ' Frame',
-    1000
-  );
+  const cfgKey = bindingConfigKey(el.dataset.forkSlot);
+  configWrite(cfgKey, cycleActionKey(configRead(cfgKey), delta));
+  if (el.__forkUpdateLabel) el.__forkUpdateLabel();
 }
-document.addEventListener('keydown', onFrameStepKey, true);
+document.addEventListener('keydown', onMenuKey, true);
 
-// Append our toggle rows once upstream's settings UI exists. The container is
+// Slot keys dispatch their bound action. Slots bound to 'none' fall through
+// untouched so the TV app's own key handling is preserved.
+function onShortcutKey(evt) {
+  if (isMenuOpen()) return;
+
+  const slot = slotForKeyCode(evt.keyCode || evt.which || 0);
+  if (!slot) return;
+
+  const action = getAction(configRead(bindingConfigKey(slot.id)));
+  if (!action || !action.handler) return;
+  if (action.scope === 'VIDEO' && !isWatchContext()) return;
+  if (evt.repeat && !action.burst) return;
+
+  evt.preventDefault();
+  evt.stopPropagation();
+  action.handler();
+}
+document.addEventListener('keydown', onShortcutKey, true);
+
+// --- Settings UI -------------------------------------------------------------
+
+// Binding rows reuse the checkbox row styling (.toggler-wrapper +
+// .ytaf-focused) but carry no id, so upstream's Enter-toggles-checkbox
+// path ignores them; onMenuKey above handles their input instead.
+let cyclerTabIndex = 900; // clear of checkboxTools' own tabindex counter
+function bindingRow(slot) {
+  const wrapper = document.createElement('div');
+  wrapper.classList.add('toggler-wrapper');
+
+  const focusable = document.createElement('div');
+  focusable.setAttribute('tabindex', cyclerTabIndex);
+  cyclerTabIndex += 1;
+  focusable.dataset.forkSlot = slot.id;
+
+  const label = document.createElement('div');
+  label.classList.add('desc');
+  focusable.__forkUpdateLabel = function () {
+    const action = getAction(configRead(bindingConfigKey(slot.id))) || getAction('none');
+    label.textContent = slot.label + ': ' + action.label;
+  };
+  focusable.__forkUpdateLabel();
+
+  focusable.addEventListener('focus', () => wrapper.classList.add('ytaf-focused'));
+  focusable.addEventListener('blur', () => wrapper.classList.remove('ytaf-focused'));
+
+  wrapper.appendChild(focusable);
+  wrapper.appendChild(label);
+  return wrapper;
+}
+
+// Append our rows once upstream's settings UI exists. The container is
 // built when startUserScript() runs, which is after module import time.
 let uiTries = 0;
 function appendForkUI() {
@@ -88,13 +180,10 @@ function appendForkUI() {
       (state) => configWrite('forkRemoveShorts', state)
     )
   );
-  container.appendChild(
-    checkboxTools.add(
-      '__fork_frame_step',
-      'Frame Step (Red/Blue)',
-      configRead('forkFrameStep'),
-      (state) => configWrite('forkFrameStep', state)
-    )
-  );
+
+  const shortcuts = document.createElement('div');
+  shortcuts.classList.add('blockquote');
+  SLOTS.forEach((slot) => shortcuts.appendChild(bindingRow(slot)));
+  container.appendChild(shortcuts);
 }
 appendForkUI();

@@ -34,12 +34,20 @@ adding features itself.
   upstream files. Pure logic goes in `filters.mjs` with node-runnable tests in
   `test.mjs` (run by `fork-ci.yml`).
 - Current fork features: **Remove Shorts** toggle (shelves + tiles), **feed ad item
-  removal** (adSlotRenderer/reel ads, rides the existing AdBlock toggle), **frame
-  stepping** (red = 1 frame back, blue = 1 frame forward while watching; ported from
-  LawfulGremlin/youtube-webos, bound to color keys since this base has no shortcut
-  registry — the ±15-frame variants were dropped, key auto-repeat covers them), and
-  an end-of-video clamp in `sponsorblock.js` that stops outro skips from looping the
-  video (the one deliberate upstream-file edit, marked with a `fork:` comment).
+  removal** (adSlotRenderer/reel ads, rides the existing AdBlock toggle), a
+  **shortcut-key registry** with **frame stepping** actions (both ported from
+  LawfulGremlin/youtube-webos fork-extensions), and an end-of-video clamp in
+  `sponsorblock.js` that stops outro skips from looping the video (the one
+  deliberate upstream-file edit, marked with a `fork:` comment).
+- Shortcut keys: the settings menu has a binding row per bindable remote key —
+  red/yellow/blue color buttons (green opens the menu itself) and number keys 0-9.
+  Enter/left/right on a row cycles its action: None, Frame Step Forward/Backward,
+  Skip 15 Frames Forward/Backward. Defaults: red = 1 frame back, blue = 1 frame
+  forward; everything else None (unbound keys fall through to the TV app
+  untouched). New features should `registerShortcutAction()` in
+  `webapp/src/fork/index.js` instead of installing their own key listeners —
+  same API as youtube-webos's `fork-extensions/shortcut-registry.js`, so
+  actions port across the two forks unchanged.
 - Deliberately not ported: 4K/quality forcing (capped by the Cobalt binary + DRM,
   not fixable in JS), auto-login (Cobalt's native account flow already works), UI
   themes/OLED/cosmetic CSS (WebView-specific, poor fit for Cobalt's CSS subset).
