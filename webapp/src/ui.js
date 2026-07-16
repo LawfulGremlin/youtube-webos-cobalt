@@ -89,30 +89,64 @@ export function userScriptStartUI() {
 
     const nextItem = focusableItems[currentFocusIndex];
     if (nextItem) {
+      // fork: reveal the target row before focusing it — .focus() on an
+      // element inside a display:none ancestor is a silent no-op here.
+      updateRowWindow(nextItem);
       nextItem.focus();
       lastTabIndex = nextItem.tabIndex;
     }
   }
 
-  // fork: THREE scroll/visibility mechanisms have now been tried and
-  // reverted here — native scrollIntoView (no-op), manual scrollTop with
-  // pixel-based sizing (also no-op: focus reached hidden rows but the
-  // viewport never moved), and display:none/'' row windowing (regressed
-  // further — after some navigation, hardware reported the menu became
-  // completely unresponsive: couldn't navigate up or even close it,
-  // most likely from hiding ~17 of 25 rows in one bulk operation the
-  // instant the menu opened). Each was a plausible-looking fix that
-  // could only be disproven by a live hardware round-trip, and the last
-  // one made things WORSE than the original bug, not better — so this
-  // deliberately stops guessing rather than risk a fourth. Currently the
-  // settings menu simply renders all rows (may extend past the visible
-  // screen on long lists), with NO hide/show/scroll logic at all —
-  // known-safe: navigation and closing are unaffected by anything in
-  // this area, confirmed across multiple hardware rounds before the
-  // windowing attempt. Do not reintroduce scrolling/windowing without
-  // either live remote-debugging (Cobalt supports
-  // --remote_debugging_port via the YTAF_DEBUG build flag) or much
-  // smaller, individually-verified steps.
+  // fork: three earlier scroll/visibility attempts failed here — native
+  // scrollIntoView (no-op), manual scrollTop with pixel sizing (also a
+  // no-op: getComputedStyle reports maxHeight correctly, but this engine
+  // doesn't actually enforce it as a layout constraint — clientHeight
+  // exceeded the declared maxHeight when checked live via CDP), and an
+  // earlier version of this exact row-windowing approach, which on
+  // hardware locked up the whole menu once navigation crossed row 8.
+  // Root cause, found via live remote-debugging (see FORK.md): this
+  // engine has NO Element.prototype.closest AT ALL (confirmed on every
+  // element, not just some), so the previous getRowWrapper() silently
+  // returned null every time, the window position could never shift off
+  // its initial [0,7], and focusing anything from row 8 onward failed
+  // forever. Fixed by walking parentElement manually instead. Verified
+  // live over a full 26-step down+up traversal (0 focus failures) before
+  // ever touching hardware.
+  const ROW_WINDOW_SIZE = 8;
+  let rowWindowStart = 0;
+
+  function getRowWrapper(item) {
+    let node = item;
+    while (node && node !== uiContainer) {
+      if (node.classList && node.classList.contains('toggler-wrapper')) {
+        return node;
+      }
+      node = node.parentElement || node.parentNode;
+    }
+    return null;
+  }
+
+  function updateRowWindow(focusedItem) {
+    const rows = Array.from(uiContainer.querySelectorAll('.toggler-wrapper'));
+    if (rows.length === 0) return;
+
+    const windowSize = Math.min(ROW_WINDOW_SIZE, rows.length);
+    const focusedIndex = rows.indexOf(getRowWrapper(focusedItem));
+
+    if (focusedIndex !== -1) {
+      if (focusedIndex < rowWindowStart) {
+        rowWindowStart = focusedIndex;
+      } else if (focusedIndex > rowWindowStart + windowSize - 1) {
+        rowWindowStart = focusedIndex - windowSize + 1;
+      }
+    }
+    rowWindowStart = Math.max(0, Math.min(rowWindowStart, rows.length - windowSize));
+    const windowEnd = rowWindowStart + windowSize - 1;
+
+    rows.forEach((row, index) => {
+      row.style.display = index >= rowWindowStart && index <= windowEnd ? '' : 'none';
+    });
+  }
 
   const uiContainer = document.createElement('div');
   uiContainer.classList.add('ytaf-ui-container');
@@ -320,13 +354,15 @@ export function userScriptStartUI() {
     }
 
     if (target) {
+      // fork: keep moveFocus()'s own index in sync with this explicit,
+      // known focus placement, and reveal the row before focusing it —
+      // same reason as in moveFocus().
+      currentFocusIndex = focusableItems.indexOf(target);
+      updateRowWindow(target);
       target.focus();
       if (target.tabIndex !== null && target.tabIndex > 0) {
         lastTabIndex = target.tabIndex;
       }
-      // fork: keep moveFocus()'s own index in sync with this explicit,
-      // known focus placement (see currentFocusIndex above).
-      currentFocusIndex = focusableItems.indexOf(target);
       return true;
     }
 

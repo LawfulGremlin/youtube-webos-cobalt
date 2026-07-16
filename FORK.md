@@ -47,22 +47,28 @@ adding features itself.
     `currentFocusIndex` now tracks position ourselves, advanced only by our
     own calls, so it can't inherit an extra step from anything else that
     might also be moving focus for the same keypress.
-  - **Scrolling the settings menu past one screen is UNSOLVED.** Three
-    mechanisms were tried and reverted, each disproven only by a live
-    hardware round-trip: native `scrollIntoView` (no-op), manual
-    `getBoundingClientRect`+`scrollTop` with a pixel-based `maxHeight`
-    (also a no-op — focus reached hidden rows, but the viewport never
-    moved), and `display:none/''` row windowing (regressed further —
-    after some navigation the menu became entirely unresponsive: couldn't
-    navigate up or even close it, most likely from hiding ~17 of 25 rows
-    in one bulk operation the instant the menu opened). The menu currently
-    just renders every row with no hide/show/scroll logic — it may extend
-    past the visible screen on long lists, but navigation and closing are
-    unaffected, confirmed across multiple hardware rounds. **Do not
-    reattempt scrolling by guessing** — get live remote debugging first
-    (Cobalt supports `--remote_debugging_port` via the `YTAF_DEBUG` build
-    flag in the Makefile) so a fix can be verified before it reaches
-    hardware, or take much smaller, individually-verified steps.
+  - **Scrolling past one screen: solved via `display:none/''` row
+    windowing** (`ROW_WINDOW_SIZE = 8`, `updateRowWindow()`/`getRowWrapper()`
+    in `ui.js`). Three earlier mechanisms failed first, each only
+    disprovable by a live hardware round-trip before this fork got remote
+    debugging working: native `scrollIntoView` (no-op); manual
+    `getBoundingClientRect`+`scrollTop` with a pixel-based `maxHeight` (also
+    a no-op — live inspection via CDP later showed why: `getComputedStyle`
+    reports `maxHeight` correctly, but this engine doesn't actually enforce
+    it as a layout constraint — `clientHeight` exceeded the declared
+    `maxHeight` when checked); and an earlier attempt at this same
+    windowing approach, which locked up the whole menu on hardware once
+    navigation crossed row 8. Root cause of *that* lockup, found via live
+    CDP debugging: **this engine has no `Element.prototype.closest` at
+    all** (confirmed false on every focusable element, not just some) —
+    `getRowWrapper()` used `.closest()` and silently returned `null` every
+    time, so the visible window could never shift off its initial `[0,7]`,
+    and focusing row 8 onward failed forever (not a "regression under
+    navigation" — it never worked once past the first screen). Fixed by
+    walking `parentElement` manually instead. Verified live via CDP
+    (`Runtime.evaluate` over the debug build's websocket — see below)
+    through a full 26-row down+up traversal and a mixed navigate/close
+    sequence, with 0 focus failures, *before* touching hardware.
   - `fork/index.js` — `navigation-checkbox.js` polyfills a global
     `window.navigate(dir)` for native browser spatial navigation; nothing in
     this codebase calls it, so if it's real, only the platform calls it. This
@@ -133,13 +139,21 @@ and:
   DevTools frontend without ares-package aborting on it. If a fresh debug build
   hits a *new* unparseable file, add it to `UNMINIFIABLE_DEVTOOLS_FILES`.
 
-**Packaging succeeds and installs; end-to-end devtools connectivity (opening
-`http://<tv-ip>:9222/json` and actually attaching a browser) is not yet verified
-on hardware.** The debugger's HTTP handler serves plain files rooted at
-`content/web/debug_remote/` (`cobalt/debug/remote/debug_web_server.cc`) rather than
-a dynamic REST API — `/json` resolves to a static `debug_remote/json/index.json`
-listing a `devtoolsFrontendUrl` and `webSocketDebuggerUrl` pointing at the bundled
-frontend, not the standard `chrome://inspect` auto-discovery flow.
+**Confirmed working end-to-end on hardware**, including the full CDP loop: `/json`
+discovery, the bundled DevTools frontend HTML, and a real WebSocket
+`Runtime.evaluate` round-trip (`1+1` → `2`, and inspecting the live page's own
+`location.href`/`window.sponsorblock`). The debugger's HTTP handler serves plain
+files rooted at `content/web/debug_remote/` (`cobalt/debug/remote/debug_web_server.cc`)
+rather than a dynamic REST API — `/json` resolves to a static
+`debug_remote/json/index.json` listing a `devtoolsFrontendUrl` and
+`webSocketDebuggerUrl` pointing at the bundled frontend, not the standard
+`chrome://inspect` auto-discovery flow, but a plain WebSocket client connecting
+to `ws://<tv-ip>:9222/devtools/page/cobalt` works directly (see
+`tools/cdp-eval.py`, checked in specifically so this doesn't need rebuilding
+from scratch next time — `tools/cdp-eval.py <tv-ip> '<js expression>'`).
+
+This is how the row-windowing fix above was actually found and verified — live,
+before ever touching hardware — rather than by another guess-and-ship round.
 
 `cobalt-patches/cobalt-23.lts.4.patch` had 5 hunks with corrupted `@@` headers (line
 counts didn't match the hunk body — hand-edited at some point without recounting,
