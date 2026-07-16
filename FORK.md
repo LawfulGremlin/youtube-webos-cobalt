@@ -99,15 +99,47 @@ prebuilt Cobalt binary from `cobalt-bin/*.xz` and never touches Cobalt's own sou
 so `REMOTE_DEBUG=1` (a fork-added Makefile flag, independent of upstream's
 `COBALT_DEBUG`) only adds the `--remote_debugging_port=9222` switch to an existing
 binary. Confirmed on hardware: the gold binary doesn't open the port at all — it's
-compiled out, not disabled at runtime. A real debug session needs a `-logging`
-Cobalt binary, built from source:
+compiled out, not runtime-disabled. A real debug session needs a Cobalt binary built
+from source, with **two** settings, both required:
 
-    make cobalt-bin/23.lts.4-12-logging/libcobalt.so   # hours: clones Cobalt, Docker/Chromium build
-    make cobalt-bin/23.lts.4-12-logging.xz              # archives it in the same format as the others
+    make cobalt-bin/23.lts.4-12-logging/libcobalt.so BUILD_COBALT_TYPE=qa
+    make cobalt-bin/23.lts.4-12-logging.xz    # archives it in the same format as the others
 
-Then `make package ... COBALT_DEBUG=1` picks up the `-logging` archive automatically
-(via `PACKAGE_COBALT_ARCHIVE`), and the resulting IPK opens `9222` for Chrome DevTools
-Protocol — connect with `curl http://<tv-ip>:9222/json/list` to get a `webSocketDebuggerUrl`.
+- `COBALT_DEBUG`/the `-logging` suffix (upstream's own flag) is unrelated to the
+  debugger — it only enables this fork's `YtafFileLog` custom logging (from
+  `cobalt-patches/`). It does **not** enable the debugger.
+- `BUILD_COBALT_TYPE=qa` is what actually matters: Chromium's `ENABLE_DEBUGGER`
+  code (the whole remote-debug server, gated with `#if defined(ENABLE_DEBUGGER)`
+  in `cobalt/browser/application.cc`) is compiled in only for non-`gold` configs
+  (`starboard/build/config/BUILD.gn`: `if (!is_gold) { defines += ["ENABLE_DEBUGGER", ...] }`).
+  `gold` is the Makefile's default `BUILD_COBALT_TYPE` — building without overriding
+  it silently produces a binary that never opens the port, no error either way.
+
+Then `make package ... COBALT_DEBUG=1` (this time meaning the *packaging* step, not
+the from-source build above) picks the `-logging` archive via `PACKAGE_COBALT_ARCHIVE`
+and:
+- forwards `COBALT_DEBUG` through `docker-make.%` into the container's own `make`
+  invocation — command-line variables on the outer `make` don't reach a nested one
+  automatically, only real env vars via `-e`, so this needed an explicit fix.
+- stubs the specific DevTools frontend files (`UNMINIFIABLE_DEVTOOLS_FILES`,
+  currently `formatter_worker.js`, `heap_snapshot_worker.js`) that ares-package's
+  bundled terser can't parse — these are heavy-analysis worker-thread bundles
+  (pretty-printing, heap snapshots) using newer JS syntax than the rest of the
+  frontend. There's no flag to disable ares-package's minification (`-c` means
+  "check only, don't package" — a red herring) and `-e`/`--app-exclude` doesn't
+  skip minification either (it processes every file before filtering), so this is
+  the only way found to keep the (real, working — confirmed by reading
+  `debug_web_server.cc`: static `/json` discovery file + websocket, not a stub)
+  DevTools frontend without ares-package aborting on it. If a fresh debug build
+  hits a *new* unparseable file, add it to `UNMINIFIABLE_DEVTOOLS_FILES`.
+
+**Packaging succeeds and installs; end-to-end devtools connectivity (opening
+`http://<tv-ip>:9222/json` and actually attaching a browser) is not yet verified
+on hardware.** The debugger's HTTP handler serves plain files rooted at
+`content/web/debug_remote/` (`cobalt/debug/remote/debug_web_server.cc`) rather than
+a dynamic REST API — `/json` resolves to a static `debug_remote/json/index.json`
+listing a `devtoolsFrontendUrl` and `webSocketDebuggerUrl` pointing at the bundled
+frontend, not the standard `chrome://inspect` auto-discovery flow.
 
 `cobalt-patches/cobalt-23.lts.4.patch` had 5 hunks with corrupted `@@` headers (line
 counts didn't match the hunk body — hand-edited at some point without recounting,
