@@ -100,7 +100,7 @@ index c35472cba..2d198e746 100644
  #include "cobalt/dom/html_script_element.h"
  #include "cobalt/dom/initial_computed_style.h"
  #include "cobalt/dom/keyboard_event.h"
-@@ -64,12 +67,28 @@
+@@ -64,12 +67,32 @@
  #include "cobalt/web/dom_exception.h"
  #include "cobalt/web/message_event.h"
  #include "nb/memory_scope.h"
@@ -187,7 +187,7 @@ index 1a1f7ba30..daafd98a7 100644
  #include "url/gurl.h"
  
  namespace cobalt {
-@@ -44,6 +46,21 @@ namespace {
+@@ -44,6 +46,25 @@ namespace {
  
  bool PermitAnyURL(const GURL&, bool) { return true; }
  
@@ -288,7 +288,7 @@ index 8463a489c..91b608e4e 100644
  #if defined(STARBOARD)
  #include "starboard/configuration.h"
  #if SB_HAS(CORE_DUMP_HANDLER_SUPPORT)
-@@ -33,6 +35,21 @@ namespace script {
+@@ -33,6 +35,25 @@ namespace script {
  
  namespace {
  
@@ -359,7 +359,7 @@ index 0fd593703..7deda4443 100644
  #include "starboard/common/murmurhash2.h"
  
  
-@@ -71,6 +72,40 @@ std::string ToStringOrNull(v8::Isolate* isolate, v8::Local<v8::Value> value) {
+@@ -71,6 +72,44 @@ std::string ToStringOrNull(v8::Isolate* isolate, v8::Local<v8::Value> value) {
    return *v8::String::Utf8Value(isolate, value.As<v8::String>());
  }
  
@@ -430,7 +430,7 @@ index 2778aec0e..17baeabfe 100644
  #include "v8/include/libplatform/v8-tracing.h"
  #include "v8/include/v8-inspector.h"
  #include "v8/third_party/inspector_protocol/crdtp/json.h"
-@@ -84,6 +85,30 @@ constexpr const char* kInspectorDomains[] = {
+@@ -84,6 +85,34 @@ constexpr const char* kInspectorDomains[] = {
  constexpr int kContextGroupId = 1;
  constexpr char kContextName[] = "Cobalt";
  

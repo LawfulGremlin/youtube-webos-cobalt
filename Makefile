@@ -22,6 +22,14 @@ COBALT_DEBUG?=$(YTAF_DEBUG)
 COBALT_DEBUG_ENABLED=$(filter 1 true yes on,$(COBALT_DEBUG))
 COBALT_DEBUG_SUFFIX=$(if $(COBALT_DEBUG_ENABLED),-logging,)
 COBALT_DEBUG_GN_ARG=$(if $(COBALT_DEBUG_ENABLED),true,false)
+# fork: independent of COBALT_DEBUG, which also switches the downloaded
+# cobalt-bin archive to a "-logging" variant we don't have locally (building
+# one means a from-source Cobalt/Chromium build via the docker-make.%
+# targets below — hours, not worth it until proven necessary). This just
+# adds the devtools remote-debugging switches to the existing gold binary,
+# to test whether it honors them at all before investing in a debug build.
+REMOTE_DEBUG?=0
+REMOTE_DEBUG_ENABLED=$(filter 1 true yes on,$(REMOTE_DEBUG))
 PACKAGE_COBALT_ARCHIVE?=cobalt-bin/$(PACKAGE_COBALT_VERSION)-$(PACKAGE_SB_API_VERSION)$(COBALT_DEBUG_SUFFIX).xz
 OFFICAL_YOUTUBE_IPK?=ipks-official/2023-07-30-youtube.leanback.v4-1.1.7.ipk
 
@@ -296,7 +304,7 @@ $(WORKDIR)/ipk/content/app/cobalt/content/web/adblock: $(WEBAPP_OUTPUT_STAMP)
 	cp assets/imageForRecents.png $(WORKDIR)/ipk/$$(jq -r '.imageForRecents' < $(WORKDIR)/ipk/appinfo.json)
 
 	echo " --evergreen_lite" >> $(WORKDIR)/ipk/switches
-	if [ -n "$(COBALT_DEBUG_ENABLED)" ]; then \
+	if [ -n "$(COBALT_DEBUG_ENABLED)" ] || [ -n "$(REMOTE_DEBUG_ENABLED)" ]; then \
 		echo " --remote_debugging_port=9222" >> $(WORKDIR)/ipk/switches; \
 		echo " --dev_servers_listen_ip=0.0.0.0" >> $(WORKDIR)/ipk/switches; \
 	fi

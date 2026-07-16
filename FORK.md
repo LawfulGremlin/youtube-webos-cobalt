@@ -92,6 +92,30 @@ cannot run it. Do not run `release.yml` (it updates the public `repo.json`) unti
 the build has been sideloaded and checked on a real TV
 (`ares-setup-device` + `ares-install`).
 
+## Debug builds (remote devtools)
+
+`make package` (used for every release) patches the checked-in official IPK with a
+prebuilt Cobalt binary from `cobalt-bin/*.xz` and never touches Cobalt's own source —
+so `REMOTE_DEBUG=1` (a fork-added Makefile flag, independent of upstream's
+`COBALT_DEBUG`) only adds the `--remote_debugging_port=9222` switch to an existing
+binary. Confirmed on hardware: the gold binary doesn't open the port at all — it's
+compiled out, not disabled at runtime. A real debug session needs a `-logging`
+Cobalt binary, built from source:
+
+    make cobalt-bin/23.lts.4-12-logging/libcobalt.so   # hours: clones Cobalt, Docker/Chromium build
+    make cobalt-bin/23.lts.4-12-logging.xz              # archives it in the same format as the others
+
+Then `make package ... COBALT_DEBUG=1` picks up the `-logging` archive automatically
+(via `PACKAGE_COBALT_ARCHIVE`), and the resulting IPK opens `9222` for Chrome DevTools
+Protocol — connect with `curl http://<tv-ip>:9222/json/list` to get a `webSocketDebuggerUrl`.
+
+`cobalt-patches/cobalt-23.lts.4.patch` had 5 hunks with corrupted `@@` headers (line
+counts didn't match the hunk body — hand-edited at some point without recounting,
+not anything this session touched) that made `patch` abort partway with "malformed
+patch". Fixed by recomputing every header's counts from its actual body; verify with
+`patch -p1 --dry-run < cobalt-patches/cobalt-23.lts.4.patch` against a clean clone
+before trusting a patch-file edit.
+
 ## Homebrew repository
 
 Add this URL to webOS Homebrew / Device Manager as a custom repository:
