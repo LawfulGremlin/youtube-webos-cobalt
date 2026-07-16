@@ -88,33 +88,39 @@ adding features itself.
     by sitting inside the player subtree and inheriting the controls' fade,
     which is the same placement that gets pruned. There was nothing to borrow.
 
-    Markers **emulate being behind the bar** rather than actually being there,
-    because they can't be: anything inserted into the slider is pruned in under
-    100ms (measured — the fill is re-patched constantly as it advances, and the
-    probe was gone before the first 100ms sample), and body-level stacking is
-    both unverifiable and unsafe, since Cobalt composites video by punching
-    through the web layer, so content painted below the player risks being
-    erased with it. Note this engine has neither `document.elementFromPoint`
-    nor `Page.captureScreenshot`/`DOM.getNodeForLocation` over CDP, so paint
-    order can't be checked from here at all — prefer approaches that don't
-    depend on it. The emulation is exact, in three parts:
-    - `clipMarkersToProgress()` draws only the *unplayed* part of a segment, so
-      YouTube's progress fill is never covered — which is what being behind an
-      opaque fill looks like. Re-derived from `currentTime` every tick, so
-      seeking backwards restores the marker instead of shrinking it forever.
-    - `blendUnderTrack()` pre-composites the category colour under the track's
-      own translucent white (read live off the element, not hardcoded), giving
-      the muted tone a marker underneath it would have. A fully opaque track
-      would blend to invisible, so that case keeps the raw colour instead.
-    - The marker yields to the playhead knob's live rect. The knob is centred
-      on the playhead — exactly where a clipped marker starts — so it used to
-      cut across the knob's right half (knob 1724-1772 vs marker from 1693).
-      It follows the knob's actual position rather than assuming it tracks
-      `currentTime`, since while scrubbing it runs ahead of playback.
+    Markers are **translucent** (`MARKER_ALPHA`, currently 0.55) and cover their
+    whole segment, played part included. That single choice replaced a pile of
+    machinery — clipping to the unplayed span, pre-blending against the track's
+    colour, and dodging the playhead knob's rect — all of which were solving the
+    wrong problem. The goal is to see how far into a segment you are *without*
+    losing what the segment covers, and letting the compositor blend one
+    translucent colour over whatever is beneath does that in one step: over the
+    opaque played fill it reads as a pale tint (`rgb(110,110,239)` for outro),
+    over the track it stays saturated (`rgb(34,34,166)`), and the boundary
+    between the two *is* the progress indicator. The knob shows through too.
+
+    Note "behind the bar" is not achievable, and would not have helped anyway:
+    - Inside the slider, anything foreign is pruned in under 100ms (measured —
+      the fill is re-patched constantly as it advances; the probe was gone
+      before the first 100ms sample).
+    - Body-level stacking is unsafe (Cobalt composites video by punching
+      through the web layer, so content painted below the player risks being
+      erased with it) and unverifiable: this engine has no
+      `document.elementFromPoint`, and the debug backend implements neither
+      `Page.captureScreenshot` nor `DOM.getNodeForLocation`, so **paint order
+      cannot be checked from here at all** — prefer approaches not relying on it.
+    - The played fill is *opaque* (`rgb(241,241,241)`), so a marker genuinely
+      behind it would simply vanish under the fill — the exact complaint that
+      the clipped version produced, since clipping reproduced "behind" honestly.
+
+    `layoutMarkers()` re-derives each marker's span from `data-sb-start`/`-end`
+    every tick rather than only at draw time, so a reused overlay
+    (`findExistingOverlay()`) or a bar that changed width lands correctly
+    instead of keeping the geometry it was first built with.
 
     The settings-menu swatches deliberately keep the *raw* category colours —
-    there's no track behind them to mute against, and they're a key to which
-    category is which, not a preview of the exact pixels on the bar.
+    they're a key to which category is which, not a preview of the exact pixels
+    on the bar (which depend on what's underneath them).
 
     All of it verified live via CDP before touching hardware, mostly without
     needing real playback: inject a synthetic `ytlr-progress-bar`/`slider`

@@ -224,23 +224,24 @@ function parseCssColor(value) {
   return { r: parts[0], g: parts[1], b: parts[2], a: parts.length > 3 ? parts[3] : 1 };
 }
 
-// fork: markers can't actually be drawn *behind* the timeline (see
-// clipMarkersToProgress for why), but the result is reproducible: the track is
-// a translucent white wash over whatever is beneath it, so a colour sitting
-// under it composites to exactly this. Pre-blending gives the muted look
-// without needing to be underneath anything. The track colour is read from the
-// live element rather than hardcoded, so a restyle upstream carries over.
-function blendUnderTrack(color, trackColor) {
-  const base = parseCssColor(color);
-  const track = parseCssColor(trackColor);
-  if (!base) return color;
-  // A fully opaque track would blend the marker into the track's own colour —
-  // which is what being behind one would really look like, i.e. invisible.
-  // Show the unmuted colour instead; a visible marker beats an accurate one.
-  if (!track || !track.a || track.a >= 1) return color;
+// fork: markers are translucent so they MERGE with the bar instead of hiding
+// it. Drawing them behind it is impossible anyway (anything inserted into the
+// slider is pruned in under 100ms — measured; and body-level stacking risks
+// Cobalt's video punch-out erasing them, with no way to check paint order from
+// here), but it also wouldn't give the wanted look: the played fill is opaque
+// (rgb(241,241,241)), so a marker truly behind it would simply disappear under
+// the fill. Letting the compositor blend one translucent colour over whatever
+// is beneath gets it in one step, and self-adjusts per backdrop: over the
+// opaque fill it reads as a pale tint, over the track's translucent white it
+// stays saturated, and the playhead knob shows through rather than being cut
+// out. The boundary between those two tints is the progress indicator.
+// Tunable: lower = more bar showing through, higher = stronger category colour.
+const MARKER_ALPHA = 0.55;
 
-  const mix = (channel, over) => Math.round(track.a * over + (1 - track.a) * channel);
-  return `rgb(${mix(base.r, track.r)}, ${mix(base.g, track.g)}, ${mix(base.b, track.b)})`;
+function markerColor(category) {
+  const base = parseCssColor(categoryColors[category] || '#ffff00');
+  if (!base) return categoryColors[category] || '#ffff00';
+  return `rgba(${base.r}, ${base.g}, ${base.b}, ${MARKER_ALPHA})`;
 }
 
 // fork: the overlay hangs off <body>, so it does not inherit whatever the
@@ -515,7 +516,7 @@ class SponsorBlockController {
     this.overlay.style.top = `${barRect.top}px`;
     this.overlay.style.width = `${barRect.width}px`;
     this.overlay.style.height = `${barRect.height}px`;
-    this.clipMarkersToProgress(barRect);
+    this.layoutMarkers(barRect);
   }
 
   // fork: don't paint over the part of a segment that has already played, so
@@ -531,24 +532,18 @@ class SponsorBlockController {
   // does), so clipping matches what "behind" would look like, and keeps the
   // marker colour clean where it does show instead of tinting it through the
   // track's translucent white.
-  clipMarkersToProgress(barRect) {
+  // fork: markers cover their whole segment — the played part included — so a
+  // segment never disappears as you play through it. The progress fill shows
+  // through the translucent colour (see MARKER_ALPHA), which is what makes
+  // "how far into this segment am I" readable without hiding what the marker
+  // covers. Re-laid out every tick rather than only at draw time, so a reused
+  // overlay (findExistingOverlay) or a bar that changed width lands correctly
+  // instead of keeping whatever geometry it was first built with.
+  layoutMarkers(barRect) {
     if (!this.overlay || !barRect || !barRect.width) return;
 
     const duration = getVideoDuration(this.video, this.segments);
     if (!duration) return;
-
-    const currentTime = this.video ? this.video.currentTime : 0;
-
-    // fork: the knob sits centred on the playhead, which is exactly where a
-    // clipped marker starts — so the marker used to cut across its right half
-    // (measured: knob 1724-1772, marker starting at 1693). Yield to wherever
-    // the knob actually is rather than assuming it tracks currentTime: while
-    // scrubbing it runs ahead of playback, which is precisely when you're
-    // looking at it.
-    const knob = document.querySelector('[idomkey="playheadKnob"]');
-    const knobRect = knob ? knob.getBoundingClientRect() : null;
-    const knobLeft = knobRect && knobRect.width ? knobRect.left - barRect.left : null;
-    const knobRight = knobRect && knobRect.width ? knobRect.right - barRect.left + 2 : null;
 
     const markers = this.overlay.children || [];
 
@@ -558,29 +553,11 @@ class SponsorBlockController {
       const end = parseFloat(marker.getAttribute('data-sb-end'));
       if (!Number.isFinite(start) || !Number.isFinite(end)) continue;
 
-      // Seeking backwards has to bring the marker back, so this is always
-      // re-derived from currentTime rather than shrunk in place.
-      const from = Math.max(start, currentTime);
-      if (from >= end) {
-        marker.style.display = 'none';
-        continue;
-      }
+      const left = `${(start / duration) * barRect.width}px`;
+      const width = `${Math.max(((end - start) / duration) * barRect.width, 2)}px`;
 
-      let left = (from / duration) * barRect.width;
-      const right = (end / duration) * barRect.width;
-
-      if (knobRight !== null && knobRight > left && knobLeft < right) {
-        left = Math.max(left, knobRight);
-      }
-
-      if (right - left <= 0) {
-        marker.style.display = 'none';
-        continue;
-      }
-
-      marker.style.display = 'block';
-      marker.style.left = `${left}px`;
-      marker.style.width = `${Math.max(right - left, 2)}px`;
+      if (marker.style.left !== left) marker.style.left = left;
+      if (marker.style.width !== width) marker.style.width = width;
     }
   }
 
@@ -814,8 +791,6 @@ class SponsorBlockController {
       return;
     }
 
-    const trackColor = window.getComputedStyle(this.progressBar).backgroundColor;
-
     const markerContainer = document.createElement('div');
     markerContainer.id = 'previewbar';
     markerContainer.setAttribute(markerContainerAttribute, 'true');
@@ -842,15 +817,12 @@ class SponsorBlockController {
       marker.style.cssText = 'position: absolute; top: 0; height: 100%;';
       marker.style.left = `${left}px`;
       marker.style.width = `${Math.max(width, 2)}px`;
-      // fork: clipMarkersToProgress() re-derives the drawn span from these on
-      // every tick, and reads them back off the node so a reused overlay
+      // fork: layoutMarkers() re-derives the drawn span from these every tick,
+      // reading them back off the node so a reused overlay
       // (findExistingOverlay) keeps working without any in-memory bookkeeping.
       marker.setAttribute('data-sb-start', String(start));
       marker.setAttribute('data-sb-end', String(end));
-      marker.style.backgroundColor = blendUnderTrack(
-        categoryColors[segmentData.category] || '#ffff00',
-        trackColor
-      );
+      marker.style.backgroundColor = markerColor(segmentData.category);
       marker.title = categoryLabel(segmentData.category);
       markerContainer.appendChild(marker);
       renderedCount += 1;
