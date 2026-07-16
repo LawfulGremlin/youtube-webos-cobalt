@@ -22,6 +22,10 @@ COBALT_DEBUG?=$(YTAF_DEBUG)
 COBALT_DEBUG_ENABLED=$(filter 1 true yes on,$(COBALT_DEBUG))
 COBALT_DEBUG_SUFFIX=$(if $(COBALT_DEBUG_ENABLED),-logging,)
 COBALT_DEBUG_GN_ARG=$(if $(COBALT_DEBUG_ENABLED),true,false)
+# fork: DevTools frontend files ares-package's bundled terser can't parse
+# (see the ares-package recipe below for why exclude flags don't help).
+# Bare filenames, matched anywhere under content/web/debug_remote/.
+UNMINIFIABLE_DEVTOOLS_FILES=formatter_worker.js heap_snapshot_worker.js
 # fork: independent of COBALT_DEBUG, which also switches the downloaded
 # cobalt-bin archive to a "-logging" variant we don't have locally (building
 # one means a from-source Cobalt/Chromium build via the docker-make.%
@@ -318,6 +322,26 @@ endif
 	! test -z "$$libcobalt" || (echo "" && echo "--" && echo "File \"libcobalt.so\" is not present in your IPK. This patch is not compatible with your IPK version." && exit 1) && \
 	cp $(WORKDIR)/cobalt/libcobalt.so $$libcobalt
 	cp -r $(WORKDIR)/cobalt/content $(WORKDIR)/ipk/content/app/cobalt
+# fork: a debug (non-gold) Cobalt build bundles its own DevTools frontend
+# under content/web/debug_remote/devtools/ — needed to actually use the
+# remote debugger; it's a real, working CDP-style server (static /json
+# discovery + websocket), not a stub. ares-package minifies every bundled
+# .js unconditionally (no CLI flag disables it, and -e/--app-exclude
+# doesn't skip the minification step either — it processes every file
+# first and only filters afterward), and its bundled terser is too old to
+# parse some of that frontend's own worker-thread bundles (heavy analysis
+# panels — pretty-printing, heap snapshots — built with newer syntax than
+# the rest of the UI). Losing those specific panels is an acceptable
+# trade for a working Console/Elements/Network/Sources inspector, so stub
+# each culprit's content in place as discovered (keeps the file present —
+# nothing else 404s referencing it — but trivially minifiable) rather
+# than losing the whole frontend. Extend UNMINIFIABLE_DEVTOOLS_FILES if a
+# fresh debug build hits another one.
+	if [ -n "$(COBALT_DEBUG_ENABLED)" ]; then \
+		for f in $(UNMINIFIABLE_DEVTOOLS_FILES); do \
+			find $(WORKDIR)/ipk/content/app/cobalt/content/web/debug_remote -name "$$f" -exec sh -c 'echo "// stub: unparseable by ares-package minifier" > "$$1"' _ {} \; ; \
+		done; \
+	fi
 	mkdir -p $(WORKDIR)/ipk/content/app/cobalt/content/web/adblock
 	mkdir -p $(WORKDIR)/ipk/content/app/cobalt/content/web/adblock
 	if command -v rsync >/dev/null 2>&1; then \
@@ -362,7 +386,13 @@ $(PACKAGE_TARGET): FORCE $(WORKDIR)/image/usr/palm/applications/$(PACKAGE_NAME_O
 
 .PHONY: docker-make.%
 docker-make.%:
-	docker run --rm -i -u $$(id -u):$$(id -g) -e HOME=/app -e npm_config_cache=/app/.npm -e WEBAPP_DEBUG="$(WEBAPP_DEBUG)" -v "$$PWD:/app" -w /app $(NODE_DOCKER_IMAGE) sh -lc 'mkdir -p /app/.webos /app/.npm && make $*'
+# fork: COBALT_DEBUG must be forwarded explicitly — this runs a NEW `make`
+# invocation inside the container, which doesn't inherit variables set on
+# the outer `make` command line (only real env vars via -e). Without this,
+# `make package ... COBALT_DEBUG=1` silently built as if COBALT_DEBUG were
+# unset, since the DevTools-stub step above (gated on COBALT_DEBUG_ENABLED)
+# runs via this target too.
+	docker run --rm -i -u $$(id -u):$$(id -g) -e HOME=/app -e npm_config_cache=/app/.npm -e WEBAPP_DEBUG="$(WEBAPP_DEBUG)" -e COBALT_DEBUG="$(COBALT_DEBUG)" -v "$$PWD:/app" -w /app $(NODE_DOCKER_IMAGE) sh -lc 'mkdir -p /app/.webos /app/.npm && make $*'
 .PHONY: npm
 npm:
 	( \
