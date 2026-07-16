@@ -88,10 +88,21 @@ function isMenuOpen() {
   return Boolean(menu && menu.style.display !== 'none');
 }
 
+// ui.js's key handler is ALSO a capture listener on document, and
+// stopPropagation() does not affect other listeners on the same node —
+// only stopImmediatePropagation() does. Without it, left/right on a
+// binding row would cycle the action AND move focus via ui.js.
+function swallowEvent(evt) {
+  evt.preventDefault();
+  if (evt.stopImmediatePropagation) evt.stopImmediatePropagation();
+  evt.stopPropagation();
+}
+
 // Binding rows in the settings menu: Enter/left/right cycle the focused
 // slot's action. Registered at import time, which is before ui.js installs
-// its document handlers, so this capture listener wins for these keys while
-// a binding row is focused; up/down fall through to ui.js focus movement.
+// its document handlers, so this capture listener runs first for these keys
+// while a binding row is focused; up/down fall through to ui.js focus
+// movement.
 function onMenuKey(evt) {
   if (!isMenuOpen()) return;
   const el = document.activeElement;
@@ -103,8 +114,7 @@ function onMenuKey(evt) {
   else if (key === 37) delta = -1; // left
   else return;
 
-  evt.preventDefault();
-  evt.stopPropagation();
+  swallowEvent(evt);
 
   const cfgKey = bindingConfigKey(el.dataset.forkSlot);
   configWrite(cfgKey, cycleActionKey(configRead(cfgKey), delta));
@@ -125,8 +135,7 @@ function onShortcutKey(evt) {
   if (action.scope === 'VIDEO' && !isWatchContext()) return;
   if (evt.repeat && !action.burst) return;
 
-  evt.preventDefault();
-  evt.stopPropagation();
+  swallowEvent(evt);
   action.handler();
 }
 document.addEventListener('keydown', onShortcutKey, true);
