@@ -26,6 +26,7 @@ COBALT_DEBUG_GN_ARG=$(if $(COBALT_DEBUG_ENABLED),true,false)
 # (see the ares-package recipe below for why exclude flags don't help).
 # Bare filenames, matched anywhere under content/web/debug_remote/.
 UNMINIFIABLE_DEVTOOLS_FILES=formatter_worker.js heap_snapshot_worker.js
+ICON_DIR=$(if $(COBALT_DEBUG_ENABLED),assets/debug,assets)
 # fork: independent of COBALT_DEBUG, which also switches the downloaded
 # cobalt-bin archive to a "-logging" variant we don't have locally (building
 # one means a from-source Cobalt/Chromium build via the docker-make.%
@@ -300,10 +301,13 @@ $(WORKDIR)/ipk/content/app/cobalt/content/web/adblock: $(WEBAPP_OUTPUT_STAMP)
 	jq --arg version "$(PACKAGE_VERSION)" 'del(.fileSystemType) | .version = $$version | .vendorExtension.userAgent = "$$browserName$$/$$browserVersion$$ ($$platformName$$-$$platformVersion$$), _TV_O18/$$firmwareVersion$$ (LG, $$modelName$$, $$networkMode$$)" | .vendorExtension.allowCrossDomain = true | .support360Content = true | .trustLevel = "netcast" | .privilegedJail = true | .supportGIP = true' < $(WORKDIR)/ipk/appinfo.json > $(WORKDIR)/ipk/appinfo2.json
 	mv $(WORKDIR)/ipk/appinfo2.json $(WORKDIR)/ipk/appinfo.json
 
-	cp assets/icon.png $(WORKDIR)/ipk/$$(jq -r '.icon' < $(WORKDIR)/ipk/appinfo.json)
-	cp assets/mediumLargeIcon.png $(WORKDIR)/ipk/$$(jq -r '.mediumLargeIcon' < $(WORKDIR)/ipk/appinfo.json)
-	cp assets/largeIcon.png $(WORKDIR)/ipk/$$(jq -r '.largeIcon' < $(WORKDIR)/ipk/appinfo.json)
-	cp assets/extraLargeIcon.png $(WORKDIR)/ipk/$$(jq -r '.extraLargeIcon' < $(WORKDIR)/ipk/appinfo.json)
+# fork: debug builds get red-tinted icons (assets/debug/*.png) so they're
+# visually distinguishable from the release app in the webOS app list —
+# both install side by side under different app IDs.
+	cp $(ICON_DIR)/icon.png $(WORKDIR)/ipk/$$(jq -r '.icon' < $(WORKDIR)/ipk/appinfo.json)
+	cp $(ICON_DIR)/mediumLargeIcon.png $(WORKDIR)/ipk/$$(jq -r '.mediumLargeIcon' < $(WORKDIR)/ipk/appinfo.json)
+	cp $(ICON_DIR)/largeIcon.png $(WORKDIR)/ipk/$$(jq -r '.largeIcon' < $(WORKDIR)/ipk/appinfo.json)
+	cp $(ICON_DIR)/extraLargeIcon.png $(WORKDIR)/ipk/$$(jq -r '.extraLargeIcon' < $(WORKDIR)/ipk/appinfo.json)
 	cp assets/playIcon.png $(WORKDIR)/ipk/$$(jq -r '.playIcon' < $(WORKDIR)/ipk/appinfo.json)
 	cp assets/imageForRecents.png $(WORKDIR)/ipk/$$(jq -r '.imageForRecents' < $(WORKDIR)/ipk/appinfo.json)
 
