@@ -473,6 +473,49 @@ class SponsorBlockController {
     this.overlay.style.top = `${barRect.top}px`;
     this.overlay.style.width = `${barRect.width}px`;
     this.overlay.style.height = `${barRect.height}px`;
+    this.clipMarkersToProgress(barRect.width);
+  }
+
+  // fork: don't paint over the part of a segment that has already played, so
+  // YouTube's own progress fill stays visible inside a marker and you can see
+  // where playback is within a segment. Drawing the markers *behind* the bar
+  // instead — the obvious way — isn't available here: anything inserted into
+  // the slider is pruned in under 100ms (it is re-patched constantly as the
+  // fill advances; measured live, gone before the first 100ms sample), and
+  // body-level stacking can't be relied on either, since Cobalt composites
+  // video by punching through the web layer and content painted below the
+  // player risks going with it. The played fill is opaque white anyway
+  // (rgb(241,241,241) — it would hide a marker behind it exactly like this
+  // does), so clipping matches what "behind" would look like, and keeps the
+  // marker colour clean where it does show instead of tinting it through the
+  // track's translucent white.
+  clipMarkersToProgress(barWidth) {
+    if (!this.overlay || !barWidth) return;
+
+    const duration = getVideoDuration(this.video, this.segments);
+    if (!duration) return;
+
+    const currentTime = this.video ? this.video.currentTime : 0;
+    const markers = this.overlay.children || [];
+
+    for (let index = 0; index < markers.length; index += 1) {
+      const marker = markers[index];
+      const start = parseFloat(marker.getAttribute('data-sb-start'));
+      const end = parseFloat(marker.getAttribute('data-sb-end'));
+      if (!Number.isFinite(start) || !Number.isFinite(end)) continue;
+
+      // Seeking backwards has to bring the marker back, so this is always
+      // re-derived from currentTime rather than shrunk in place.
+      const from = Math.max(start, currentTime);
+      if (from >= end) {
+        marker.style.display = 'none';
+        continue;
+      }
+
+      marker.style.display = 'block';
+      marker.style.left = `${(from / duration) * barWidth}px`;
+      marker.style.width = `${Math.max(((end - from) / duration) * barWidth, 2)}px`;
+    }
   }
 
   // fork: drawOverlay() calls stopMarkerObserver() as soon as it succeeds, so
@@ -731,6 +774,11 @@ class SponsorBlockController {
       marker.style.cssText = 'position: absolute; top: 0; height: 100%;';
       marker.style.left = `${left}px`;
       marker.style.width = `${Math.max(width, 2)}px`;
+      // fork: clipMarkersToProgress() re-derives the drawn span from these on
+      // every tick, and reads them back off the node so a reused overlay
+      // (findExistingOverlay) keeps working without any in-memory bookkeeping.
+      marker.setAttribute('data-sb-start', String(start));
+      marker.setAttribute('data-sb-end', String(end));
       marker.style.backgroundColor = categoryColors[segmentData.category] || '#ffff00';
       marker.title = categoryLabel(segmentData.category);
       markerContainer.appendChild(marker);

@@ -88,6 +88,21 @@ adding features itself.
     by sitting inside the player subtree and inheriting the controls' fade,
     which is the same placement that gets pruned. There was nothing to borrow.
 
+    Markers are clipped to the *unplayed* part of their segment
+    (`clipMarkersToProgress()`, re-derived from `currentTime` each tick so
+    seeking backwards restores them) rather than drawn behind the bar, so
+    YouTube's progress fill stays visible inside a segment. Drawing them behind
+    it is not possible: anything inserted into the slider is pruned in under
+    100ms (measured — the fill is re-patched constantly as it advances, and the
+    probe was gone before the first sample), and body-level stacking can't be
+    trusted either, because Cobalt composites video by punching through the web
+    layer, so content painted below the player risks being erased with it. The
+    played fill is opaque white, so clipping is what "behind" would look like
+    anyway, without tinting the marker through the track's translucent white.
+    Note this engine has neither `document.elementFromPoint` nor
+    `Page.captureScreenshot`/`DOM.getNodeForLocation` over CDP, so paint order
+    can't be checked from here — prefer approaches that don't depend on it.
+
     All of it verified live via CDP before touching hardware, mostly without
     needing real playback: inject a synthetic `ytlr-progress-bar`/`slider`
     pair, drive `checkForProgressBar()`, then assert on the result (marker
