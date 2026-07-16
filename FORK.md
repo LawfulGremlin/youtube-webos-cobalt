@@ -60,6 +60,22 @@ adding features itself.
     segment reference, injected-segment marker rendered with correct
     geometry and category color, stable across continued playback) before
     ever touching hardware.
+
+    A second, related fix landed alongside it: `clearOverlay()` now actually
+    removes the marker container from the DOM instead of just nulling the JS
+    reference (previously scattered as `this.overlay = null` across
+    `reset()`/`destroy()`/`loadVideo()`/`checkForProgressBar()`).
+    `findExistingOverlay()` only ever matches the *current* videoID, so a
+    prior video's leftover container was never found again and just
+    accumulated as a permanent sibling of the stable anchor on every video
+    change — harmless while marker rendering was broken outright, but a real
+    bug once the fix above made rendering actually happen. Verified live via
+    CDP without needing real playback: injected a synthetic
+    `ytlr-progress-bar`/`idomkey="progress-bar"` pair directly into the DOM,
+    drove `drawOverlay()` to create a real marker node, then called
+    `loadVideo()` with a different ID to simulate a video switch and
+    confirmed the old node's `parentNode` is `null` and zero
+    `data-ytaf-video-id` nodes remain anywhere in the document.
   - `ui.js` — one hardware-confirmed fix stands: `moveFocus()` re-derived
     "current position" from `document.activeElement` every call — on
     hardware, down/up skipped a row every time. Root cause unconfirmed (see
