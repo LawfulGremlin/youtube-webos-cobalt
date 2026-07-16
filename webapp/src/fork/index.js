@@ -4,10 +4,13 @@
 
 import { configRead, configWrite } from '../config.js';
 import { checkboxTools } from '../checkboxTools.js';
+import { showNotification } from '../ui.js';
 import { filterTvResponse } from './filters.mjs';
+import { framesForKey, stepTarget } from './frame-step.mjs';
 
 const FORK_DEFAULTS = {
-  forkRemoveShorts: false
+  forkRemoveShorts: false,
+  forkFrameStep: true
 };
 
 // Seed fork-only keys: upstream's defaultConfig doesn't know them, so an
@@ -38,6 +41,35 @@ JSON.parse = function () {
   return result;
 };
 
+// Frame stepping on the red/blue remote keys (watch context only, and never
+// while the settings menu is open). Registered in capture phase before
+// upstream's handlers; red/blue don't collide with them (ui.js uses green).
+function onFrameStepKey(evt) {
+  const frames = framesForKey(evt.keyCode || evt.which || 0);
+  if (!frames) return;
+  if (!configRead('forkFrameStep')) return;
+
+  const menu = document.querySelector('.ytaf-ui-container');
+  if (menu && menu.style.display !== 'none') return;
+  if (!/[?&#]v=/.test(String(window.location.href) + String(window.location.hash))) return;
+
+  const video = document.querySelector('video');
+  if (!video || !isFinite(video.currentTime)) return;
+
+  evt.preventDefault();
+  evt.stopPropagation();
+
+  if (!video.paused) video.pause();
+  video.currentTime = stepTarget(video.currentTime, video.duration, frames);
+
+  const abs = Math.abs(frames);
+  showNotification(
+    frames > 0 ? '►| +' + abs + ' Frame' : '|◄ -' + abs + ' Frame',
+    1000
+  );
+}
+document.addEventListener('keydown', onFrameStepKey, true);
+
 // Append our toggle rows once upstream's settings UI exists. The container is
 // built when startUserScript() runs, which is after module import time.
 let uiTries = 0;
@@ -54,6 +86,14 @@ function appendForkUI() {
       'Remove Shorts',
       configRead('forkRemoveShorts'),
       (state) => configWrite('forkRemoveShorts', state)
+    )
+  );
+  container.appendChild(
+    checkboxTools.add(
+      '__fork_frame_step',
+      'Frame Step (Red/Blue)',
+      configRead('forkFrameStep'),
+      (state) => configWrite('forkFrameStep', state)
     )
   );
 }

@@ -3,6 +3,7 @@
 
 import assert from 'node:assert/strict';
 import { filterTvResponse } from './filters.mjs';
+import { framesForKey, stepTarget, FRAME_DURATION_SEC } from './frame-step.mjs';
 
 const BOTH = { removeShorts: true, removeAds: true };
 
@@ -93,4 +94,26 @@ assert.equal(filterTvResponse('"a string"', BOTH), 0);
 assert.equal(filterTvResponse([null, 42, 'x'], BOTH), 0);
 assert.equal(filterTvResponse({ a: { b: [null, { c: [] }] } }, BOTH), 0);
 
-console.log('fork filters: all tests passed');
+// Frame step: key mapping (red back, blue forward incl. 191 alt, others inert)
+assert.equal(framesForKey(403), -1);
+assert.equal(framesForKey(406), 1);
+assert.equal(framesForKey(191), 1);
+assert.equal(framesForKey(404), 0); // green — settings menu, must stay untouched
+assert.equal(framesForKey(405), 0);
+assert.equal(framesForKey(undefined), 0);
+
+// Frame step: normal stepping math
+assert.ok(Math.abs(stepTarget(10, 100, 1) - (10 + FRAME_DURATION_SEC)) < 1e-9);
+assert.ok(Math.abs(stepTarget(10, 100, -1) - (10 - FRAME_DURATION_SEC)) < 1e-9);
+
+// Frame step: floor at 0, ceiling one frame short of the end (Cobalt restarts
+// a video seeked to its exact end)
+assert.equal(stepTarget(0, 100, -1), 0);
+assert.equal(stepTarget(99.999, 100, 1), 100 - FRAME_DURATION_SEC);
+assert.equal(stepTarget(100, 100, 1), 100 - FRAME_DURATION_SEC);
+
+// Frame step: unknown duration (NaN while loading) must not block stepping
+assert.ok(Math.abs(stepTarget(10, NaN, 1) - (10 + FRAME_DURATION_SEC)) < 1e-9);
+assert.equal(stepTarget(0, undefined, -1), 0);
+
+console.log('fork filters + frame step: all tests passed');

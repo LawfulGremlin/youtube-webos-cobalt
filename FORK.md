@@ -34,8 +34,11 @@ adding features itself.
   upstream files. Pure logic goes in `filters.mjs` with node-runnable tests in
   `test.mjs` (run by `fork-ci.yml`).
 - Current fork features: **Remove Shorts** toggle (shelves + tiles), **feed ad item
-  removal** (adSlotRenderer/reel ads, rides the existing AdBlock toggle), and an
-  end-of-video clamp in `sponsorblock.js` that stops outro skips from looping the
+  removal** (adSlotRenderer/reel ads, rides the existing AdBlock toggle), **frame
+  stepping** (red = 1 frame back, blue = 1 frame forward while watching; ported from
+  LawfulGremlin/youtube-webos, bound to color keys since this base has no shortcut
+  registry — the ±15-frame variants were dropped, key auto-repeat covers them), and
+  an end-of-video clamp in `sponsorblock.js` that stops outro skips from looping the
   video (the one deliberate upstream-file edit, marked with a `fork:` comment).
 - Deliberately not ported: 4K/quality forcing (capped by the Cobalt binary + DRM,
   not fixable in JS), auto-login (Cobalt's native account flow already works), UI
