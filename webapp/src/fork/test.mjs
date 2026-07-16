@@ -2,7 +2,11 @@
 // Plain node + assert — no framework, mirrors upstream's zero-test-infra style.
 
 import assert from 'node:assert/strict';
-import { filterTvResponse } from './filters.mjs';
+import {
+  filterTvResponse,
+  getUnmatchedShoppingKeys,
+  resetUnmatchedShoppingKeys
+} from './filters.mjs';
 import { stepTarget, FRAME_DURATION_SEC } from './frame-step.mjs';
 import {
   SLOTS,
@@ -145,5 +149,51 @@ assert.equal(stepTarget(100, 100, 1), 100 - FRAME_DURATION_SEC);
 // Frame step: unknown duration (NaN while loading) must not block stepping
 assert.ok(Math.abs(stepTarget(10, NaN, 1) - (10 + FRAME_DURATION_SEC)) < 1e-9);
 assert.equal(stepTarget(0, undefined, -1), 0);
+
+// Shopping/merch overlay: removed as an object property (playerOverlays), which
+// is where the in-video QR card lives — the array path alone never reaches it.
+{
+  const data = {
+    playerOverlays: {
+      playerOverlayRenderer: {
+        merchandiseShelfRenderer: { title: 'Rippling Muscles T-shirt' },
+        decoratedPlayerBarRenderer: { keep: true }
+      }
+    }
+  };
+  assert.equal(filterTvResponse(data, { removeAds: true }), 1);
+  assert.equal(
+    data.playerOverlays.playerOverlayRenderer.merchandiseShelfRenderer,
+    undefined
+  );
+  assert.ok(data.playerOverlays.playerOverlayRenderer.decoratedPlayerBarRenderer);
+}
+
+// Shopping overlay carried as an array item is dropped too.
+{
+  const data = { contents: [{ tileRenderer: { videoId: 'keep' } }, { productShelfRenderer: {} }] };
+  assert.equal(filterTvResponse(data, { removeAds: true }), 1);
+  assert.equal(data.contents.length, 1);
+  assert.ok(data.contents[0].tileRenderer);
+}
+
+// Shopping removal rides the adblock toggle: off means untouched.
+{
+  const data = { playerOverlays: { merchandiseShelfRenderer: { a: 1 } } };
+  assert.equal(filterTvResponse(data, { removeAds: false, removeShorts: true }), 0);
+  assert.ok(data.playerOverlays.merchandiseShelfRenderer);
+}
+
+// Diagnostic: shopping-shaped keys we do NOT know are reported, never removed —
+// this is what names the real renderer if the guessed list misses it.
+{
+  resetUnmatchedShoppingKeys();
+  const data = { playerOverlays: { someUnknownShoppingThingRenderer: { a: 1 }, productListRenderer: {} } };
+  filterTvResponse(data, { removeAds: true });
+  assert.deepEqual(getUnmatchedShoppingKeys(), ['someUnknownShoppingThingRenderer']);
+  assert.ok(data.playerOverlays.someUnknownShoppingThingRenderer, 'unknown keys must survive');
+  assert.equal(data.playerOverlays.productListRenderer, undefined, 'known keys are removed');
+  resetUnmatchedShoppingKeys();
+}
 
 console.log('fork filters + frame step + shortcut registry: all tests passed');

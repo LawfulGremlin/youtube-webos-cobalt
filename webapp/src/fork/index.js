@@ -5,7 +5,7 @@
 import { configRead, configWrite } from '../config.js';
 import { checkboxTools } from '../checkboxTools.js';
 import { showNotification } from '../ui.js';
-import { filterTvResponse } from './filters.mjs';
+import { filterTvResponse, getUnmatchedShoppingKeys } from './filters.mjs';
 import { stepTarget } from './frame-step.mjs';
 import {
   SLOTS,
@@ -55,6 +55,13 @@ JSON.parse = function () {
   }
   return result;
 };
+
+// fork: the in-video shopping/merch overlay's exact TV renderer name is
+// unconfirmed (the TV was off when it was reported, and it only appears
+// mid-playback). SHOPPING_RENDERER_KEYS is a best guess; this exposes whatever
+// shopping-shaped keys it did NOT match, so `window.ytafShoppingKeys()` over
+// the debug build's CDP names the real one instead of another guessing round.
+window.ytafShoppingKeys = getUnmatchedShoppingKeys;
 
 // --- Shortcut actions -------------------------------------------------------
 

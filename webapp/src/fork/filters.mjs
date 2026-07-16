@@ -5,6 +5,39 @@
 // Predicates ported from LawfulGremlin/youtube-webos src/adblock.js so both
 // forks drop the same renderer shapes.
 
+// fork: the in-video shopping/merch overlay (a QR card, e.g. "Rippling Muscles
+// T-shirt / Limited delivery areas", with its own dismiss X) is not a feed ad —
+// it's a different renderer, which is why the adSlotRenderer path never touched
+// it. These are the plausible InnerTube names for it; the TV client's exact one
+// is unconfirmed, hence SHOPPING_KEY_HINT below, which reports anything
+// shopping-shaped that these names miss so the list can be corrected from real
+// data rather than guessed at again.
+const SHOPPING_RENDERER_KEYS = [
+  'merchandiseShelfRenderer',
+  'shoppingOverlayRenderer',
+  'productListRenderer',
+  'productShelfRenderer',
+  'productsInVideoOverlayRenderer',
+  'tvProductShelfRenderer',
+  'shoppingCarouselRenderer',
+  'ypcOfferRenderer'
+];
+
+// Anything that looks commerce-y but isn't in the list above. Recorded, never
+// removed — removing on a loose regex would risk eating real content.
+const SHOPPING_KEY_HINT = /(merch|shopping|product|commerce|storefront)/i;
+
+const shoppingKeysSeen = Object.create(null);
+
+/** Diagnostic: shopping-shaped renderer keys seen but NOT removed. */
+export function getUnmatchedShoppingKeys() {
+  return Object.keys(shoppingKeysSeen).sort();
+}
+
+export function resetUnmatchedShoppingKeys() {
+  Object.keys(shoppingKeysSeen).forEach((key) => delete shoppingKeysSeen[key]);
+}
+
 const SHELF_TYPE_SHORTS = 'TVHTML5_SHELF_RENDERER_TYPE_SHORTS';
 const TILE_STYLE_SHORTS = 'TILE_STYLE_YTLR_SHORTS';
 const CONTENT_TYPE_SHORTS = 'TILE_CONTENT_TYPE_SHORTS';
@@ -47,6 +80,14 @@ function isShortsTile(item) {
 // Feed-level ad items. Upstream adblock.js nulls the shallow ad keys
 // (adPlacements, adSlots, ...) but leaves ad *items* sitting inside feed
 // arrays; this removes them entirely, like youtube-webos does.
+// In-video shopping/merch overlay carried as a feed/array item.
+function isShoppingItem(item) {
+  for (let i = 0; i < SHOPPING_RENDERER_KEYS.length; i++) {
+    if (item[SHOPPING_RENDERER_KEYS[i]]) return true;
+  }
+  return false;
+}
+
 function isFeedAd(item) {
   if (item.adSlotRenderer) return true;
   const endpoint = item.command?.reelWatchEndpoint;
@@ -75,6 +116,7 @@ export function filterTvResponse(root, flags) {
 
   function shouldDrop(item) {
     if (!item || typeof item !== 'object') return false;
+    if (removeAds && isShoppingItem(item)) return true;
     if (removeAds && isFeedAd(item)) return true;
     if (removeShorts && (isShortsShelf(item) || isShortsTile(item))) return true;
     return false;
@@ -99,9 +141,24 @@ export function filterTvResponse(root, flags) {
       return;
     }
 
+    // fork: shopping overlays hang off objects (playerOverlays and friends),
+    // not just feed arrays, so drop matching properties outright — the array
+    // path above alone would never reach them.
     const keys = Object.keys(value);
     for (let i = 0; i < keys.length; i++) {
-      walk(value[keys[i]], depth + 1);
+      const key = keys[i];
+
+      if (removeAds && SHOPPING_RENDERER_KEYS.indexOf(key) !== -1) {
+        delete value[key];
+        removed += 1;
+        continue;
+      }
+
+      if (SHOPPING_KEY_HINT.test(key) && value[key] && typeof value[key] === 'object') {
+        shoppingKeysSeen[key] = true;
+      }
+
+      walk(value[key], depth + 1);
     }
   }
 
