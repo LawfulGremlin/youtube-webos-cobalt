@@ -57,7 +57,12 @@ adding features itself.
     note below), but the fix doesn't need to know: `currentFocusIndex` now
     tracks position ourselves, advanced only by our own calls, so it can't
     inherit an extra step from anything else that might also be moving focus
-    for the same keypress.
+    for the same keypress. In both call sites, `updateRowWindow()` must run
+    BEFORE `.focus()`, not after — `.focus()` on an element inside a
+    `display:none` ancestor is a silent no-op, so focusing a target still
+    hidden by the previous window and revealing it a moment later would
+    simply fail to move focus every time navigation crosses into a new
+    window.
   - `fork/index.js` — `navigation-checkbox.js` polyfills a global
     `window.navigate(dir)` for native browser spatial navigation; nothing in
     this codebase calls it, so if it's real, only the platform calls it. This

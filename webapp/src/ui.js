@@ -89,9 +89,13 @@ export function userScriptStartUI() {
 
     const nextItem = focusableItems[currentFocusIndex];
     if (nextItem) {
+      // fork: reveal the target row BEFORE focusing it — .focus() on an
+      // element inside a display:none ancestor is a silent no-op, so
+      // focusing first and unhiding after would fail every time the move
+      // crosses into a row outside the current window.
+      updateRowWindow(nextItem);
       nextItem.focus();
       lastTabIndex = nextItem.tabIndex;
-      updateRowWindow(nextItem);
     }
   }
 
@@ -341,14 +345,15 @@ export function userScriptStartUI() {
     }
 
     if (target) {
+      // fork: keep moveFocus()'s own index in sync with this explicit,
+      // known focus placement (see currentFocusIndex above), and reveal
+      // the row before focusing it — same reason as in moveFocus().
+      currentFocusIndex = focusableItems.indexOf(target);
+      updateRowWindow(target);
       target.focus();
       if (target.tabIndex !== null && target.tabIndex > 0) {
         lastTabIndex = target.tabIndex;
       }
-      // fork: keep moveFocus()'s own index in sync with this explicit,
-      // known focus placement (see currentFocusIndex above).
-      currentFocusIndex = focusableItems.indexOf(target);
-      updateRowWindow(target);
       return true;
     }
 
