@@ -80,6 +80,25 @@ export function userScriptStartUI() {
     if (nextItem) {
       nextItem.focus();
       lastTabIndex = nextItem.tabIndex;
+      ensureFocusVisible(nextItem);
+    }
+  }
+
+  // fork: Cobalt's minimal engine doesn't auto-scroll a newly focused
+  // element into view like a full browser does, so a menu taller than one
+  // screen (13 shortcut-binding rows pushed this past the fold) left focus
+  // moving off-screen with no visual feedback. Manual nearest-edge scroll
+  // via getBoundingClientRect, since scrollIntoView({block}) support on
+  // this engine is unknown.
+  function ensureFocusVisible(item) {
+    if (!item) return;
+    const itemRect = item.getBoundingClientRect();
+    const containerRect = uiContainer.getBoundingClientRect();
+
+    if (itemRect.top < containerRect.top) {
+      uiContainer.scrollTop -= containerRect.top - itemRect.top;
+    } else if (itemRect.bottom > containerRect.bottom) {
+      uiContainer.scrollTop += itemRect.bottom - containerRect.bottom;
     }
   }
 
@@ -285,6 +304,7 @@ export function userScriptStartUI() {
       if (target.tabIndex !== null && target.tabIndex > 0) {
         lastTabIndex = target.tabIndex;
       }
+      ensureFocusVisible(target);
       return true;
     }
 

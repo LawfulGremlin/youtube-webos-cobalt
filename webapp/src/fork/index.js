@@ -88,6 +88,27 @@ function isMenuOpen() {
   return Boolean(menu && menu.style.display !== 'none');
 }
 
+// fork: navigation-checkbox.js installs a global window.navigate(dir) as a
+// polyfill for native browser-engine spatial navigation — nothing in this
+// codebase calls it, so the only caller is Cobalt/YouTube-TV-chrome itself.
+// That means a single D-pad press drives BOTH the native/polyfilled
+// navigate() AND ui.js's own moveFocus() independently, each moving focus
+// one step — net effect: our settings menu skips every other row. Suppress
+// the call only while our menu owns the screen; leave it untouched
+// elsewhere so the rest of the app's own navigation isn't affected.
+console.info('[ytaf-fork] window.navigate at fork init: ' + typeof window.navigate);
+if (typeof window.navigate === 'function') {
+  const nativeNavigate = window.navigate;
+  window.navigate = function () {
+    if (isMenuOpen()) {
+      console.info('[ytaf-fork] suppressed window.navigate (menu open)');
+      return undefined;
+    }
+    return nativeNavigate.apply(this, arguments);
+  };
+  console.info('[ytaf-fork] wrapped window.navigate to suppress it while menu is open');
+}
+
 // ui.js's key handler is ALSO a capture listener on document, and
 // stopPropagation() does not affect other listeners on the same node —
 // only stopImmediatePropagation() does. Without it, left/right on a

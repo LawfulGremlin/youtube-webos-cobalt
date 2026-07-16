@@ -37,8 +37,20 @@ adding features itself.
   removal** (adSlotRenderer/reel ads, rides the existing AdBlock toggle), a
   **shortcut-key registry** with **frame stepping** actions (both ported from
   LawfulGremlin/youtube-webos fork-extensions), and an end-of-video clamp in
-  `sponsorblock.js` that stops outro skips from looping the video (the one
-  deliberate upstream-file edit, marked with a `fork:` comment).
+  `sponsorblock.js` that stops outro skips from looping the video. These are the
+  deliberate upstream-file edits, each marked with a `fork:` comment:
+  - `sponsorblock.js` — the outro-loop clamp above.
+  - `ui.js` — `ensureFocusVisible()`: Cobalt doesn't auto-scroll a focused element
+    into view, so the settings menu (now 25 rows with the shortcut registry added)
+    left focus moving off-screen with no feedback. Found on first real-hardware test.
+  - `ui.js` / `fork/index.js` — `navigation-checkbox.js` polyfills a global
+    `window.navigate(dir)` for native browser spatial navigation; nothing in this
+    codebase calls it, so on hardware that provides it natively, a single D-pad
+    press drove it AND `ui.js`'s own `moveFocus()` in parallel, silently skipping
+    every other row. `fork/index.js` wraps `window.navigate` to no-op while our
+    menu is open, logging `[ytaf-fork] wrapped window.navigate...` /
+    `suppressed window.navigate...` so a failed fix is diagnosable from
+    `logread` without another blind guess.
 - Shortcut keys: the settings menu has a binding row per bindable remote key —
   red/yellow/blue color buttons (green opens the menu itself) and number keys 0-9.
   Enter/left/right on a row cycles its action: None, Frame Step Forward/Backward,
