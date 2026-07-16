@@ -61,9 +61,8 @@ JSON.parse = function () {
 // keys off shoppingTimelyActionRenderer, which is *inferred* from the DOM tag
 // (ytlr-shopping-timely-action-renderer) via this client's tag↔renderer naming
 // convention — the element names are confirmed live, the InnerTube key isn't.
-// fork.css keys off the confirmed element name instead; this just gates it on
-// the AdBlock toggle, so it follows the setting live. If the JSON key is right,
-// the rule never has anything to hide.
+// fork.css keys off the confirmed element name instead; this gates it on the
+// AdBlock toggle. If the JSON key is right, the rule never has anything to hide.
 function syncShoppingCardHiding() {
   const root = document.documentElement;
   if (!root) return;
@@ -74,6 +73,15 @@ function syncShoppingCardHiding() {
   }
 }
 syncShoppingCardHiding();
+
+// The JSON filter above re-reads the toggle on every parse, so it follows the
+// setting for free — this class doesn't, and syncing it only at import would
+// leave the card hidden (or showing) until the next launch. configWrite emits
+// this event for exactly that.
+document.addEventListener('ytaf-config-changed', (evt) => {
+  const key = evt && evt.detail && evt.detail.key;
+  if (!key || key === 'enableAdBlock') syncShoppingCardHiding();
+});
 
 // fork: SHOPPING_RENDERER_KEYS above is inferred, not confirmed. This exposes
 // any shopping-shaped key it did NOT match, so `window.ytafShoppingKeys()` over
