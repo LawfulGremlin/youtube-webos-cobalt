@@ -91,26 +91,48 @@ export function userScriptStartUI() {
     if (nextItem) {
       nextItem.focus();
       lastTabIndex = nextItem.tabIndex;
-      ensureFocusVisible(nextItem);
+      updateRowWindow(nextItem);
     }
   }
 
-  // fork: Cobalt's minimal engine doesn't auto-scroll a newly focused
-  // element into view like a full browser does, so a menu taller than one
-  // screen (13 shortcut-binding rows pushed this past the fold) left focus
-  // moving off-screen with no visual feedback. Manual nearest-edge scroll
-  // via getBoundingClientRect, since scrollIntoView({block}) support on
-  // this engine is unknown.
-  function ensureFocusVisible(item) {
-    if (!item) return;
-    const itemRect = item.getBoundingClientRect();
-    const containerRect = uiContainer.getBoundingClientRect();
+  // fork: two prior attempts at "scroll the menu so focus stays visible"
+  // (native scrollIntoView, then manual getBoundingClientRect + scrollTop)
+  // both did nothing on hardware — focus could reach rows below the fold,
+  // but the viewport itself never moved. That means whatever makes
+  // overflow+scrollTop an interactive, scrollable region isn't working on
+  // this engine, regardless of box sizing. Rather than guess at another
+  // CSS/scroll trick, this uses the one primitive already PROVEN to work
+  // here: display:none/'' toggling is literally how the whole menu shows
+  // and hides itself. Only a sliding window of rows around the focused one
+  // is ever rendered; everything else is display:none, so the container
+  // never needs to overflow or scroll at all.
+  const ROW_WINDOW_SIZE = 8;
+  let rowWindowStart = 0;
 
-    if (itemRect.top < containerRect.top) {
-      uiContainer.scrollTop -= containerRect.top - itemRect.top;
-    } else if (itemRect.bottom > containerRect.bottom) {
-      uiContainer.scrollTop += itemRect.bottom - containerRect.bottom;
+  function getRowWrapper(item) {
+    return item && item.closest ? item.closest('.toggler-wrapper') : null;
+  }
+
+  function updateRowWindow(focusedItem) {
+    const rows = Array.from(uiContainer.querySelectorAll('.toggler-wrapper'));
+    if (rows.length === 0) return;
+
+    const windowSize = Math.min(ROW_WINDOW_SIZE, rows.length);
+    const focusedIndex = rows.indexOf(getRowWrapper(focusedItem));
+
+    if (focusedIndex !== -1) {
+      if (focusedIndex < rowWindowStart) {
+        rowWindowStart = focusedIndex;
+      } else if (focusedIndex > rowWindowStart + windowSize - 1) {
+        rowWindowStart = focusedIndex - windowSize + 1;
+      }
     }
+    rowWindowStart = Math.max(0, Math.min(rowWindowStart, rows.length - windowSize));
+    const windowEnd = rowWindowStart + windowSize - 1;
+
+    rows.forEach((row, index) => {
+      row.style.display = index >= rowWindowStart && index <= windowEnd ? '' : 'none';
+    });
   }
 
   const uiContainer = document.createElement('div');
@@ -326,7 +348,7 @@ export function userScriptStartUI() {
       // fork: keep moveFocus()'s own index in sync with this explicit,
       // known focus placement (see currentFocusIndex above).
       currentFocusIndex = focusableItems.indexOf(target);
-      ensureFocusVisible(target);
+      updateRowWindow(target);
       return true;
     }
 

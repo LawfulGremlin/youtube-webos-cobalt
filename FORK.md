@@ -41,17 +41,23 @@ adding features itself.
   deliberate upstream-file edits, each marked with a `fork:` comment:
   - `sponsorblock.js` — the outro-loop clamp above.
   - `ui.js` — the settings menu (25 rows once the shortcut registry landed) has
-    two hardware-confirmed fixes: (1) `maxHeight`/`maxWidth` were `80vh`/`80vw` —
-    Cobalt appears not to evaluate those units, so the box never actually
-    constrained its content, `overflow: auto` never engaged, and focus could
-    move off-screen with nothing to scroll; both are now computed in JS from
-    `window.innerWidth/innerHeight` and set as plain pixels. (2)
-    `moveFocus()` re-derived "current position" from `document.activeElement`
-    every call — on hardware, down/up skipped a row every time. Root cause
-    unconfirmed (see the `window.navigate` note below), but the fix doesn't
-    need to know: `currentFocusIndex` now tracks position ourselves, advanced
-    only by our own calls, so it can't inherit an extra step from anything
-    else that might also be moving focus for the same keypress.
+    two hardware-confirmed fixes: (1) two straight attempts at making the menu
+    scroll (native scrollIntoView, then manual getBoundingClientRect+scrollTop
+    with a pixel-based maxHeight) both did nothing on hardware — focus reached
+    rows below the fold, but the viewport itself never moved, meaning
+    whatever makes `overflow`+`scrollTop` an interactive scrollable region
+    isn't working on this engine at all, independent of box sizing. Rather
+    than guess at a third CSS/scroll trick, `updateRowWindow()` uses the one
+    primitive already proven to work here — `display: none/''` toggling is
+    literally how the whole menu shows and hides itself — to render only a
+    sliding window of rows around the focused one, so the container never
+    needs to overflow or scroll. (2) `moveFocus()` re-derived "current
+    position" from `document.activeElement` every call — on hardware, down/up
+    skipped a row every time. Root cause unconfirmed (see the `window.navigate`
+    note below), but the fix doesn't need to know: `currentFocusIndex` now
+    tracks position ourselves, advanced only by our own calls, so it can't
+    inherit an extra step from anything else that might also be moving focus
+    for the same keypress.
   - `fork/index.js` — `navigation-checkbox.js` polyfills a global
     `window.navigate(dir)` for native browser spatial navigation; nothing in
     this codebase calls it, so if it's real, only the platform calls it. This
