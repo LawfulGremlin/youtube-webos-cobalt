@@ -230,23 +230,27 @@ function findProgressBarParts() {
       if (visited.includes(progressBar)) continue;
       visited.push(progressBar);
 
+      // fork: a "segment" idomkey child used to sit inside progress-bar and
+      // was used only to steal its className/cssText for our own overlay's
+      // visual style (positioning is computed independently — see
+      // syncOverlayWithSegment). YouTube's TV client no longer renders this
+      // element at all (confirmed live: zero idomkey="segment" nodes
+      // anywhere, on any progress bar, during real playback) — treating its
+      // absence as "no progress bar" broke marker rendering unconditionally,
+      // regardless of whether a video actually had segments. segment is now
+      // optional: found gets a nicer visual match, not found still works
+      // with a hardcoded fallback style.
       let segment = null;
       const children = progressBar.children || [];
-
-      // Der aktuelle YouTube-DOM:
-      // progress-bar enthält segment als direktes Kind.
       for (let childIndex = 0; childIndex < children.length; childIndex += 1) {
         if (children[childIndex].getAttribute?.('idomkey') === 'segment') {
           segment = children[childIndex];
           break;
         }
       }
-
-      // Fallback, falls YouTube noch einen Wrapper ergänzt.
       if (!segment) {
         segment = progressBar.querySelector('[idomkey="segment"]');
       }
-      if (!segment) continue;
 
       const rect = progressBar.getBoundingClientRect();
       const result = { progressBar, segment };
@@ -453,11 +457,18 @@ class SponsorBlockController {
   }
 
   syncOverlayWithSegment() {
-    if (!this.overlay || !this.progressSegment || !this.progressBar) return;
+    if (!this.overlay || !this.progressBar) return;
 
-    // Optik vollständig vom originalen Cue übernehmen.
-    this.overlay.className = this.progressSegment.className;
-    this.overlay.style.cssText = this.progressSegment.style.cssText;
+    // fork: progressSegment is optional now (see findProgressBarParts) —
+    // copy its look when present, otherwise fall back to a plain absolute
+    // overlay. Either way, position/size below is computed independently.
+    if (this.progressSegment) {
+      this.overlay.className = this.progressSegment.className;
+      this.overlay.style.cssText = this.progressSegment.style.cssText;
+    } else {
+      this.overlay.className = '';
+      this.overlay.style.cssText = 'position: absolute; pointer-events: none;';
+    }
 
     // Da previewbar außerhalb der laufend neu geschriebenen progress-bar liegt,
     // muss nur ihre einmalige Geometrie auf die echte Leiste übertragen werden.
@@ -623,7 +634,7 @@ class SponsorBlockController {
   }
 
   drawOverlay() {
-    if (!this.progressBar || !this.progressSegment || !this.segments.length) {
+    if (!this.progressBar || !this.segments.length) {
       this.markerStatus = this.segments.length ? 'waiting-for-progress-bar' : 'no-segments';
       return;
     }
@@ -647,8 +658,13 @@ class SponsorBlockController {
     markerContainer.id = 'previewbar';
     markerContainer.setAttribute(markerContainerAttribute, 'true');
     markerContainer.setAttribute('data-ytaf-video-id', this.videoID || '');
-    markerContainer.className = this.progressSegment.className;
-    markerContainer.style.cssText = this.progressSegment.style.cssText;
+    if (this.progressSegment) {
+      markerContainer.className = this.progressSegment.className;
+      markerContainer.style.cssText = this.progressSegment.style.cssText;
+    } else {
+      markerContainer.className = '';
+      markerContainer.style.cssText = 'position: absolute; pointer-events: none;';
+    }
 
     const barRect = this.progressBar.getBoundingClientRect();
     const barWidth = this.progressBar.offsetWidth || barRect.width;

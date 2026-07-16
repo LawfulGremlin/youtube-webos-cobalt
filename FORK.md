@@ -39,7 +39,27 @@ adding features itself.
   LawfulGremlin/youtube-webos fork-extensions), and an end-of-video clamp in
   `sponsorblock.js` that stops outro skips from looping the video. These are the
   deliberate upstream-file edits, each marked with a `fork:` comment:
-  - `sponsorblock.js` — the outro-loop clamp above.
+  - `sponsorblock.js` — the outro-loop clamp above, and a second, separately
+    hardware-confirmed fix: **marker rendering (colored progress-bar segments)
+    was completely broken**, unconditionally, regardless of whether a video
+    actually had SponsorBlock data. Root cause, found via live CDP debugging:
+    `findProgressBarParts()` required an `idomkey="segment"` child inside the
+    progress bar (used only to steal its className/cssText for visual
+    styling — positioning was always computed independently), but YouTube's
+    current TV client no longer renders that element at all — confirmed zero
+    matches on every progress bar, live, during real playback. Its absence
+    was treated as "no progress bar found," so `markerStatus` stuck on
+    `waiting-for-progress-bar` forever and `drawOverlay()` never ran. Fixed
+    by making `progressSegment` optional throughout, with a hardcoded
+    fallback style (`position: absolute; pointer-events: none;`) when no
+    reference element exists. Skip logic itself was independently verified
+    working correctly the whole time (it's purely `segments` data +
+    `video.currentTime`, no DOM dependency) — confirmed live by injecting a
+    fake segment into the running controller and watching the video actually
+    seek past it. Verified end-to-end via CDP (progress bar found without a
+    segment reference, injected-segment marker rendered with correct
+    geometry and category color, stable across continued playback) before
+    ever touching hardware.
   - `ui.js` — one hardware-confirmed fix stands: `moveFocus()` re-derived
     "current position" from `document.activeElement` every call — on
     hardware, down/up skipped a row every time. Root cause unconfirmed (see
