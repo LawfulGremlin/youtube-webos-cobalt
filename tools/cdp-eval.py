@@ -42,6 +42,11 @@ def _read_frame(sock):
             buf += sock.recv(8192)
         length = struct.unpack('>H', buf[2:4])[0]
         idx = 4
+    elif length == 127:
+        while len(buf) < 10:
+            buf += sock.recv(8192)
+        length = struct.unpack('>Q', buf[2:10])[0]
+        idx = 10
     while len(buf) < idx + length:
         buf += sock.recv(8192)
     return buf[idx:idx + length].decode(errors='replace')
