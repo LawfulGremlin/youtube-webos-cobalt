@@ -316,7 +316,7 @@ class SponsorBlockController {
     }
     this.progressBar = null;
     this.progressSegment = null;
-    this.overlay = null;
+    this.clearOverlay();
 
     if (this.nextSkipTimeout) {
       window.clearTimeout(this.nextSkipTimeout);
@@ -371,7 +371,7 @@ class SponsorBlockController {
     this.lastBody = '';
     this.lastSkipText = 'none';
     this.markerStatus = 'none';
-    this.overlay = null;
+    this.clearOverlay();
     this.progressBar = null;
     this.progressSegment = null;
     this.skipped = {};
@@ -491,6 +491,20 @@ class SponsorBlockController {
     this.overlay.style.height = `${barRect.height / rootFontSize}rem`;
   }
 
+  // fork: this.overlay = null (previously scattered across reset/destroy/
+  // loadVideo) only cleared the JS reference — the marker container stayed
+  // in the DOM as a permanent sibling of the stable anchor. Since
+  // findExistingOverlay() only ever matches the CURRENT videoID, a prior
+  // video's leftover container was never found again, never removed, and
+  // just stacked with every subsequent video change. Route every clear
+  // through here so the DOM node is actually removed, not just forgotten.
+  clearOverlay() {
+    if (this.overlay && this.overlay.parentNode) {
+      this.overlay.parentNode.removeChild(this.overlay);
+    }
+    this.overlay = null;
+  }
+
   findExistingOverlay(progressBar) {
     const { parent } = getStableMarkerAnchor(progressBar);
     if (!parent) return null;
@@ -531,7 +545,7 @@ class SponsorBlockController {
     }
 
     // Eine alte JS-Referenz kann übrig bleiben, obwohl YouTube den Knoten entfernt hat.
-    this.overlay = null;
+    this.clearOverlay();
     this.drawOverlay();
   }
 
@@ -588,7 +602,7 @@ class SponsorBlockController {
     this.lastBody = '';
     this.lastSkipText = 'none';
     this.markerStatus = 'none';
-    this.overlay = null;
+    this.clearOverlay();
     this.progressBar = null;
     this.progressSegment = null;
 
