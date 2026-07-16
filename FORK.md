@@ -88,20 +88,33 @@ adding features itself.
     by sitting inside the player subtree and inheriting the controls' fade,
     which is the same placement that gets pruned. There was nothing to borrow.
 
-    Markers are clipped to the *unplayed* part of their segment
-    (`clipMarkersToProgress()`, re-derived from `currentTime` each tick so
-    seeking backwards restores them) rather than drawn behind the bar, so
-    YouTube's progress fill stays visible inside a segment. Drawing them behind
-    it is not possible: anything inserted into the slider is pruned in under
+    Markers **emulate being behind the bar** rather than actually being there,
+    because they can't be: anything inserted into the slider is pruned in under
     100ms (measured — the fill is re-patched constantly as it advances, and the
-    probe was gone before the first sample), and body-level stacking can't be
-    trusted either, because Cobalt composites video by punching through the web
-    layer, so content painted below the player risks being erased with it. The
-    played fill is opaque white, so clipping is what "behind" would look like
-    anyway, without tinting the marker through the track's translucent white.
-    Note this engine has neither `document.elementFromPoint` nor
-    `Page.captureScreenshot`/`DOM.getNodeForLocation` over CDP, so paint order
-    can't be checked from here — prefer approaches that don't depend on it.
+    probe was gone before the first 100ms sample), and body-level stacking is
+    both unverifiable and unsafe, since Cobalt composites video by punching
+    through the web layer, so content painted below the player risks being
+    erased with it. Note this engine has neither `document.elementFromPoint`
+    nor `Page.captureScreenshot`/`DOM.getNodeForLocation` over CDP, so paint
+    order can't be checked from here at all — prefer approaches that don't
+    depend on it. The emulation is exact, in three parts:
+    - `clipMarkersToProgress()` draws only the *unplayed* part of a segment, so
+      YouTube's progress fill is never covered — which is what being behind an
+      opaque fill looks like. Re-derived from `currentTime` every tick, so
+      seeking backwards restores the marker instead of shrinking it forever.
+    - `blendUnderTrack()` pre-composites the category colour under the track's
+      own translucent white (read live off the element, not hardcoded), giving
+      the muted tone a marker underneath it would have. A fully opaque track
+      would blend to invisible, so that case keeps the raw colour instead.
+    - The marker yields to the playhead knob's live rect. The knob is centred
+      on the playhead — exactly where a clipped marker starts — so it used to
+      cut across the knob's right half (knob 1724-1772 vs marker from 1693).
+      It follows the knob's actual position rather than assuming it tracks
+      `currentTime`, since while scrubbing it runs ahead of playback.
+
+    The settings-menu swatches deliberately keep the *raw* category colours —
+    there's no track behind them to mute against, and they're a key to which
+    category is which, not a preview of the exact pixels on the bar.
 
     All of it verified live via CDP before touching hardware, mostly without
     needing real playback: inject a synthetic `ytlr-progress-bar`/`slider`

@@ -201,6 +201,48 @@ function getMarkerHost() {
   return document.body || document.documentElement || null;
 }
 
+function parseCssColor(value) {
+  if (!value) return null;
+
+  const text = String(value).trim();
+  if (text.charAt(0) === '#') {
+    const digits =
+      text.length === 4
+        ? text[1] + text[1] + text[2] + text[2] + text[3] + text[3]
+        : text.substring(1);
+    const packed = parseInt(digits, 16);
+    if (!Number.isFinite(packed)) return null;
+    return { r: (packed >> 16) & 255, g: (packed >> 8) & 255, b: packed & 255, a: 1 };
+  }
+
+  const match = text.match(/rgba?\(([^)]+)\)/);
+  if (!match) return null;
+
+  const parts = match[1].split(',').map((part) => parseFloat(part));
+  if (parts.length < 3 || !parts.every((part) => Number.isFinite(part))) return null;
+
+  return { r: parts[0], g: parts[1], b: parts[2], a: parts.length > 3 ? parts[3] : 1 };
+}
+
+// fork: markers can't actually be drawn *behind* the timeline (see
+// clipMarkersToProgress for why), but the result is reproducible: the track is
+// a translucent white wash over whatever is beneath it, so a colour sitting
+// under it composites to exactly this. Pre-blending gives the muted look
+// without needing to be underneath anything. The track colour is read from the
+// live element rather than hardcoded, so a restyle upstream carries over.
+function blendUnderTrack(color, trackColor) {
+  const base = parseCssColor(color);
+  const track = parseCssColor(trackColor);
+  if (!base) return color;
+  // A fully opaque track would blend the marker into the track's own colour —
+  // which is what being behind one would really look like, i.e. invisible.
+  // Show the unmuted colour instead; a visible marker beats an accurate one.
+  if (!track || !track.a || track.a >= 1) return color;
+
+  const mix = (channel, over) => Math.round(track.a * over + (1 - track.a) * channel);
+  return `rgb(${mix(base.r, track.r)}, ${mix(base.g, track.g)}, ${mix(base.b, track.b)})`;
+}
+
 // fork: the overlay hangs off <body>, so it does not inherit whatever the
 // player does to hide its controls — it has to mirror it manually. YouTube's
 // TV client fades the transport controls out with opacity:0 on an ANCESTOR of
@@ -473,7 +515,7 @@ class SponsorBlockController {
     this.overlay.style.top = `${barRect.top}px`;
     this.overlay.style.width = `${barRect.width}px`;
     this.overlay.style.height = `${barRect.height}px`;
-    this.clipMarkersToProgress(barRect.width);
+    this.clipMarkersToProgress(barRect);
   }
 
   // fork: don't paint over the part of a segment that has already played, so
@@ -489,13 +531,25 @@ class SponsorBlockController {
   // does), so clipping matches what "behind" would look like, and keeps the
   // marker colour clean where it does show instead of tinting it through the
   // track's translucent white.
-  clipMarkersToProgress(barWidth) {
-    if (!this.overlay || !barWidth) return;
+  clipMarkersToProgress(barRect) {
+    if (!this.overlay || !barRect || !barRect.width) return;
 
     const duration = getVideoDuration(this.video, this.segments);
     if (!duration) return;
 
     const currentTime = this.video ? this.video.currentTime : 0;
+
+    // fork: the knob sits centred on the playhead, which is exactly where a
+    // clipped marker starts — so the marker used to cut across its right half
+    // (measured: knob 1724-1772, marker starting at 1693). Yield to wherever
+    // the knob actually is rather than assuming it tracks currentTime: while
+    // scrubbing it runs ahead of playback, which is precisely when you're
+    // looking at it.
+    const knob = document.querySelector('[idomkey="playheadKnob"]');
+    const knobRect = knob ? knob.getBoundingClientRect() : null;
+    const knobLeft = knobRect && knobRect.width ? knobRect.left - barRect.left : null;
+    const knobRight = knobRect && knobRect.width ? knobRect.right - barRect.left + 2 : null;
+
     const markers = this.overlay.children || [];
 
     for (let index = 0; index < markers.length; index += 1) {
@@ -512,9 +566,21 @@ class SponsorBlockController {
         continue;
       }
 
+      let left = (from / duration) * barRect.width;
+      const right = (end / duration) * barRect.width;
+
+      if (knobRight !== null && knobRight > left && knobLeft < right) {
+        left = Math.max(left, knobRight);
+      }
+
+      if (right - left <= 0) {
+        marker.style.display = 'none';
+        continue;
+      }
+
       marker.style.display = 'block';
-      marker.style.left = `${(from / duration) * barWidth}px`;
-      marker.style.width = `${Math.max(((end - from) / duration) * barWidth, 2)}px`;
+      marker.style.left = `${left}px`;
+      marker.style.width = `${Math.max(right - left, 2)}px`;
     }
   }
 
@@ -748,6 +814,8 @@ class SponsorBlockController {
       return;
     }
 
+    const trackColor = window.getComputedStyle(this.progressBar).backgroundColor;
+
     const markerContainer = document.createElement('div');
     markerContainer.id = 'previewbar';
     markerContainer.setAttribute(markerContainerAttribute, 'true');
@@ -779,7 +847,10 @@ class SponsorBlockController {
       // (findExistingOverlay) keeps working without any in-memory bookkeeping.
       marker.setAttribute('data-sb-start', String(start));
       marker.setAttribute('data-sb-end', String(end));
-      marker.style.backgroundColor = categoryColors[segmentData.category] || '#ffff00';
+      marker.style.backgroundColor = blendUnderTrack(
+        categoryColors[segmentData.category] || '#ffff00',
+        trackColor
+      );
       marker.title = categoryLabel(segmentData.category);
       markerContainer.appendChild(marker);
       renderedCount += 1;
