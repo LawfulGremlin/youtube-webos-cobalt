@@ -89,55 +89,30 @@ export function userScriptStartUI() {
 
     const nextItem = focusableItems[currentFocusIndex];
     if (nextItem) {
-      // fork: reveal the target row BEFORE focusing it — .focus() on an
-      // element inside a display:none ancestor is a silent no-op, so
-      // focusing first and unhiding after would fail every time the move
-      // crosses into a row outside the current window.
-      updateRowWindow(nextItem);
       nextItem.focus();
       lastTabIndex = nextItem.tabIndex;
     }
   }
 
-  // fork: two prior attempts at "scroll the menu so focus stays visible"
-  // (native scrollIntoView, then manual getBoundingClientRect + scrollTop)
-  // both did nothing on hardware — focus could reach rows below the fold,
-  // but the viewport itself never moved. That means whatever makes
-  // overflow+scrollTop an interactive, scrollable region isn't working on
-  // this engine, regardless of box sizing. Rather than guess at another
-  // CSS/scroll trick, this uses the one primitive already PROVEN to work
-  // here: display:none/'' toggling is literally how the whole menu shows
-  // and hides itself. Only a sliding window of rows around the focused one
-  // is ever rendered; everything else is display:none, so the container
-  // never needs to overflow or scroll at all.
-  const ROW_WINDOW_SIZE = 8;
-  let rowWindowStart = 0;
-
-  function getRowWrapper(item) {
-    return item && item.closest ? item.closest('.toggler-wrapper') : null;
-  }
-
-  function updateRowWindow(focusedItem) {
-    const rows = Array.from(uiContainer.querySelectorAll('.toggler-wrapper'));
-    if (rows.length === 0) return;
-
-    const windowSize = Math.min(ROW_WINDOW_SIZE, rows.length);
-    const focusedIndex = rows.indexOf(getRowWrapper(focusedItem));
-
-    if (focusedIndex !== -1) {
-      if (focusedIndex < rowWindowStart) {
-        rowWindowStart = focusedIndex;
-      } else if (focusedIndex > rowWindowStart + windowSize - 1) {
-        rowWindowStart = focusedIndex - windowSize + 1;
-      }
-    }
-    rowWindowStart = Math.max(0, Math.min(rowWindowStart, rows.length - windowSize));
-    const windowEnd = rowWindowStart + windowSize - 1;
-
-    rows.forEach((row, index) => {
-      row.style.display = index >= rowWindowStart && index <= windowEnd ? '' : 'none';
-    });
-  }
+  // fork: THREE scroll/visibility mechanisms have now been tried and
+  // reverted here — native scrollIntoView (no-op), manual scrollTop with
+  // pixel-based sizing (also no-op: focus reached hidden rows but the
+  // viewport never moved), and display:none/'' row windowing (regressed
+  // further — after some navigation, hardware reported the menu became
+  // completely unresponsive: couldn't navigate up or even close it,
+  // most likely from hiding ~17 of 25 rows in one bulk operation the
+  // instant the menu opened). Each was a plausible-looking fix that
+  // could only be disproven by a live hardware round-trip, and the last
+  // one made things WORSE than the original bug, not better — so this
+  // deliberately stops guessing rather than risk a fourth. Currently the
+  // settings menu simply renders all rows (may extend past the visible
+  // screen on long lists), with NO hide/show/scroll logic at all —
+  // known-safe: navigation and closing are unaffected by anything in
+  // this area, confirmed across multiple hardware rounds before the
+  // windowing attempt. Do not reintroduce scrolling/windowing without
+  // either live remote-debugging (Cobalt supports
+  // --remote_debugging_port via the YTAF_DEBUG build flag) or much
+  // smaller, individually-verified steps.
 
   const uiContainer = document.createElement('div');
   uiContainer.classList.add('ytaf-ui-container');
@@ -345,15 +320,13 @@ export function userScriptStartUI() {
     }
 
     if (target) {
-      // fork: keep moveFocus()'s own index in sync with this explicit,
-      // known focus placement (see currentFocusIndex above), and reveal
-      // the row before focusing it — same reason as in moveFocus().
-      currentFocusIndex = focusableItems.indexOf(target);
-      updateRowWindow(target);
       target.focus();
       if (target.tabIndex !== null && target.tabIndex > 0) {
         lastTabIndex = target.tabIndex;
       }
+      // fork: keep moveFocus()'s own index in sync with this explicit,
+      // known focus placement (see currentFocusIndex above).
+      currentFocusIndex = focusableItems.indexOf(target);
       return true;
     }
 

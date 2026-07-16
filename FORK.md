@@ -40,29 +40,29 @@ adding features itself.
   `sponsorblock.js` that stops outro skips from looping the video. These are the
   deliberate upstream-file edits, each marked with a `fork:` comment:
   - `sponsorblock.js` — the outro-loop clamp above.
-  - `ui.js` — the settings menu (25 rows once the shortcut registry landed) has
-    two hardware-confirmed fixes: (1) two straight attempts at making the menu
-    scroll (native scrollIntoView, then manual getBoundingClientRect+scrollTop
-    with a pixel-based maxHeight) both did nothing on hardware — focus reached
-    rows below the fold, but the viewport itself never moved, meaning
-    whatever makes `overflow`+`scrollTop` an interactive scrollable region
-    isn't working on this engine at all, independent of box sizing. Rather
-    than guess at a third CSS/scroll trick, `updateRowWindow()` uses the one
-    primitive already proven to work here — `display: none/''` toggling is
-    literally how the whole menu shows and hides itself — to render only a
-    sliding window of rows around the focused one, so the container never
-    needs to overflow or scroll. (2) `moveFocus()` re-derived "current
-    position" from `document.activeElement` every call — on hardware, down/up
-    skipped a row every time. Root cause unconfirmed (see the `window.navigate`
-    note below), but the fix doesn't need to know: `currentFocusIndex` now
-    tracks position ourselves, advanced only by our own calls, so it can't
-    inherit an extra step from anything else that might also be moving focus
-    for the same keypress. In both call sites, `updateRowWindow()` must run
-    BEFORE `.focus()`, not after — `.focus()` on an element inside a
-    `display:none` ancestor is a silent no-op, so focusing a target still
-    hidden by the previous window and revealing it a moment later would
-    simply fail to move focus every time navigation crosses into a new
-    window.
+  - `ui.js` — one hardware-confirmed fix stands: `moveFocus()` re-derived
+    "current position" from `document.activeElement` every call — on
+    hardware, down/up skipped a row every time. Root cause unconfirmed (see
+    the `window.navigate` note below), but the fix doesn't need to know:
+    `currentFocusIndex` now tracks position ourselves, advanced only by our
+    own calls, so it can't inherit an extra step from anything else that
+    might also be moving focus for the same keypress.
+  - **Scrolling the settings menu past one screen is UNSOLVED.** Three
+    mechanisms were tried and reverted, each disproven only by a live
+    hardware round-trip: native `scrollIntoView` (no-op), manual
+    `getBoundingClientRect`+`scrollTop` with a pixel-based `maxHeight`
+    (also a no-op — focus reached hidden rows, but the viewport never
+    moved), and `display:none/''` row windowing (regressed further —
+    after some navigation the menu became entirely unresponsive: couldn't
+    navigate up or even close it, most likely from hiding ~17 of 25 rows
+    in one bulk operation the instant the menu opened). The menu currently
+    just renders every row with no hide/show/scroll logic — it may extend
+    past the visible screen on long lists, but navigation and closing are
+    unaffected, confirmed across multiple hardware rounds. **Do not
+    reattempt scrolling by guessing** — get live remote debugging first
+    (Cobalt supports `--remote_debugging_port` via the `YTAF_DEBUG` build
+    flag in the Makefile) so a fix can be verified before it reaches
+    hardware, or take much smaller, individually-verified steps.
   - `fork/index.js` — `navigation-checkbox.js` polyfills a global
     `window.navigate(dir)` for native browser spatial navigation; nothing in
     this codebase calls it, so if it's real, only the platform calls it. This
