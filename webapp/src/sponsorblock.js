@@ -54,6 +54,21 @@ export function userScriptStartSponsorBlock() {
   controller.start();
 }
 
+// fork: adblock-main's startOptionalHook() only calls the starter above when
+// the toggle is ON at startup — so with SponsorBlock disabled at launch there
+// is no controller, and a listener registered in start() doesn't exist either:
+// enabling it from the menu did nothing until an app restart. This listener
+// runs from module import (which is unconditional) and only bootstraps the
+// controller on that first enable; every change after that is handled by the
+// controller's own listener. Listeners added during an event's dispatch don't
+// run for that same event, so the two never double-handle the enabling one.
+document.addEventListener('ytaf-config-changed', (evt) => {
+  if (evt?.detail?.key !== 'enableSponsorBlock') return;
+  if (!controller && configRead('enableSponsorBlock')) {
+    userScriptStartSponsorBlock();
+  }
+});
+
 function categoryLabel(category) {
   return text('sponsorBlock', category);
 }
