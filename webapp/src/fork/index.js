@@ -112,6 +112,21 @@ window.__ytafXhrFiltered = 0; // dev counter, checked over CDP
   }
 
   proto.open = function (method, url) {
+    // Instances are reusable: open() decides scope per request, so a shadow
+    // installed for a feed URL must come off (with its cache) when the same
+    // instance is reopened for anything else — deleting the configurable own
+    // accessors falls back to the prototype getters.
+    if (this.__ytafUrl !== undefined) {
+      delete this.__ytafUrl;
+      delete this.__ytafFilteredFor;
+      delete this.__ytafFiltered;
+      try {
+        delete this.responseText;
+        delete this.response;
+      } catch (err) {
+        // not ours to delete — leave it
+      }
+    }
     if (YOUTUBEI_FEED_RE.test(String(url))) {
       this.__ytafUrl = String(url).slice(0, 100);
       try {
