@@ -29,7 +29,8 @@ cdp() { python3 "$HERE/cdp-eval.py" "$TV_IP" "$1" 2>/dev/null \
 STATE=$(cdp "JSON.stringify({v:(location.hash.match(/[?&]v=([^&#]+)/)||[])[1]||'',t:Math.floor(document.querySelector('video')?.currentTime||0),paused:!!document.querySelector('video')?.paused})" || echo '')
 VID=$(echo "$STATE" | python3 -c "import sys,json;print(json.load(sys.stdin).get('v',''))" 2>/dev/null || echo '')
 POS=$(echo "$STATE" | python3 -c "import sys,json;print(json.load(sys.stdin).get('t',0))" 2>/dev/null || echo 0)
-echo "captured: video='${VID:-none}' t=${POS}s"
+WAS_PAUSED=$(echo "$STATE" | python3 -c "import sys,json;print('yes' if json.load(sys.stdin).get('paused') else 'no')" 2>/dev/null || echo no)
+echo "captured: video='${VID:-none}' t=${POS}s paused=$WAS_PAUSED"
 
 # 2. close / install / launch
 ares-launch --device "$DEVICE" -c "$APP_ID" 2>/dev/null || true
@@ -69,13 +70,39 @@ if [ "$PICKER" = "yes" ]; then
   cdp "(function(){function k(t){var e;try{e=new KeyboardEvent(t,{keyCode:13,which:13,key:'Enter',bubbles:true,cancelable:true});}catch(x){e=document.createEvent('Event');e.initEvent(t,true,true);e.keyCode=13;e.which=13;}(document.activeElement||document.body).dispatchEvent(e);document.dispatchEvent(e);}k('keydown');k('keyup');return 'sent';})()" >/dev/null
 fi
 
-# 6. wait for the watch page + player, then seek and play
+# 6. wait for the watch page + player, then seek (and play, if it was playing)
+OK=no
 for i in $(seq 1 25); do
   OK=$(cdp "location.hash.indexOf('v=$VID') > -1 && document.querySelector('video') ? 'yes' : 'no'")
   [ "$OK" = "yes" ] && break
   sleep 1
 done
+if [ "$OK" != "yes" ]; then
+  echo "FAILED: watch page for $VID never appeared (stuck on: $(cdp "location.hash.slice(0,50)"))" >&2
+  exit 1
+fi
 sleep 2
-cdp "var v=document.querySelector('video'); if(v){v.currentTime=$POS; v.play();} 'resumed'" >/dev/null
+if [ "$WAS_PAUSED" = "yes" ]; then
+  cdp "var v=document.querySelector('video'); if(v){v.currentTime=$POS; v.pause();} 'resumed'" >/dev/null
+else
+  cdp "var v=document.querySelector('video'); if(v){v.currentTime=$POS; v.play();} 'resumed'" >/dev/null
+fi
 sleep 3
-cdp "JSON.stringify({restored:(location.hash.match(/[?&]v=([^&#]+)/)||[])[1], t:Math.floor(document.querySelector('video')?.currentTime||0), paused:document.querySelector('video')?.paused})"
+
+# 7. verify — exit 0 only if playback actually restored
+FINAL=$(cdp "JSON.stringify({restored:(location.hash.match(/[?&]v=([^&#]+)/)||[])[1]||'', t:Math.floor(document.querySelector('video')?.currentTime||0), paused:!!document.querySelector('video')?.paused, hasVideo:!!document.querySelector('video')})")
+echo "$FINAL"
+echo "$FINAL" | python3 -c "
+import sys, json
+s = json.load(sys.stdin)
+vid, pos, was_paused = '$VID', $POS, '$WAS_PAUSED' == 'yes'
+problems = []
+if not s.get('hasVideo'): problems.append('no video element')
+if s.get('restored') != vid: problems.append('wrong video: %r' % s.get('restored'))
+if abs(s.get('t', 0) - pos) > 20: problems.append('position off: %ss vs %ss' % (s.get('t'), pos))
+if not was_paused and s.get('paused'): problems.append('not playing')
+if problems:
+    print('FAILED: ' + '; '.join(problems), file=sys.stderr)
+    sys.exit(1)
+print('restored OK')
+"
