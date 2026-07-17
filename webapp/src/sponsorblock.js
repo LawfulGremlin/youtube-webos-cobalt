@@ -384,6 +384,7 @@ class SponsorBlockController {
     // used to change nothing until the next video: markers stayed painted and
     // skips stayed scheduled. configWrite emits this event on every change.
     document.addEventListener('ytaf-config-changed', (evt) => {
+      if (!this.active) return;
       const key = evt?.detail?.key || '';
       if (key.indexOf('enableSponsorBlock') !== 0) return;
 
@@ -405,6 +406,13 @@ class SponsorBlockController {
 
   destroy() {
     this.active = false;
+    // fork: kill in-flight fetches outright. Without this, a response landing
+    // after destroy() passes the token guard and its handleSegments() calls
+    // attachVideo()/observePlayerUI() — restarting the poller, re-adding video
+    // listeners and re-arming the observer on a discarded instance. This is
+    // the resurrection vector for a failed bootstrap: start() fires the fetch
+    // via syncVideoState() before the point where it can throw.
+    this.fetchToken += 1;
 
     if (this.domObserver) {
       this.domObserver.disconnect();
@@ -443,6 +451,11 @@ class SponsorBlockController {
   }
 
   syncVideoState() {
+    // fork: destroyed instances must stay destroyed — this is the entry point
+    // for the hashchange/yt-navigate listeners start() registers, which
+    // destroy() cannot remove (anonymous), and attachVideo()/loadVideo() below
+    // would otherwise restart the poller and refetch on a discarded instance.
+    if (!this.active) return;
     if (!configRead('enableSponsorBlock')) {
       this.reset();
       return;
