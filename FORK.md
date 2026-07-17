@@ -289,3 +289,20 @@ web API exists:
 Add this URL to webOS Homebrew / Device Manager as a custom repository:
 
     https://raw.githubusercontent.com/LawfulGremlin/youtube-webos-cobalt/main/repo.json
+
+## App restarts that restore playback
+
+`tools/tv-app-restart.sh <tv-ip> <ares-device> [ipk]` — closes the debug app
+(optionally installing a new IPK), relaunches it, and restores the video that
+was playing, at the captured position. Used for every dev close/reopen so a
+reinstall doesn't cost the viewer their place.
+
+How it has to work on this Cobalt build (each alternative tested live and
+ignored): launch params / `contentTarget` deep links do nothing (cold or warm),
+plain hash mutation doesn't route, and `resume_time` in the watch hash isn't
+honored. What does work: plant `#/watch?v=<id>` and `location.reload()` so the
+router sees it at bootstrap; the account picker swallows deep routes, but the
+planted hash *survives* it — a synthetic Enter picks the default account (per
+user choice: first entry) and the router then restores the watch page. Position
+is restored by scripting the video element directly (`currentTime` + `play()`),
+which is also why `resume_time` not working doesn't matter.
