@@ -49,9 +49,25 @@ let controller = null;
 export function userScriptStartSponsorBlock() {
   if (controller) return;
 
-  controller = new SponsorBlockController();
-  window.sponsorblock = controller;
-  controller.start();
+  // fork: commit only after start() succeeds. Assigning first meant a throw
+  // out of start() left a half-initialized zombie in `controller` — the
+  // bootstrap listener below (and this guard) then treated SponsorBlock as
+  // running forever, so it could never be started again without an app
+  // restart. destroy() on the failed instance disconnects anything start()
+  // managed to register before throwing, so it can't act on events either.
+  const next = new SponsorBlockController();
+  try {
+    next.start();
+  } catch (err) {
+    try {
+      next.destroy();
+    } catch (destroyErr) {
+      console.warn('[SponsorBlock] failed-instance cleanup also failed:', destroyErr);
+    }
+    throw err;
+  }
+  controller = next;
+  window.sponsorblock = next;
 }
 
 // fork: adblock-main's startOptionalHook() only calls the starter above when
@@ -65,7 +81,15 @@ export function userScriptStartSponsorBlock() {
 document.addEventListener('ytaf-config-changed', (evt) => {
   if (evt?.detail?.key !== 'enableSponsorBlock') return;
   if (!controller && configRead('enableSponsorBlock')) {
-    userScriptStartSponsorBlock();
+    // Swallow rather than rethrow: an exception crossing dispatchEvent would
+    // land in configWrite's CustomEvent try/catch and trigger its fallback
+    // dispatch — every config listener would run twice for the same change.
+    // Since a failed start commits nothing, the next toggle simply retries.
+    try {
+      userScriptStartSponsorBlock();
+    } catch (err) {
+      console.warn('[SponsorBlock] bootstrap failed, will retry on next toggle:', err);
+    }
   }
 });
 
