@@ -57,6 +57,85 @@ JSON.parse = function () {
   return result;
 };
 
+// fork: the JSON.parse chain above never sees the feed. Measured live on
+// hardware: a full home-feed scroll produced 3 JSON.parse calls, none of them
+// carrying adSlotRenderer — while an XHR tap saw /youtubei/v1/browse return a
+// body containing one, and the sponsored tile sat on screen inside
+// ytlr-ad-slot-renderer the whole time. The app parses its network responses
+// with something private, so string-level hooks on the page's JSON.parse
+// (upstream adblock.js included) are blind to feed payloads. The one place
+// every consumer must pass is the XHR object itself: shadow the instance's
+// responseText/response getters at open() time (verified live: the prototype
+// getters are reachable and an own accessor shadows them), filter lazily on
+// first read, cache per raw body. Player/stats endpoints are deliberately not
+// touched — feed surfaces only.
+const YOUTUBEI_FEED_RE = /\/youtubei\/v1\/(browse|search|next|reel\/reel_item_watch)/;
+window.__ytafXhrFiltered = 0; // dev counter, checked over CDP
+(function () {
+  const proto = XMLHttpRequest.prototype;
+  const textDesc = Object.getOwnPropertyDescriptor(proto, 'responseText');
+  const respDesc = Object.getOwnPropertyDescriptor(proto, 'response');
+  if (!textDesc || !textDesc.get) return;
+  const origOpen = proto.open;
+
+  function makeFilteredGetter(xhr) {
+    return function () {
+      const raw = textDesc.get.call(xhr);
+      if (typeof raw !== 'string' || !raw) return raw;
+      if (xhr.__ytafFilteredFor === raw) return xhr.__ytafFiltered;
+
+      let out = raw;
+      try {
+        const removeAds = configRead('enableAdBlock');
+        const removeShorts = configRead('forkRemoveShorts');
+        if (removeAds || removeShorts) {
+          // prevParse, NOT the chained JSON.parse: the chain's filter would
+          // mutate during parsing and leave our own removed-count at 0, which
+          // would skip the re-stringify and hand back the unfiltered raw.
+          const data = prevParse(raw);
+          const removed = filterTvResponse(data, { removeAds, removeShorts });
+          if (removed) {
+            out = JSON.stringify(data);
+            window.__ytafXhrFiltered += removed;
+            console.info(
+              '[ytaf-fork] filtered ' + removed + ' item(s) from ' + (xhr.__ytafUrl || 'youtubei')
+            );
+          }
+        }
+      } catch (err) {
+        // fail open: hand back the raw body rather than break the feed
+      }
+      xhr.__ytafFilteredFor = raw;
+      xhr.__ytafFiltered = out;
+      return out;
+    };
+  }
+
+  proto.open = function (method, url) {
+    if (YOUTUBEI_FEED_RE.test(String(url))) {
+      this.__ytafUrl = String(url).slice(0, 100);
+      try {
+        const filtered = makeFilteredGetter(this);
+        Object.defineProperty(this, 'responseText', { configurable: true, get: filtered });
+        if (respDesc && respDesc.get) {
+          const xhr = this;
+          Object.defineProperty(this, 'response', {
+            configurable: true,
+            get: function () {
+              // text responses only; a structured responseType passes through
+              if (!xhr.responseType || xhr.responseType === 'text') return filtered();
+              return respDesc.get.call(xhr);
+            }
+          });
+        }
+      } catch (err) {
+        // engine refused the shadow — the JSON.parse chain still covers what it covers
+      }
+    }
+    return origOpen.apply(this, arguments);
+  };
+})();
+
 // fork: belt-and-braces for the in-video shopping QR card. The JSON filter above
 // keys off shoppingTimelyActionRenderer, which is *inferred* from the DOM tag
 // (ytlr-shopping-timely-action-renderer) via this client's tag↔renderer naming
