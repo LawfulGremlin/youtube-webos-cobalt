@@ -339,6 +339,28 @@ class SponsorBlockController {
     this.observePlayerUI();
     window.addEventListener('hashchange', () => this.syncVideoState(), true);
     document.addEventListener('yt-navigate-finish', () => this.syncVideoState(), true);
+    // fork: the enableSponsorBlock check only lives in syncVideoState(), which
+    // runs on navigation — so flipping the toggle (or a category) mid-video
+    // used to change nothing until the next video: markers stayed painted and
+    // skips stayed scheduled. configWrite emits this event on every change.
+    document.addEventListener('ytaf-config-changed', (evt) => {
+      const key = evt?.detail?.key || '';
+      if (key.indexOf('enableSponsorBlock') !== 0) return;
+
+      if (!configRead('enableSponsorBlock')) {
+        this.reset();
+        return;
+      }
+      // Re-enabled, or a category changed while on: refetch the current video
+      // so the segment set matches the new category selection. reset() first
+      // so a toggle-off/on lands in the same state as a fresh navigation.
+      const videoId = getCurrentVideoId();
+      this.reset();
+      if (videoId) {
+        this.attachVideo();
+        this.loadVideo(videoId);
+      }
+    });
   }
 
   destroy() {
@@ -519,19 +541,6 @@ class SponsorBlockController {
     this.layoutMarkers(barRect);
   }
 
-  // fork: don't paint over the part of a segment that has already played, so
-  // YouTube's own progress fill stays visible inside a marker and you can see
-  // where playback is within a segment. Drawing the markers *behind* the bar
-  // instead — the obvious way — isn't available here: anything inserted into
-  // the slider is pruned in under 100ms (it is re-patched constantly as the
-  // fill advances; measured live, gone before the first 100ms sample), and
-  // body-level stacking can't be relied on either, since Cobalt composites
-  // video by punching through the web layer and content painted below the
-  // player risks going with it. The played fill is opaque white anyway
-  // (rgb(241,241,241) — it would hide a marker behind it exactly like this
-  // does), so clipping matches what "behind" would look like, and keeps the
-  // marker colour clean where it does show instead of tinting it through the
-  // track's translucent white.
   // fork: markers cover their whole segment — the played part included — so a
   // segment never disappears as you play through it. The progress fill shows
   // through the translucent colour (see MARKER_ALPHA), which is what makes
@@ -868,7 +877,14 @@ class SponsorBlockController {
     if (this.skipped[key]) return;
     this.skipped[key] = true;
 
-    const skipTo = Math.min(activeSegment.segment[1] + 0.01, this.video.duration || activeSegment.segment[1]);
+    // fork: same end-of-video clamp as scheduleSkip() — seeking to the exact
+    // end makes Cobalt restart the video, which loops outro skips forever.
+    // This method has no callers today, but unclamped it's a loaded footgun
+    // for whoever wires it to a shortcut later.
+    const duration = getVideoDuration(this.video, this.segments);
+    const rawSkipTo = activeSegment.segment[1] + 0.01;
+    const skipTo = duration > 0 ? Math.min(rawSkipTo, Math.max(duration - 0.35, 0)) : rawSkipTo;
+    if (skipTo <= this.video.currentTime) return;
     this.video.currentTime = skipTo;
     this.lastSkipText = `${activeSegment.category} ${activeSegment.segment[0].toFixed(
       1

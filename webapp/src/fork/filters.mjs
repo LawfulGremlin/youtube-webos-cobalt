@@ -177,6 +177,19 @@ export function filterTvResponse(root, flags) {
         continue;
       }
 
+      // A timely action hung off an object property gets dropped whole, same
+      // as one carried in an array — deleting only its inner shopping payload
+      // would leave the wrapper (and its dismiss X) as an empty shell.
+      if (
+        removeAds &&
+        key === TIMELY_ACTION_KEY &&
+        hasShoppingRenderer(value[key])
+      ) {
+        delete value[key];
+        removed += 1;
+        continue;
+      }
+
       if (SHOPPING_KEY_HINT.test(key) && value[key] && typeof value[key] === 'object') {
         shoppingKeysSeen[key] = true;
       }

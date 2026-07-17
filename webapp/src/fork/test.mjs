@@ -183,6 +183,31 @@ assert.equal(stepTarget(0, undefined, -1), 0);
   assert.ok(data.timelyActions[0].timelyActionRenderer.content.someOtherActionRenderer);
 }
 
+// A timely action hung off an OBJECT property is dropped whole too — not just
+// its inner shopping payload, which would leave the wrapper's dismiss X behind.
+{
+  const data = {
+    playerOverlays: {
+      timelyActionRenderer: { content: { shoppingTimelyActionRenderer: { qr: true } } },
+      keepMe: { a: 1 }
+    }
+  };
+  assert.equal(filterTvResponse(data, { removeAds: true }), 1);
+  assert.equal(data.playerOverlays.timelyActionRenderer, undefined);
+  assert.ok(data.playerOverlays.keepMe);
+}
+
+// An object-hung timely action WITHOUT shopping content survives whole.
+{
+  const data = {
+    playerOverlays: {
+      timelyActionRenderer: { content: { someOtherActionRenderer: { keep: 1 } } }
+    }
+  };
+  assert.equal(filterTvResponse(data, { removeAds: true }), 0);
+  assert.ok(data.playerOverlays.timelyActionRenderer.content.someOtherActionRenderer);
+}
+
 // Shopping overlay carried as a plain array item is dropped too.
 {
   const data = { contents: [{ tileRenderer: { videoId: 'keep' } }, { shoppingTimelyActionRenderer: {} }] };
