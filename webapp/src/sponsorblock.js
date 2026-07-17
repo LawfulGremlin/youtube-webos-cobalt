@@ -327,6 +327,7 @@ class SponsorBlockController {
   overlay = null;
   markerCheckFrame = null;
   isProcessing = false;
+  fetchToken = 0;
   attachVideoTimeout = null;
   nextSkipTimeout = null;
   skipPollInterval = null;
@@ -419,6 +420,9 @@ class SponsorBlockController {
   }
 
   reset() {
+    // Invalidate any in-flight fetch outright — don't rely on the videoID
+    // guard, which compares against the URL rather than this controller.
+    this.fetchToken += 1;
     this.videoID = null;
     this.segments = [];
     this.skippableCategories = [];
@@ -732,14 +736,24 @@ class SponsorBlockController {
       videoId
     )}&${categoryParams}&${actionParams}`;
 
+    // fork: the videoID guard in the handlers can't catch a stale response for
+    // the SAME video — a toggle refetch fires a second request for the video
+    // already being fetched, and if the older response lands last it overwrites
+    // the newer one (its body was requested with the old category set, so a
+    // newly-enabled category's segments are simply absent from it). Only the
+    // response carrying the latest token is allowed to land.
+    this.fetchToken += 1;
+    const token = this.fetchToken;
+
     requestJSON(
       this.requestUrl,
-      (results, status = 200, body = '') => this.handleSegments(results, status, body),
-      (err, status = 'n/a', body = '') => this.handleError(err, status, body)
+      (results, status = 200, body = '') => this.handleSegments(results, status, body, token),
+      (err, status = 'n/a', body = '') => this.handleError(err, status, body, token)
     );
   }
 
-  handleSegments(results, status, body) {
+  handleSegments(results, status, body, token) {
+    if (token !== this.fetchToken) return;
     if (this.videoID !== getCurrentVideoId()) return;
 
     this.lastStatus = status;
@@ -754,7 +768,8 @@ class SponsorBlockController {
     this.observePlayerUI();
   }
 
-  handleError(err, status, body) {
+  handleError(err, status, body, token) {
+    if (token !== this.fetchToken) return;
     if (this.videoID !== getCurrentVideoId()) return;
 
     this.lastStatus = status;
