@@ -101,6 +101,7 @@ if not s.get('hasVideo'): problems.append('no video element')
 if s.get('restored') != vid: problems.append('wrong video: %r' % s.get('restored'))
 if abs(s.get('t', 0) - pos) > 20: problems.append('position off: %ss vs %ss' % (s.get('t'), pos))
 if not was_paused and s.get('paused'): problems.append('not playing')
+if was_paused and not s.get('paused'): problems.append('should be paused but is playing')
 if problems:
     print('FAILED: ' + '; '.join(problems), file=sys.stderr)
     sys.exit(1)
