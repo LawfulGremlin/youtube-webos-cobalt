@@ -25,6 +25,15 @@ COBALT_DEBUG_GN_ARG=$(if $(COBALT_DEBUG_ENABLED),true,false)
 PACKAGE_COBALT_ARCHIVE?=cobalt-bin/$(PACKAGE_COBALT_VERSION)-$(PACKAGE_SB_API_VERSION)$(COBALT_DEBUG_SUFFIX).xz
 OFFICAL_YOUTUBE_IPK?=ipks-official/2023-07-30-youtube.leanback.v4-1.1.7.ipk
 
+# A separate build for testing compatibility with older webOS releases.  It
+# retains the starter binary from the older official YouTube package instead
+# of replacing the installed YouTube app.
+COMPAT_TEST_OFFICIAL_YOUTUBE_IPK?=ipks-official/2022-12-01-youtube.leanback.v4-1.1.4.ipk
+COMPAT_TEST_PACKAGE_NAME?=com.cobalt.youtube.adfree.compat
+COMPAT_TEST_DISPLAY_NAME?=YouTube Cobalt AdFree Compatibility Test
+# webOS requires versions in strictly numeric major.minor.patch form.
+COMPAT_TEST_VERSION?=1.1.1
+
 WORKDIR?=workdir
 WORKDIR_COBALT?=$(WORKDIR)/cobalt-$(BUILD_COBALT_VERSION)
 
@@ -108,6 +117,14 @@ check-package:
 package: check-package
 	$(MAKE) clean-ipk
 	$(MAKE) $(PACKAGE_TARGET)
+
+.PHONY: compatibility-test-package
+compatibility-test-package:
+	$(MAKE) package \
+	  PACKAGE="$(COMPAT_TEST_OFFICIAL_YOUTUBE_IPK)" \
+	  PACKAGE_NAME="$(COMPAT_TEST_PACKAGE_NAME)" \
+	  PACKAGE_DISPLAY_NAME="$(COMPAT_TEST_DISPLAY_NAME)" \
+	  PROJECT_VERSION="$(COMPAT_TEST_VERSION)"
 
 .PHONY: clean-ipk
 clean-ipk:
