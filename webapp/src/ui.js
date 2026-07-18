@@ -8,6 +8,7 @@ import './ui.css';
 import { configRead, configWrite } from './config.js';
 import { checkboxTools } from './checkboxTools.js';
 import { text as languageText } from './languages/index.js';
+import { sponsorBlockCategoryColors } from './sponsorblock-categories.js';
 
 let lastTabIndex = 0;
 
@@ -16,14 +17,14 @@ function text(key) {
 }
 
 export function userScriptStartUI() {
-  console.info('[ytaf] userScriptStartUI() called');
-  // We handle key events ourselves.
-  if (!window.__spatialNavigation__) {
-    window.__spatialNavigation__ = {};
+  if (window.__ytafUiInitialized && document.querySelector('.ytaf-ui-container')) {
+    return;
   }
-  window.__spatialNavigation__.keyMode = 'NONE';
+  window.__ytafUiInitialized = true;
+  console.info('[ytaf] userScriptStartUI() called');
 
   const ARROW_KEY_CODE = { 37: 'left', 38: 'up', 39: 'right', 40: 'down' };
+  let lastGreenKeyAt = 0;
 
   function getDirectionFromEvent(evt) {
     const key = (evt.key || '').toLowerCase();
@@ -158,7 +159,8 @@ export function userScriptStartUI() {
       '__sponsorblock_sponsor',
       text('sponsor'),
       configRead('enableSponsorBlockSponsor'),
-      callbackConfig('enableSponsorBlockSponsor')
+      callbackConfig('enableSponsorBlockSponsor'),
+      { color: sponsorBlockCategoryColors.sponsor }
     )
   );
   sponsorBlock.appendChild(
@@ -166,7 +168,8 @@ export function userScriptStartUI() {
       '__sponsorblock_intro',
       text('intro'),
       configRead('enableSponsorBlockIntro'),
-      callbackConfig('enableSponsorBlockIntro')
+      callbackConfig('enableSponsorBlockIntro'),
+      { color: sponsorBlockCategoryColors.intro }
     )
   );
   sponsorBlock.appendChild(
@@ -174,7 +177,8 @@ export function userScriptStartUI() {
       '__sponsorblock_outro',
       text('outro'),
       configRead('enableSponsorBlockOutro'),
-      callbackConfig('enableSponsorBlockOutro')
+      callbackConfig('enableSponsorBlockOutro'),
+      { color: sponsorBlockCategoryColors.outro }
     )
   );
   sponsorBlock.appendChild(
@@ -182,7 +186,8 @@ export function userScriptStartUI() {
       '__sponsorblock_interaction',
       text('interaction'),
       configRead('enableSponsorBlockInteraction'),
-      callbackConfig('enableSponsorBlockInteraction')
+      callbackConfig('enableSponsorBlockInteraction'),
+      { color: sponsorBlockCategoryColors.interaction }
     )
   );
   sponsorBlock.appendChild(
@@ -190,7 +195,8 @@ export function userScriptStartUI() {
       '__sponsorblock_selfpromo',
       text('selfpromo'),
       configRead('enableSponsorBlockSelfPromo'),
-      callbackConfig('enableSponsorBlockSelfPromo')
+      callbackConfig('enableSponsorBlockSelfPromo'),
+      { color: sponsorBlockCategoryColors.selfpromo }
     )
   );
   sponsorBlock.appendChild(
@@ -198,7 +204,8 @@ export function userScriptStartUI() {
       '__sponsorblock_music_offtopic',
       text('musicOfftopic'),
       configRead('enableSponsorBlockMusicOfftopic'),
-      callbackConfig('enableSponsorBlockMusicOfftopic')
+      callbackConfig('enableSponsorBlockMusicOfftopic'),
+      { color: sponsorBlockCategoryColors.music_offtopic }
     )
   );
   sponsorBlock.appendChild(
@@ -206,7 +213,8 @@ export function userScriptStartUI() {
       '__sponsorblock_preview',
       text('preview'),
       configRead('enableSponsorBlockPreview'),
-      callbackConfig('enableSponsorBlockPreview')
+      callbackConfig('enableSponsorBlockPreview'),
+      { color: sponsorBlockCategoryColors.preview }
     )
   );
   sponsorBlock.appendChild(
@@ -214,7 +222,8 @@ export function userScriptStartUI() {
       '__sponsorblock_filler',
       text('filler'),
       configRead('enableSponsorBlockFiller'),
-      callbackConfig('enableSponsorBlockFiller')
+      callbackConfig('enableSponsorBlockFiller'),
+      { color: sponsorBlockCategoryColors.filler }
     )
   );
   sponsorBlock.appendChild(
@@ -222,7 +231,8 @@ export function userScriptStartUI() {
       '__sponsorblock_hook',
       text('hook'),
       configRead('enableSponsorBlockHook'),
-      callbackConfig('enableSponsorBlockHook')
+      callbackConfig('enableSponsorBlockHook'),
+      { color: sponsorBlockCategoryColors.hook }
     )
   );
   uiContainer.appendChild(sponsorBlock);
@@ -230,7 +240,31 @@ export function userScriptStartUI() {
   (document.body || document.documentElement).appendChild(uiContainer);
 
   let latestFocus = null;
-  let focusKeepAliveTimer = null;
+  let focusGuardFrame = null;
+  let spatialNavigationState = null;
+
+  function suspendSpatialNavigation() {
+    const spatialNavigation =
+      window.__spatialNavigation__ || (window.__spatialNavigation__ = {});
+    spatialNavigationState = {
+      target: spatialNavigation,
+      hadKeyMode: Object.prototype.hasOwnProperty.call(spatialNavigation, 'keyMode'),
+      keyMode: spatialNavigation.keyMode
+    };
+    spatialNavigation.keyMode = 'NONE';
+  }
+
+  function restoreSpatialNavigation() {
+    if (!spatialNavigationState) return;
+
+    const { target, hadKeyMode, keyMode } = spatialNavigationState;
+    if (hadKeyMode) {
+      target.keyMode = keyMode;
+    } else {
+      delete target.keyMode;
+    }
+    spatialNavigationState = null;
+  }
 
   function isContainerOpen() {
     return uiContainer.style.display !== 'none' && uiContainer.style.visibility !== 'hidden';
@@ -294,33 +328,16 @@ export function userScriptStartUI() {
 
   function openContainer() {
     console.info('Container: Showing & Focusing!');
-    applyVisibleContainerStyles();
     latestFocus =
       document.activeElement && document.activeElement !== document.body
         ? document.activeElement
         : null;
+    suspendSpatialNavigation();
+    applyVisibleContainerStyles();
 
     setTimeout(() => {
       focusMenuItem(1);
     }, 0);
-  }
-
-  function keepContainerFocus() {
-    if (isContainerOpen()) {
-      const activeElement = document.activeElement;
-      const hasFocusInside = Boolean(
-        activeElement &&
-        (activeElement === uiContainer || uiContainer.contains(activeElement))
-      );
-
-      if (!hasFocusInside) {
-        latestFocus = activeElement;
-        console.info('Container: Not have focus: Focusing!');
-        focusMenuItem();
-      }
-
-      focusKeepAliveTimer = setTimeout(keepContainerFocus, 250);
-    }
   }
 
   function menuHasFocus() {
@@ -334,27 +351,58 @@ export function userScriptStartUI() {
     if (!isContainerOpen() || menuHasFocus()) {
       return;
     }
-
-    const activeElement = document.activeElement;
-    if (activeElement && activeElement !== document.body) {
-      latestFocus = activeElement;
-    }
     focusMenuItem();
+  }
+
+  function queueMenuFocusGuard() {
+    if (!isContainerOpen() || focusGuardFrame !== null) return;
+
+    focusGuardFrame = window.requestAnimationFrame(() => {
+      focusGuardFrame = null;
+      captureMenuFocus();
+    });
+  }
+
+  function guardMenuFocus(evt) {
+    if (
+      isContainerOpen() &&
+      evt.target &&
+      evt.target !== uiContainer &&
+      !uiContainer.contains(evt.target)
+    ) {
+      queueMenuFocusGuard();
+    }
   }
 
   function closeContainer() {
     console.info('Container: Hiding!');
-    if (focusKeepAliveTimer) {
-      clearTimeout(focusKeepAliveTimer);
-      focusKeepAliveTimer = null;
+    if (focusGuardFrame !== null) {
+      window.cancelAnimationFrame(focusGuardFrame);
+      focusGuardFrame = null;
     }
     uiContainer.style.display = 'none';
     uiContainer.style.visibility = 'hidden';
     uiContainer.style.pointerEvents = 'none';
-    uiContainer.blur();
-    if (latestFocus != null) {
-      latestFocus.focus();
+    const menuFocus = document.activeElement;
+    if (menuFocus && uiContainer.contains(menuFocus) && typeof menuFocus.blur === 'function') {
+      menuFocus.blur();
     }
+    restoreSpatialNavigation();
+
+    const focusBeforeMenu = latestFocus;
+    latestFocus = null;
+    const restoreFocus = () => {
+      if (
+        focusBeforeMenu?.isConnected &&
+        typeof focusBeforeMenu.focus === 'function' &&
+        !uiContainer.contains(focusBeforeMenu)
+      ) {
+        focusBeforeMenu.focus();
+      }
+    };
+    restoreFocus();
+    // Some Cobalt versions update focus once more after the colour-key keydown.
+    setTimeout(restoreFocus, 0);
   }
 
   const eventHandler = (evt) => {
@@ -366,7 +414,6 @@ export function userScriptStartUI() {
         evt.preventDefault();
         evt.stopPropagation();
         captureMenuFocus();
-        return false;
       }
 
       const direction = getDirectionFromEvent(evt);
@@ -393,8 +440,7 @@ export function userScriptStartUI() {
           // prevent the synthetic click from toggling again
           const wrapper = focusedElement.parentElement;
           if (wrapper) {
-            wrapper.dataset.ytafSkipClick = '1';
-            setTimeout(() => delete wrapper.dataset.ytafSkipClick, 300);
+            wrapper.dataset.ytafIgnoreClickUntil = String(Date.now() + 1000);
           }
           checkboxTools.toggleCheck(focusedElement.id);
         }
@@ -413,7 +459,9 @@ export function userScriptStartUI() {
       console.info('Taking over!');
       evt.preventDefault();
       evt.stopPropagation();
-      if (evt.type === 'keydown') {
+      const now = Date.now();
+      if (evt.type === 'keydown' && !evt.repeat && now - lastGreenKeyAt > 350) {
+        lastGreenKeyAt = now;
         if (!isContainerOpen()) {
           openContainer();
         } else {
@@ -421,7 +469,9 @@ export function userScriptStartUI() {
         }
       }
       return false;
-    } else if (
+    }
+
+    if (
       evt.type === 'keydown' &&
       evt.charCode == 0 &&
       evt.keyCode == 187
@@ -446,6 +496,9 @@ export function userScriptStartUI() {
   document.addEventListener('keydown', eventHandler, true);
   document.addEventListener('keypress', eventHandler, true);
   document.addEventListener('keyup', eventHandler, true);
+  // YouTube's visible player controls can reclaim focus after handling a key.
+  // While our menu is open, keep focus modal and restore the last menu item.
+  document.addEventListener('focus', guardMenuFocus, true);
 
   setTimeout(() => {
     showNotification(text('openHint'), 3000, 'green');
@@ -468,7 +521,9 @@ export function showNotification(text, time = 3000, variant = 'yellow') {
   elmInner.classList.add(`message-${variant}`);
   elmInner.classList.add('message-hidden');
   elm.appendChild(elmInner);
-  document.querySelector('.ytaf-notification-container').appendChild(elm);
+  const notificationContainer = document.querySelector('.ytaf-notification-container');
+  if (!notificationContainer) return;
+  notificationContainer.appendChild(elm);
 
   setTimeout(() => {
     elmInner.classList.remove('message-hidden');
@@ -476,7 +531,7 @@ export function showNotification(text, time = 3000, variant = 'yellow') {
   setTimeout(() => {
     elmInner.classList.add('message-hidden');
     setTimeout(() => {
-      document.querySelector('.ytaf-notification-container').removeChild(elm);
+      if (elm.parentNode) elm.parentNode.removeChild(elm);
     }, 1000);
   }, time);
 }

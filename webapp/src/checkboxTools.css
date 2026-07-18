@@ -117,3 +117,14 @@
   line-height: 1.22;
   color: rgba(255, 255, 255, 0.9);
 }
+
+.toggler-wrapper.ytaf-sponsorblock-category .desc {
+  flex: 1 1 auto;
+}
+
+.toggler-wrapper .ytaf-category-swatch {
+  flex: 0 0 14px;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+}

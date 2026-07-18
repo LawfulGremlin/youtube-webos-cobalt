@@ -4,7 +4,7 @@ let checkboxTabIndex = 1;
 
 let callbacks = {};
 
-function add(name, label, checked = false, callback = null) {
+function add(name, label, checked = false, callback = null, options = {}) {
   /*
   <div class="toggler-wrapper" for="adblock">
     <div type="checkbox" tabindex="1" checked="checked">
@@ -18,6 +18,9 @@ function add(name, label, checked = false, callback = null) {
 
   const wrapper = document.createElement('div');
   wrapper.classList.add('toggler-wrapper');
+  if (options.color) {
+    wrapper.classList.add('ytaf-sponsorblock-category');
+  }
 
   const sliderDiv = document.createElement('div');
   sliderDiv.classList.add('toggler-slider');
@@ -37,6 +40,15 @@ function add(name, label, checked = false, callback = null) {
 
   wrapper.appendChild(checkboxSliderDiv);
   wrapper.appendChild(divabel);
+  if (options.color) {
+    const colorSwatch = document.createElement('span');
+    colorSwatch.classList.add('ytaf-category-swatch');
+    colorSwatch.setAttribute('aria-hidden', 'true');
+    // Inline colours also work on older Cobalt builds without CSS variables.
+    colorSwatch.style.backgroundColor = options.color;
+    colorSwatch.style.boxShadow = `0 0 0 1px rgba(255, 255, 255, 0.3), 0 0 9px ${options.color}`;
+    wrapper.appendChild(colorSwatch);
+  }
 
   if (checked) {
     checkboxSliderDiv.setAttribute('checked', 'checked');
@@ -56,8 +68,10 @@ function add(name, label, checked = false, callback = null) {
     'click',
     (evt) => {
       // If a keyboard handler just toggled this control, ignore the synthesized click
-      if (wrapper.dataset.ytafSkipClick === '1') {
-        delete wrapper.dataset.ytafSkipClick;
+      if (Number(wrapper.dataset.ytafIgnoreClickUntil || 0) > Date.now()) {
+        delete wrapper.dataset.ytafIgnoreClickUntil;
+        evt.preventDefault();
+        evt.stopPropagation();
         return;
       }
       cb(evt);
@@ -81,7 +95,7 @@ function isChecked(name) {
     return;
   }
   const sliceDiv = document.querySelector('#' + name);
-  return sliceDiv.hasAttribute('checked');
+  return Boolean(sliceDiv && sliceDiv.hasAttribute('checked'));
 }
 
 function toggleCheck(name) {
@@ -102,8 +116,9 @@ function check(name) {
     return;
   }
   const sliceDiv = document.querySelector('#' + name);
+  if (!sliceDiv) return;
   sliceDiv.setAttribute('checked', 'checked');
-  callbacks[sliceDiv.tabIndex](true);
+  callbacks[sliceDiv.tabIndex]?.(true);
 }
 
 function uncheck(name) {
@@ -111,8 +126,9 @@ function uncheck(name) {
     return;
   }
   const sliceDiv = document.querySelector('#' + name);
+  if (!sliceDiv) return;
   sliceDiv.removeAttribute('checked');
-  callbacks[sliceDiv.tabIndex](false);
+  callbacks[sliceDiv.tabIndex]?.(false);
 }
 
 function remove(name) {
