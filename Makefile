@@ -9,7 +9,7 @@ PACKAGE_NAME_OFFICIAL=youtube.leanback.v4
 PACKAGE_NAME?=youtube.leanback.v4
 PACKAGE_NAME_TARGET=$(PACKAGE_NAME)
 PACKAGE_DISPLAY_NAME?=YouTube webOS Cobalt AdFree
-PROJECT_VERSION?=1.0.0
+PROJECT_VERSION?=1.1.1
 PACKAGE_COBALT_VERSION?=23.lts.4
 PACKAGE_VERSION?=$(PROJECT_VERSION)
 PACKAGE_IPK_BUILD=$(PACKAGE_NAME_TARGET)_$(PACKAGE_VERSION)_arm.ipk
@@ -45,6 +45,9 @@ BUILD_COBALT_SB_API_VERSION=$(word 2, $(subst -, ,$(BUILD_VERSION)))
 BUILD_COBALT_DEBUG?=$(if $(filter logging,$(word 3, $(subst -, ,$(BUILD_VERSION)))),1,$(COBALT_DEBUG))
 BUILD_COBALT_DEBUG_ENABLED=$(filter 1 true yes on,$(BUILD_COBALT_DEBUG))
 BUILD_COBALT_DEBUG_GN_ARG=$(if $(BUILD_COBALT_DEBUG_ENABLED),true,false)
+# Release libraries otherwise retain a large DWARF debug-information section.
+# Debug builds keep it for symbolized diagnostics.
+COBALT_STRIP_ENABLED=$(if $(BUILD_COBALT_DEBUG_ENABLED),,1)
 BUILD_COBALT_ARCHITECTURE?=arm-softfp
 BUILD_COBALT_PLATFORM?=evergreen-$(BUILD_COBALT_ARCHITECTURE)
 BUILD_COBALT_TARGET?=cobalt
@@ -289,6 +292,9 @@ $(WORKDIR)/cobalt:
 	mkdir -p $@
 	@! test -z $(PACKAGE_SB_API_VERSION) || (echo "" && echo "--" && echo "Cannot find SB_API_VERSION in IPK binary. You can try to specify it with: make PACKAGE_SB_API_VERSION=12" && exit 1)
 	tar -xJvf $(PACKAGE_COBALT_ARCHIVE) -C $@
+	if [ -n "$(COBALT_STRIP_ENABLED)" ] && [ -f "$@/libcobalt.so" ]; then \
+		docker run --rm -v "$$PWD:/work" -w /work cobalt-build-evergreen:latest sh -lc 'arm-linux-gnueabi-strip --strip-debug "$$1"' sh "/work/$@/libcobalt.so"; \
+	fi
 
 .PRECIOUS: $(WORKDIR)/ipk/content/app/cobalt/content/web/adblock
 $(WORKDIR)/ipk/content/app/cobalt/content/web/adblock: $(WEBAPP_OUTPUT_STAMP)
@@ -437,7 +443,7 @@ cobalt-bin/%/libcobalt.so: cobalt-bin $(WEBAPP_OUTPUT_STAMP)
 	if [ -f "$$outdir/libcobalt.so" ]; then \
 		cp "$$outdir/libcobalt.so" $@; \
 	fi; \
-	if [ "$(BUILD_COBALT_TYPE)" = "devel" ] && [ -f "$@" ]; then \
+	if [ -n "$(COBALT_STRIP_ENABLED)" ] && [ -f "$@" ]; then \
 		docker run --rm -v "$$PWD:/work" -w /work cobalt-build-evergreen:latest sh -lc 'arm-linux-gnueabi-strip --strip-debug "$$1"' sh "$@"; \
 	fi
 
