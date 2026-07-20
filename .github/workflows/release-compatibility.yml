@@ -1,0 +1,69 @@
+name: Release compatibility
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to validate
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  verify-ipk:
+    name: Verify webOS package compatibility
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download Homebrew Toolbox
+        uses: robinraju/release-downloader@v1.9
+        with:
+          repository: webosbrew/dev-toolbox-cli
+          latest: true
+          fileName: webosbrew-toolbox-*.deb
+          out-file-path: toolbox
+
+      - name: Install package verifier
+        run: sudo apt-get update && sudo apt-get install -y ./toolbox/webosbrew-toolbox-*.deb
+
+      - name: Download release IPK
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: |
+          mkdir -p release
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --pattern '*.ipk' --dir release
+          test -n "$(find release -maxdepth 1 -type f -name '*.ipk' -print -quit)"
+
+      - name: Check IPK and Cobalt binary compatibility
+        run: |
+          : > compatibility-report.md
+
+          find release -maxdepth 1 -type f -name '*.ipk' -print0 |
+            while IFS= read -r -d '' package; do
+              echo "# $(basename "$package")" | tee -a compatibility-report.md
+              set +e
+              webosbrew-ipk-verify --format markdown --details "$package" 2>&1 |
+                tee -a compatibility-report.md
+              verifier_status=${PIPESTATUS[0]}
+              set -e
+
+              if [ "$verifier_status" -ne 0 ]; then
+                echo "::warning title=Firmware compatibility gap::$(basename "$package") is not compatible with every firmware profile. See the compatibility report for details."
+              fi
+            done
+
+          cat compatibility-report.md >> "$GITHUB_STEP_SUMMARY"
+          echo "Compatibility gaps are reported as warnings because one LG starter cannot satisfy every historical and future firmware ABI." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload compatibility report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-compatibility-report
+          path: compatibility-report.md
+          if-no-files-found: warn

@@ -10,13 +10,15 @@ This project patches the webOS YouTube application by replacing or modifying the
 
 > This project is unofficial and is not affiliated with YouTube, Google, LG or webOS.
 
-## v1.0.0
+## v1.1.1
 
-The first public release is available from the GitHub releases page:
+The latest release is available from the GitHub releases page:
 
 <https://github.com/RF1705/youtube-webos-cobalt-adfree/releases>
 
-The release package uses its own app id, `com.cobalt.youtube.adfree`, so it can be installed next to the official YouTube app without overwriting it.
+The release uses the original Leanback app id, `youtube.leanback.v4`, to keep
+YouTube sign-in and phone pairing compatible. Installing it replaces the
+official YouTube application with the patched version.
 
 ## Features
 
@@ -24,11 +26,14 @@ The release package uses its own app id, `com.cobalt.youtube.adfree`, so it can 
 * Cobalt-based runtime modification
 * Advertisement blocking
 * SponsorBlock support
+* Return YouTube Dislike support
 * Playback speed support
 * Optional autostart integration
 * Installable as patched `.ipk` package
 
 The configuration screen can be opened with the **GREEN** button on the LG remote.
+While a video is playing, press **1** to decrease the playback speed or **3** to
+increase it. The available speeds range from 0.25× to 2×.
 
 ## Requirements
 
@@ -40,11 +45,17 @@ The configuration screen can be opened with the **GREEN** button on the LG remot
 * Required tools:
 
 ```sh
-sudo apt install jq git patch sed binutils squashfs-tools rename findutils xz-utils
+sudo apt install jq git sed binutils squashfs-tools rename findutils xz-utils
 ```
 
-The patched app uses its own app id by default: `com.cobalt.youtube.adfree`.
-It can be installed next to the official YouTube app.
+The patched app uses `youtube.leanback.v4` and therefore replaces the official
+YouTube application. Keep a copy of the official package if you want to restore
+it later.
+
+Community-reported device, firmware and feature results are collected in the
+[device compatibility matrix](docs/device-compatibility.md). The matrix also
+contains the reporting template and unpatched baseline test packages used for
+compatibility investigations.
 
 ## Installation
 
@@ -53,8 +64,27 @@ Download a release `.ipk` package and install it using one of the following meth
 Recommended release package:
 
 ```text
-com.cobalt.youtube.adfree_1.0.0_arm.ipk
+youtube.leanback.v4_1.1.1_arm.ipk
 ```
+
+The release also contains `youtube.leanback.v4.manifest.json` for installation
+through the webOS Homebrew Channel.
+
+### Custom Homebrew Channel repository
+
+This project also provides a custom Homebrew Channel repository:
+
+```text
+https://raw.githubusercontent.com/RF1705/youtube-webos-cobalt-adfree/main/repo.json
+```
+
+In Homebrew Channel, open **Settings**, choose **Add repository**, and enter
+the URL above.
+
+> **Important:** This app uses the same app id (`youtube.leanback.v4`) as the
+> YouTube AdFree entry in the default WebOSBrew repository. Do not install both
+> variants at the same time: choose one repository entry and uninstall the
+> other variant first.
 
 ### Install via webOS Device Manager
 
@@ -63,7 +93,7 @@ Use the webOS Device Manager and install the downloaded `.ipk` package.
 ### Install via ares-cli
 
 ```sh
-ares-install com.cobalt.youtube.adfree_*.ipk
+ares-install youtube.leanback.v4_*.ipk
 ```
 
 ### Install via SSH on rooted/Homebrew webOS
@@ -74,14 +104,14 @@ the webOS app install service:
 ```sh
 mkdir -p /media/developer/temp
 cd /media/developer/temp
-wget https://github.com/RF1705/youtube-webos-cobalt-adfree/releases/download/v1.0.0/com.cobalt.youtube.adfree_1.0.0_arm.ipk
-luna-send-pub -i 'luna://com.webos.appInstallService/dev/install' '{"id":"com.ares.defaultName","ipkUrl":"/media/developer/temp/com.cobalt.youtube.adfree_1.0.0_arm.ipk","subscribe":true}'
+wget https://github.com/RF1705/youtube-webos-cobalt-adfree/releases/download/v1.1.1/youtube.leanback.v4_1.1.1_arm.ipk
+luna-send-pub -i 'luna://com.webos.appInstallService/dev/install' '{"id":"com.ares.defaultName","ipkUrl":"/media/developer/temp/youtube.leanback.v4_1.1.1_arm.ipk","subscribe":true}'
 ```
 
 After installation, the downloaded package can be removed:
 
 ```sh
-rm /media/developer/temp/com.cobalt.youtube.adfree_1.0.0_arm.ipk
+rm /media/developer/temp/youtube.leanback.v4_1.1.1_arm.ipk
 ```
 
 ## Patch an official YouTube IPK
@@ -102,14 +132,8 @@ make PACKAGE=./your-tv-youtube.ipk
 By default the patched package uses:
 
 ```text
-App ID: com.cobalt.youtube.adfree
+App ID: youtube.leanback.v4
 Name:   YouTube webOS Cobalt AdFree
-```
-
-To overwrite the official YouTube app instead:
-
-```sh
-make PACKAGE=./your-tv-youtube.ipk PACKAGE_NAME=youtube.leanback.v4
 ```
 
 The patched IPK will be created in the `output/` directory.
@@ -184,13 +208,13 @@ Autostart can make the app appear as an input source next to HDMI/Live TV.
 Enable autostart:
 
 ```sh
-luna-send-pub -n 1 'luna://com.webos.service.eim/addDevice' '{"appId":"com.cobalt.youtube.adfree","pigImage":"","mvpdIcon":""}'
+luna-send-pub -n 1 'luna://com.webos.service.eim/addDevice' '{"appId":"youtube.leanback.v4","pigImage":"","mvpdIcon":""}'
 ```
 
 Disable autostart:
 
 ```sh
-luna-send -n 1 'luna://com.webos.service.eim/deleteDevice' '{"appId":"com.cobalt.youtube.adfree"}'
+luna-send-pub -n 1 'luna://com.webos.service.eim/deleteDevice' '{"appId":"youtube.leanback.v4"}'
 ```
 
 Autostart may improve startup time because the app can stay loaded in the background. This can increase idle memory usage.
@@ -204,15 +228,19 @@ To build Cobalt yourself, the build process clones Cobalt, applies the patches f
 Example:
 
 ```sh
-make cobalt-bin/23.lts.4-12/libcobalt.so cobalt-bin/23.lts.4-12.xz
+make BUILD_COBALT_DEBUG=0 WEBAPP_DEBUG=0 \
+  cobalt-bin/23.lts.4-12/libcobalt.so \
+  cobalt-bin/23.lts.4-12.xz
 ```
 
-If the build fails after updating the repository, try cleaning old Docker images and Cobalt output:
+For a clean rebuild after changing the Cobalt patch:
 
 ```sh
-docker image rm cobalt-build-evergreen cobalt-build-linux cobalt-build-base cobalt-base
-rm -fr cobalt/out/
-make cobalt-clean
+make clean-workdir/cobalt-23.lts.4
+rm -rf cobalt-bin/23.lts.4-12 cobalt-bin/23.lts.4-12.xz
+make BUILD_COBALT_DEBUG=0 WEBAPP_DEBUG=0 \
+  cobalt-bin/23.lts.4-12/libcobalt.so \
+  cobalt-bin/23.lts.4-12.xz
 ```
 
 ## Development TV setup

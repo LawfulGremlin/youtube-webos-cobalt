@@ -9,7 +9,7 @@ PACKAGE_NAME_OFFICIAL=youtube.leanback.v4
 PACKAGE_NAME?=youtube.leanback.v4
 PACKAGE_NAME_TARGET=$(PACKAGE_NAME)
 PACKAGE_DISPLAY_NAME?=YouTube webOS Cobalt AdFree
-PROJECT_VERSION?=1.0.0
+PROJECT_VERSION?=1.1.1
 PACKAGE_COBALT_VERSION?=23.lts.4
 PACKAGE_VERSION?=$(PROJECT_VERSION)
 PACKAGE_IPK_BUILD=$(PACKAGE_NAME_TARGET)_$(PACKAGE_VERSION)_arm.ipk
@@ -38,6 +38,15 @@ REMOTE_DEBUG_ENABLED=$(filter 1 true yes on,$(REMOTE_DEBUG))
 PACKAGE_COBALT_ARCHIVE?=cobalt-bin/$(PACKAGE_COBALT_VERSION)-$(PACKAGE_SB_API_VERSION)$(COBALT_DEBUG_SUFFIX).xz
 OFFICAL_YOUTUBE_IPK?=ipks-official/2023-07-30-youtube.leanback.v4-1.1.7.ipk
 
+# A separate build for testing compatibility with older webOS releases.  It
+# retains the starter binary from the older official YouTube package instead
+# of replacing the installed YouTube app.
+COMPAT_TEST_OFFICIAL_YOUTUBE_IPK?=ipks-official/2022-12-01-youtube.leanback.v4-1.1.4.ipk
+COMPAT_TEST_PACKAGE_NAME?=com.cobalt.youtube.adfree.compat
+COMPAT_TEST_DISPLAY_NAME?=YouTube Cobalt AdFree Compatibility Test
+# webOS requires versions in strictly numeric major.minor.patch form.
+COMPAT_TEST_VERSION?=1.1.1
+
 WORKDIR?=workdir
 WORKDIR_COBALT?=$(WORKDIR)/cobalt-$(BUILD_COBALT_VERSION)
 
@@ -49,6 +58,9 @@ BUILD_COBALT_SB_API_VERSION=$(word 2, $(subst -, ,$(BUILD_VERSION)))
 BUILD_COBALT_DEBUG?=$(if $(filter logging,$(word 3, $(subst -, ,$(BUILD_VERSION)))),1,$(COBALT_DEBUG))
 BUILD_COBALT_DEBUG_ENABLED=$(filter 1 true yes on,$(BUILD_COBALT_DEBUG))
 BUILD_COBALT_DEBUG_GN_ARG=$(if $(BUILD_COBALT_DEBUG_ENABLED),true,false)
+# Release libraries otherwise retain a large DWARF debug-information section.
+# Debug builds keep it for symbolized diagnostics.
+COBALT_STRIP_ENABLED=$(if $(BUILD_COBALT_DEBUG_ENABLED),,1)
 BUILD_COBALT_ARCHITECTURE?=arm-softfp
 BUILD_COBALT_PLATFORM?=evergreen-$(BUILD_COBALT_ARCHITECTURE)
 BUILD_COBALT_TARGET?=cobalt
@@ -121,6 +133,14 @@ check-package:
 package: check-package
 	$(MAKE) clean-ipk
 	$(MAKE) $(PACKAGE_TARGET)
+
+.PHONY: compatibility-test-package
+compatibility-test-package:
+	$(MAKE) package \
+	  PACKAGE="$(COMPAT_TEST_OFFICIAL_YOUTUBE_IPK)" \
+	  PACKAGE_NAME="$(COMPAT_TEST_PACKAGE_NAME)" \
+	  PACKAGE_DISPLAY_NAME="$(COMPAT_TEST_DISPLAY_NAME)" \
+	  PROJECT_VERSION="$(COMPAT_TEST_VERSION)"
 
 .PHONY: clean-ipk
 clean-ipk:
@@ -223,7 +243,7 @@ $(STANDALONE_WORKDIR):
 	  '"splashBackground":"splashBackground.png",' \
 	  '"imageForRecents":"imageForRecents.png",' \
 	  '"playIcon":"playIcon.png",' \
-	  '"iconColor":"#ffffff",' \
+	  '"iconColor":"#ff0000",' \
 	  '"resolution":"1920x1080",' \
 	  '"vendorExtension":{"userAgent":"$$browserName$$/$$browserVersion$$ ($$platformName$$-$$platformVersion$$), _TV_O18/$$firmwareVersion$$ (LG, $$modelName$$, $$networkMode$$)","allowCrossDomain":true},' \
 	  '"support360Content":true,' \
@@ -285,6 +305,9 @@ $(WORKDIR)/cobalt:
 	mkdir -p $@
 	@! test -z $(PACKAGE_SB_API_VERSION) || (echo "" && echo "--" && echo "Cannot find SB_API_VERSION in IPK binary. You can try to specify it with: make PACKAGE_SB_API_VERSION=12" && exit 1)
 	tar -xJvf $(PACKAGE_COBALT_ARCHIVE) -C $@
+	if [ -n "$(COBALT_STRIP_ENABLED)" ] && [ -f "$@/libcobalt.so" ]; then \
+		docker run --rm -v "$$PWD:/work" -w /work cobalt-build-evergreen:latest sh -lc 'arm-linux-gnueabi-strip --strip-debug "$$1"' sh "/work/$@/libcobalt.so"; \
+	fi
 
 .PRECIOUS: $(WORKDIR)/ipk/content/app/cobalt/content/web/adblock
 $(WORKDIR)/ipk/content/app/cobalt/content/web/adblock: $(WEBAPP_OUTPUT_STAMP)
@@ -298,7 +321,7 @@ $(WORKDIR)/ipk/content/app/cobalt/content/web/adblock: $(WEBAPP_OUTPUT_STAMP)
 	rm -f $(WORKDIR)/ipk/drm.nfz
 	sed -i.bak 's/YouTube/$(PACKAGE_DISPLAY_NAME)/g' $(WORKDIR)/ipk/appinfo.json
 	rm -f $(WORKDIR)/ipk/appinfo.json.bak
-	jq --arg version "$(PACKAGE_VERSION)" 'del(.fileSystemType) | .version = $$version | .vendorExtension.userAgent = "$$browserName$$/$$browserVersion$$ ($$platformName$$-$$platformVersion$$), _TV_O18/$$firmwareVersion$$ (LG, $$modelName$$, $$networkMode$$)" | .vendorExtension.allowCrossDomain = true | .support360Content = true | .trustLevel = "netcast" | .privilegedJail = true | .supportGIP = true' < $(WORKDIR)/ipk/appinfo.json > $(WORKDIR)/ipk/appinfo2.json
+	jq --arg version "$(PACKAGE_VERSION)" 'del(.fileSystemType) | .version = $$version | .iconColor = "#ff0000" | .vendorExtension.userAgent = "$$browserName$$/$$browserVersion$$ ($$platformName$$-$$platformVersion$$), _TV_O18/$$firmwareVersion$$ (LG, $$modelName$$, $$networkMode$$)" | .vendorExtension.allowCrossDomain = true | .support360Content = true | .trustLevel = "netcast" | .privilegedJail = true | .supportGIP = true' < $(WORKDIR)/ipk/appinfo.json > $(WORKDIR)/ipk/appinfo2.json
 	mv $(WORKDIR)/ipk/appinfo2.json $(WORKDIR)/ipk/appinfo.json
 
 # fork: debug builds get red-tinted icons (assets/debug/*.png) so they're
@@ -432,7 +455,7 @@ cobalt-bin/%/libcobalt.so: cobalt-bin $(WEBAPP_OUTPUT_STAMP)
 		git clone --depth 1 --branch $(BUILD_COBALT_VERSION) https://github.com/youtube/cobalt.git $(WORKDIR_COBALT); \
 	fi
 	if [ ! -f "$(WORKDIR_COBALT)/.patched" ]; then \
-		(cd $(WORKDIR_COBALT) && patch -p1 < "$(CURRENT_DIR)/cobalt-patches/cobalt-$(BUILD_COBALT_VERSION).patch" && touch .patched) || (echo "Missing patch for version $(BUILD_COBALT_VERSION)" && exit 1); \
+		(cd $(WORKDIR_COBALT) && git apply --recount "$(CURRENT_DIR)/cobalt-patches/cobalt-$(BUILD_COBALT_VERSION).patch" && touch .patched) || (echo "Missing or invalid patch for version $(BUILD_COBALT_VERSION)" && exit 1); \
 	fi
 	perl -0pi -e 's/^(\s*)<<: \*common-definitions\n\1<<: \*build-volumes/$$1<<: [*common-definitions, *build-volumes]/mg' $(WORKDIR_COBALT)/docker-compose.yml
 	grep -q 'archive.debian.org/debian-security' "$(WORKDIR_COBALT)/docker/linux/base/Dockerfile" || \
@@ -462,7 +485,7 @@ cobalt-bin/%/libcobalt.so: cobalt-bin $(WEBAPP_OUTPUT_STAMP)
 	if [ -f "$$outdir/libcobalt.so" ]; then \
 		cp "$$outdir/libcobalt.so" $@; \
 	fi; \
-	if [ "$(BUILD_COBALT_TYPE)" = "devel" ] && [ -f "$@" ]; then \
+	if [ -n "$(COBALT_STRIP_ENABLED)" ] && [ -f "$@" ]; then \
 		docker run --rm -v "$$PWD:/work" -w /work cobalt-build-evergreen:latest sh -lc 'arm-linux-gnueabi-strip --strip-debug "$$1"' sh "$@"; \
 	fi
 
