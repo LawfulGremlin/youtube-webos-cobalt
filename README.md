@@ -1,3 +1,5 @@
+> **This is a pull-only shadow fork** of [RF1705/youtube-webos-cobalt-adfree](https://github.com/RF1705/youtube-webos-cobalt-adfree) — all credit for the original project goes there. This fork only adds hardware-verified fixes and features on top of it; see [FORK.md](FORK.md) for what's different and why.
+
 # YouTube webOS Cobalt AdFree
 
 [![CI](https://github.com/RF1705/youtube-webos-cobalt-adfree/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/RF1705/youtube-webos-cobalt-adfree/actions/workflows/ci.yml)
@@ -9,6 +11,22 @@ Unofficial Cobalt-based YouTube app modification for LG webOS TVs with ad blocki
 This project patches the webOS YouTube application by replacing or modifying the Cobalt runtime used by YouTube TV on webOS. The goal is to keep the original YouTube TV experience while adding ad blocking, SponsorBlock support and related improvements.
 
 > This project is unofficial and is not affiliated with YouTube, Google, LG or webOS.
+
+## Add to webOS Homebrew
+
+The easiest way to install this fork and keep it updated is through the
+webOS Homebrew Channel app:
+
+1. Open **Homebrew Channel** on your TV.
+2. Go to **Settings → Add repository**.
+3. Enter this URL:
+
+   ```text
+   https://raw.githubusercontent.com/LawfulGremlin/youtube-webos-cobalt/main/repo.json
+   ```
+
+4. The app now shows up in Homebrew's app list as installable and
+   updatable, pulling directly from this fork's releases.
 
 ## v1.1.1
 
