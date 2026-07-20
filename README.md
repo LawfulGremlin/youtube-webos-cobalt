@@ -151,14 +151,22 @@ rather than the standard `chrome://inspect` flow, but it gives full
 segments/events to test logic without needing a real annotated video, all
 without touching hardware more than once to confirm the final result.
 
-When iterating on a debug build, `tools/tv-app-restart.sh` closes the app,
-optionally installs a new IPK, relaunches it, and restores whatever video
-was playing (at the same position, same paused state) so a reinstall doesn't
-cost you your place:
+A few small scripts wrap the common actions so none of this needs re-typing:
 
 ```sh
-tools/tv-app-restart.sh <tv-ip> <ares-device-name> [path/to/new.ipk]
+tools/tv-status.sh [device...]                              # reachable? CDP up? what's running?
+tools/tv-load-video.sh <device> <video-id> [secs] [--paused] # jump to a specific video, no remote needed
+tools/tv-deploy.sh debug|release <device> [version]          # build + install + launch in one step
+tools/tv-app-restart.sh <device> [ipk]                       # close/(install)/relaunch, restoring playback
 ```
+
+`tv-app-restart.sh` closes the app, optionally installs a new IPK, relaunches
+it, and restores whatever video was playing (same position, same paused
+state) so a reinstall doesn't cost you your place. `tv-deploy.sh` auto-bumps
+the patch version from the highest existing `output/*.ipk` for that variant
+if you don't pass one. All four take an `ares-*` device **name** (`lg48`),
+not an IP — resolved via `tools/tv-lib.sh` against the same
+`~/.webos/tv/novacom-devices.json` `ares-setup-device` maintains.
 
 ### Building a compatibility-test package
 
@@ -211,8 +219,9 @@ own `ci.yml` so the two never collide.
   targeted, `fork:`-commented edits (marker rendering, menu focus, category
   swatches). Kept as close to upstream as possible; see FORK.md for why each
   edit exists and what it replaced.
-* `tools/cdp-eval.py`, `tools/tv-app-restart.sh` — development tooling
-  described above.
+* `tools/cdp-eval.py`, `tools/tv-status.sh`, `tools/tv-load-video.sh`,
+  `tools/tv-deploy.sh`, `tools/tv-app-restart.sh`, `tools/tv-lib.sh` —
+  development tooling described above.
 * `FORK.md` — the full technical narrative: root causes, dead ends, and the
   Cobalt/webOS engine quirks discovered along the way (missing
   `Element.prototype.closest`, no `NodeList.forEach`, synchronous XHR
@@ -396,12 +405,11 @@ modifying or removing entries in the device list (`-a`/`-m`/`-r`), not
 selecting one to act on. `ares-package` doesn't take it either, since it
 only builds a local IPK and never touches a device at all.
 
-This fork's own dev tools don't go through the `ares-*` device registry, so
-they don't take `--device` either — they take the TV's IP directly instead,
-since `tools/cdp-eval.py` connects over a raw WebSocket rather than through
-novacom. `tools/tv-app-restart.sh` needs both: the IP for the DevTools
-connection, and the `ares-*` device name for `ares-install`/`ares-launch`,
-as two separate arguments (`tv-app-restart.sh <tv-ip> <ares-device-name> [ipk]`).
+This fork's own dev tools (`tools/tv-*.sh`) take that same device **name**
+as a plain positional argument, not `--device` — but they do accept it, and
+resolve the IP themselves from `~/.webos/tv/novacom-devices.json` (via
+`tools/tv-lib.sh`), since `tools/cdp-eval.py` connects over a raw WebSocket
+rather than through novacom and needs a real IP under the hood either way.
 
 ## Credits
 

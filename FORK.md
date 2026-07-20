@@ -309,10 +309,19 @@ Add this URL to webOS Homebrew / Device Manager as a custom repository:
 
 ## App restarts that restore playback
 
-`tools/tv-app-restart.sh <tv-ip> <ares-device> [ipk]` — closes the debug app
+`tools/tv-app-restart.sh <device-name> [ipk]` — closes the debug app
 (optionally installing a new IPK), relaunches it, and restores the video that
 was playing, at the captured position. Used for every dev close/reopen so a
-reinstall doesn't cost the viewer their place.
+reinstall doesn't cost the viewer their place. Takes an `ares-*` device name
+(resolved to an IP via `tools/tv-lib.sh`), not a bare IP.
+
+Two more small tools round out the loop: `tools/tv-status.sh [device...]`
+(reachable? CDP up? what's running?) and `tools/tv-deploy.sh debug|release
+<device> [version]` (build + install + launch in one step, auto-bumping the
+patch version from the highest existing `output/*.ipk` for that variant if
+none is given). `tools/tv-load-video.sh <device> <video-id> [secs] [--paused]`
+is the hash-plant-and-reload recipe below, standalone, for jumping an
+already-running debug app to a specific video without a full reinstall.
 
 How it has to work on this Cobalt build (each alternative tested live and
 ignored): launch params / `contentTarget` deep links do nothing (cold or warm),

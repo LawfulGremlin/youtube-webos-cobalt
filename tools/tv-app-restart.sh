@@ -2,7 +2,7 @@
 # Restart the debug app on a TV, restoring the video that was playing.
 # See FORK.md ("Debug builds"). Requires the debug build (CDP on :9222).
 #
-# Usage: tools/tv-app-restart.sh <tv-ip> <ares-device> [ipk-to-install]
+# Usage: tools/tv-app-restart.sh <device-name> [ipk-to-install]
 #
 # Flow: capture playing video+position over CDP -> close -> (install) ->
 # launch -> plant the watch hash and reload -> the account picker swallows
@@ -14,16 +14,18 @@
 # element is directly scriptable).
 
 set -e
-TV_IP="$1"
-DEVICE="$2"
-IPK="$3"
-HERE="$(dirname "$0")"
-[ -z "$TV_IP" ] || [ -z "$DEVICE" ] && { echo "usage: $0 <tv-ip> <ares-device> [ipk]"; exit 1; }
+HERE="$(cd "$(dirname "$0")" && pwd)"
+source "$HERE/tv-lib.sh"
+
+DEVICE="$1"
+IPK="$2"
+[ -z "$DEVICE" ] && { echo "usage: $0 <device-name> [ipk]"; exit 1; }
+
+TV_IP=$(tv_resolve_ip "$DEVICE")
+[ -z "$TV_IP" ] && { echo "no device named '$DEVICE' in the ares registry"; exit 1; }
 
 APP_ID=com.cobalt.youtube.adfree.debug
-
-cdp() { python3 "$HERE/cdp-eval.py" "$TV_IP" "$1" 2>/dev/null \
-        | python3 -c "import sys,json;d=json.load(sys.stdin);print(d['result']['result'].get('value',''))" 2>/dev/null; }
+cdp() { tv_cdp_eval "$TV_IP" "$1"; }
 
 # 1. capture (best effort — app may be dead/unreachable)
 STATE=$(cdp "JSON.stringify({v:(location.hash.match(/[?&]v=([^&#]+)/)||[])[1]||'',t:Math.floor(document.querySelector('video')?.currentTime||0),paused:!!document.querySelector('video')?.paused})" || echo '')
@@ -41,10 +43,7 @@ fi
 ares-launch --device "$DEVICE" "$APP_ID"
 
 # 3. wait for CDP
-for i in $(seq 1 20); do
-  curl -s -m 2 "http://$TV_IP:9222/json" >/dev/null 2>&1 && break
-  sleep 1
-done
+tv_wait_cdp "$TV_IP" 20
 echo "CDP up"
 
 [ -z "$VID" ] && { echo "no video to restore — done"; exit 0; }
@@ -53,10 +52,7 @@ echo "CDP up"
 sleep 3
 cdp "location.href = location.href.split('#')[0] + '#/watch?v=$VID'; location.reload(); 'reloading'" >/dev/null
 sleep 8
-for i in $(seq 1 20); do
-  curl -s -m 2 "http://$TV_IP:9222/json" >/dev/null 2>&1 && break
-  sleep 1
-done
+tv_wait_cdp "$TV_IP" 20
 
 # 5. account picker: Enter selects the default (first) account
 for i in $(seq 1 10); do
