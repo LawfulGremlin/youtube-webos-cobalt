@@ -1,4 +1,4 @@
-> **This is a pull-only shadow fork** of [RF1705/youtube-webos-cobalt-adfree](https://github.com/RF1705/youtube-webos-cobalt-adfree) — all credit for the original project goes there. This fork only adds hardware-verified fixes and features on top of it; see [FORK.md](FORK.md) for what's different and why.
+> **This is a pull-only detached fork** of [RF1705/youtube-webos-cobalt-adfree](https://github.com/RF1705/youtube-webos-cobalt-adfree) — all credit for the original project goes there. This fork only adds hardware-verified fixes and features on top of it; see [FORK.md](FORK.md) for what's different and why.
 
 # YouTube webOS Cobalt AdFree
 
