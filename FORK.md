@@ -294,6 +294,12 @@ web API exists:
 - **Incremental DOM prunes foreign nodes** inside the player subtree: next to
   `ytlr-progress-bar` within seconds, inside the progress `slider` in under
   100ms. Only `<body>` survives.
+- **No `ResizeObserver`, no CSS Anchor Positioning** (`CSS.supports('anchor-name',
+  '--foo')` is `false`) — confirmed live when considering whether SponsorBlock's
+  marker-position syncing could be made purely static instead of polled. There is
+  no way to make an element track another element's on-screen position without
+  JS. `MutationObserver` and `IntersectionObserver` *do* work, though — the gap is
+  specific, not "no modern observer APIs at all."
 
 ## Homebrew repository
 
