@@ -432,8 +432,15 @@ ares-setup-device -a webos \
 ```
 
 Give each registered device a distinct, memorable name (`-a <name>`) if you
-work with more than one TV — every `ares-*` command and the dev tools above
-take a `--device <name>` argument.
+work with more than one TV — every `ares-*` command takes a `--device <name>`
+argument to select between them (e.g. `ares-install --device <name> ...`).
+
+This fork's own dev tools don't go through the `ares-*` device registry, so
+they don't take `--device` — they take the TV's IP directly instead, since
+`tools/cdp-eval.py` connects over a raw WebSocket rather than through
+novacom. `tools/tv-app-restart.sh` needs both: the IP for the DevTools
+connection, and the `ares-*` device name for `ares-install`/`ares-launch`,
+as two separate arguments (`tv-app-restart.sh <tv-ip> <ares-device-name> [ipk]`).
 
 ## Project status
 
