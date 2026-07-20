@@ -1,14 +1,18 @@
 > **This is a pull-only detached fork** of [RF1705/youtube-webos-cobalt-adfree](https://github.com/RF1705/youtube-webos-cobalt-adfree) — all credit for the original project goes there. This fork only adds hardware-verified fixes and features on top of it; see [FORK.md](FORK.md) for what's different and why.
 
-# YouTube webOS Cobalt AdFree
+# YouTube webOS Cobalt AdFree (LawfulGremlin fork)
 
-[![CI](https://github.com/RF1705/youtube-webos-cobalt-adfree/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/RF1705/youtube-webos-cobalt-adfree/actions/workflows/ci.yml)
-[![Latest release](https://img.shields.io/github/v/release/RF1705/youtube-webos-cobalt-adfree?label=latest%20release)](https://github.com/RF1705/youtube-webos-cobalt-adfree/releases/latest)
-[![Downloads](https://img.shields.io/github/downloads/RF1705/youtube-webos-cobalt-adfree/total?label=downloads)](https://github.com/RF1705/youtube-webos-cobalt-adfree/releases)
+[![CI](https://github.com/LawfulGremlin/youtube-webos-cobalt/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/LawfulGremlin/youtube-webos-cobalt/actions/workflows/ci.yml)
+[![Fork CI](https://github.com/LawfulGremlin/youtube-webos-cobalt/actions/workflows/fork-ci.yml/badge.svg?branch=main)](https://github.com/LawfulGremlin/youtube-webos-cobalt/actions/workflows/fork-ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/LawfulGremlin/youtube-webos-cobalt?label=latest%20release)](https://github.com/LawfulGremlin/youtube-webos-cobalt/releases/latest)
 
-Unofficial Cobalt-based YouTube app modification for LG webOS TVs with ad blocking and SponsorBlock support.
+Unofficial Cobalt-based YouTube app modification for LG webOS TVs with ad
+blocking and SponsorBlock support.
 
-This project patches the webOS YouTube application by replacing or modifying the Cobalt runtime used by YouTube TV on webOS. The goal is to keep the original YouTube TV experience while adding ad blocking, SponsorBlock support and related improvements.
+This project patches the webOS YouTube application by replacing or modifying
+the Cobalt runtime used by YouTube TV on webOS. The goal is to keep the
+original YouTube TV experience while adding ad blocking, SponsorBlock support
+and related improvements.
 
 > This project is unofficial and is not affiliated with YouTube, Google, LG or webOS.
 
@@ -28,36 +32,47 @@ webOS Homebrew Channel app:
 4. The app now shows up in Homebrew's app list as installable and
    updatable, pulling directly from this fork's releases.
 
-## v1.1.1
+## What this fork adds
 
-The latest release is available from the GitHub releases page:
+Everything below is hardware-verified — found and confirmed by inspecting a
+real TV live over Chrome DevTools Protocol, not assumed from reading the
+source. The full technical story for each (root causes, what didn't work
+first, exact engine quirks hit along the way) lives in [FORK.md](FORK.md);
+this is the summary.
 
-<https://github.com/RF1705/youtube-webos-cobalt-adfree/releases>
+* **SponsorBlock markers that actually render.** Upstream's original marker
+  code silently never worked on any video — four separate, stacked DOM/engine
+  issues, all fixed here. Markers are translucent and cover the whole
+  segment, so the played portion shows through as a lighter tint instead of
+  hiding your progress through it.
+* **SponsorBlock category color key** in the settings menu — each toggle row
+  shows a swatch in the same color as its timeline marker.
+* **Ad blocking that reaches the actual feed**, not just what the page's own
+  `JSON.parse` sees. The home/search/Shorts feed and in-video "shopping"
+  overlays are filtered at the XHR response layer, which is the only point
+  every consumer of that data actually passes through on this platform.
+* **Menu focus that moves one row at a time.** The settings menu used to skip
+  a row on every Down/Up press on real hardware (not reproducible via a
+  synthetic key event — only a real remote press triggers it).
+* **A shortcut-key registry** with frame-stepping actions (ported from
+  [LawfulGremlin/youtube-webos](https://github.com/LawfulGremlin/youtube-webos)'s
+  `fork-extensions`), plus upstream's own playback-speed shortcuts.
+* **Remove Shorts** toggle (shelves and feed tiles).
+* Distinct debug vs. release icons, so the two variants are unmistakable on
+  the home screen when both are installed side by side.
+* Return YouTube Dislike support, playback speed control, and optional
+  autostart integration (all from upstream, unchanged).
 
-The release uses the original Leanback app id, `youtube.leanback.v4`, to keep
-YouTube sign-in and phone pairing compatible. Installing it replaces the
-official YouTube application with the patched version.
-
-## Features
-
-* YouTube for LG webOS TVs
-* Cobalt-based runtime modification
-* Advertisement blocking
-* SponsorBlock support
-* Return YouTube Dislike support
-* Playback speed support
-* Optional autostart integration
-* Installable as patched `.ipk` package
-
-The configuration screen can be opened with the **GREEN** button on the LG remote.
-While a video is playing, press **1** to decrease the playback speed or **3** to
-increase it. The available speeds range from 0.25× to 2×.
+Deliberately **not** ported: 4K/quality forcing (capped by the actual Cobalt
+binary and DRM tier, not something fixable from JavaScript), auto-login
+(Cobalt's native account flow already works), and cosmetic UI themes
+(WebView-specific, poor fit for Cobalt's CSS subset).
 
 ## Requirements
 
 * LG TV with webOS
 * Homebrew Channel, Developer Mode or root access
-* Docker
+* Docker (used automatically by the build — see [Development](#development) below)
 * Git
 * Linux or macOS build environment
 * Required tools:
@@ -66,9 +81,8 @@ increase it. The available speeds range from 0.25× to 2×.
 sudo apt install jq git sed binutils squashfs-tools rename findutils xz-utils
 ```
 
-The patched app uses `youtube.leanback.v4` and therefore replaces the official
-YouTube application. Keep a copy of the official package if you want to restore
-it later.
+This fork packages under its own app ID, `com.cobalt.youtube.adfree`, so it
+installs **alongside** the official YouTube app rather than replacing it.
 
 Community-reported device, firmware and feature results are collected in the
 [device compatibility matrix](docs/device-compatibility.md). The matrix also
@@ -77,32 +91,17 @@ compatibility investigations.
 
 ## Installation
 
-Download a release `.ipk` package and install it using one of the following methods.
-
-Recommended release package:
-
-```text
-youtube.leanback.v4_1.1.1_arm.ipk
-```
-
-The release also contains `youtube.leanback.v4.manifest.json` for installation
-through the webOS Homebrew Channel.
-
-### Custom Homebrew Channel repository
-
-This project also provides a custom Homebrew Channel repository:
+Download a release `.ipk` from the
+[releases page](https://github.com/LawfulGremlin/youtube-webos-cobalt/releases)
+and install it with one of the methods below.
 
 ```text
-https://raw.githubusercontent.com/RF1705/youtube-webos-cobalt-adfree/main/repo.json
+com.cobalt.youtube.adfree_<version>_arm.ipk
 ```
 
-In Homebrew Channel, open **Settings**, choose **Add repository**, and enter
-the URL above.
-
-> **Important:** This app uses the same app id (`youtube.leanback.v4`) as the
-> YouTube AdFree entry in the default WebOSBrew repository. Do not install both
-> variants at the same time: choose one repository entry and uninstall the
-> other variant first.
+The release also contains a webosbrew manifest for installing through the
+Homebrew Channel — see [Add to webOS Homebrew](#add-to-webos-homebrew) above,
+which is the recommended path since it keeps the app updatable.
 
 ### Install via webOS Device Manager
 
@@ -111,50 +110,177 @@ Use the webOS Device Manager and install the downloaded `.ipk` package.
 ### Install via ares-cli
 
 ```sh
-ares-install youtube.leanback.v4_*.ipk
+ares-install com.cobalt.youtube.adfree_*.ipk
 ```
 
 ### Install via SSH on rooted/Homebrew webOS
 
-Download the release package to `/media/developer/temp` and install it through
-the webOS app install service:
-
 ```sh
 mkdir -p /media/developer/temp
 cd /media/developer/temp
-wget https://github.com/RF1705/youtube-webos-cobalt-adfree/releases/download/v1.1.1/youtube.leanback.v4_1.1.1_arm.ipk
-luna-send-pub -i 'luna://com.webos.appInstallService/dev/install' '{"id":"com.ares.defaultName","ipkUrl":"/media/developer/temp/youtube.leanback.v4_1.1.1_arm.ipk","subscribe":true}'
+wget https://github.com/LawfulGremlin/youtube-webos-cobalt/releases/download/v<version>/com.cobalt.youtube.adfree_<version>_arm.ipk
+luna-send-pub -i 'luna://com.webos.appInstallService/dev/install' '{"id":"com.ares.defaultName","ipkUrl":"/media/developer/temp/com.cobalt.youtube.adfree_<version>_arm.ipk","subscribe":true}'
+rm /media/developer/temp/com.cobalt.youtube.adfree_*.ipk
 ```
 
-After installation, the downloaded package can be removed:
+## Development
+
+### Building the release package
 
 ```sh
-rm /media/developer/temp/youtube.leanback.v4_1.1.1_arm.ipk
+make package \
+  PACKAGE=ipks-official/2023-07-30-youtube.leanback.v4-1.1.7.ipk \
+  PACKAGE_NAME=com.cobalt.youtube.adfree \
+  PACKAGE_DISPLAY_NAME='YouTube Cobalt AdFree' \
+  PROJECT_VERSION=<x.y.z>
 ```
+
+`PACKAGE` is an official YouTube Leanback IPK to patch (one is checked in
+under `ipks-official/`). The output lands in `output/`.
+
+**Docker is used automatically** — `make package` invokes the webapp bundle
+step and `ares-package` both through `docker-make.%`, which runs a
+containerized `make` inside `node:22` (see `NODE_DOCKER_IMAGE` in the
+Makefile). You just need Docker installed and running; there's no separate
+manual `docker build`/`docker run` step to remember.
+
+### Building a debug variant (remote DevTools)
+
+This is the workflow used to develop and hardware-verify everything in
+[What this fork adds](#what-this-fork-adds) above — every fix in this fork
+was found and confirmed this way, live on a real TV, before shipping.
+
+The release binary has its remote-debugging server compiled **out**
+entirely (confirmed on hardware — the switch to enable it does nothing on a
+`gold` binary). A real debug session needs a Cobalt binary built from source
+as a `qa` config instead:
+
+```sh
+make cobalt-bin/23.lts.4-12-logging/libcobalt.so BUILD_COBALT_TYPE=qa
+make cobalt-bin/23.lts.4-12-logging.xz
+```
+
+This only needs to be done once — the result is committed under
+`cobalt-bin/*-logging.xz` so it doesn't need rebuilding from scratch. Then
+package with it:
+
+```sh
+make package \
+  PACKAGE=ipks-official/2023-07-30-youtube.leanback.v4-1.1.7.ipk \
+  PACKAGE_NAME=com.cobalt.youtube.adfree.debug \
+  PACKAGE_DISPLAY_NAME='YouTube Cobalt Debug' \
+  PROJECT_VERSION=<x.y.z> \
+  COBALT_DEBUG=1
+```
+
+`COBALT_DEBUG=1` picks the `-logging` Cobalt archive, forwards through to
+the containerized build correctly, and stubs the couple of DevTools frontend
+files that ares-package's bundled minifier can't parse. Install this
+alongside the release build under its own app ID
+(`com.cobalt.youtube.adfree.debug`) — the two coexist fine, and giving the
+debug variant a distinct icon (already done here) makes it obvious which one
+is running.
+
+Once installed and launched, the app opens a real Chrome DevTools Protocol
+endpoint at `http://<tv-ip>:9222`:
+
+```sh
+tools/cdp-eval.py <tv-ip> '1 + 1'                       # sanity check
+tools/cdp-eval.py <tv-ip> 'window.sponsorblock.markerStatus'
+```
+
+This is a plain WebSocket client (`ws://<tv-ip>:9222/devtools/page/cobalt`)
+rather than the standard `chrome://inspect` flow, but it gives full
+`Runtime.evaluate` access — DOM inspection, live state, injecting synthetic
+segments/events to test logic without needing a real annotated video, all
+without touching hardware more than once to confirm the final result.
+
+When iterating on a debug build, `tools/tv-app-restart.sh` closes the app,
+optionally installs a new IPK, relaunches it, and restores whatever video
+was playing (at the same position, same paused state) so a reinstall doesn't
+cost you your place:
+
+```sh
+tools/tv-app-restart.sh <tv-ip> <ares-device-name> [path/to/new.ipk]
+```
+
+### Building a compatibility-test package
+
+A separate build path exists for testing against older webOS releases
+without touching the main installation — it reuses the Cobalt starter from
+an older official YouTube package while keeping the current Cobalt 23
+runtime and web app:
+
+```sh
+make compatibility-test-package
+```
+
+Installs as `com.cobalt.youtube.adfree.compat`, alongside everything else.
+See [docs/compatibility-test.md](docs/compatibility-test.md) for what to
+report back if you test one of these.
+
+### Registering a TV with ares-cli
+
+```sh
+ares-setup-device -a <device-name> \
+  -i "username=root" \
+  -i "privatekey=/path/to/id_rsa" \
+  -i "passphrase=SSH_KEY_PASSPHRASE" \
+  -i "host=<tv-ip>" \
+  -i "port=22"
+```
+
+See [Development TV setup](#development-tv-setup) below for the Developer
+Mode (non-rooted) equivalent.
+
+### Running the fork's own tests
+
+Pure logic in `webapp/src/fork/` (feed filtering, frame-step math, the
+shortcut registry) has node-runnable tests, no build step needed:
+
+```sh
+node webapp/src/fork/test.mjs
+```
+
+Run automatically on push/PR by `fork-ci.yml`, kept separate from upstream's
+own `ci.yml` so the two never collide.
+
+### Where things live
+
+* `webapp/src/fork/` — fork-owned feature code (`merge=ours` — upstream
+  syncs never touch it). `filters.mjs`/`shortcut-registry.mjs`/`frame-step.mjs`
+  are pure logic with tests in `test.mjs`; `index.js` is the only wiring
+  point, imported once from upstream's `adblock-main.js`.
+* `sponsorblock.js`, `ui.js`, `checkboxTools.js` — upstream files with
+  targeted, `fork:`-commented edits (marker rendering, menu focus, category
+  swatches). Kept as close to upstream as possible; see FORK.md for why each
+  edit exists and what it replaced.
+* `tools/cdp-eval.py`, `tools/tv-app-restart.sh` — development tooling
+  described above.
+* `FORK.md` — the full technical narrative: root causes, dead ends, and the
+  Cobalt/webOS engine quirks discovered along the way (missing
+  `Element.prototype.closest`, no `NodeList.forEach`, synchronous XHR
+  disallowed, dynamically-injected `<style>` elements silently ignored, and
+  more). Worth reading before assuming a web API exists on this platform.
 
 ## Patch an official YouTube IPK
 
 Clone the repository:
 
 ```sh
-git clone https://github.com/RF1705/youtube-webos-cobalt-adfree.git
-cd youtube-webos-cobalt-adfree
+git clone https://github.com/LawfulGremlin/youtube-webos-cobalt.git
+cd youtube-webos-cobalt
 ```
 
 Patch your official YouTube IPK:
 
 ```sh
-make PACKAGE=./your-tv-youtube.ipk
+make package PACKAGE=./your-tv-youtube.ipk PACKAGE_NAME=com.cobalt.youtube.adfree
 ```
 
-By default the patched package uses:
-
-```text
-App ID: youtube.leanback.v4
-Name:   YouTube webOS Cobalt AdFree
-```
-
-The patched IPK will be created in the `output/` directory.
+The patched IPK will be created in the `output/` directory. See
+[Development](#development) above for the full set of build variants
+(release, debug, compatibility-test).
 
 ## Standalone Cobalt launcher
 
@@ -226,13 +352,13 @@ Autostart can make the app appear as an input source next to HDMI/Live TV.
 Enable autostart:
 
 ```sh
-luna-send-pub -n 1 'luna://com.webos.service.eim/addDevice' '{"appId":"youtube.leanback.v4","pigImage":"","mvpdIcon":""}'
+luna-send-pub -n 1 'luna://com.webos.service.eim/addDevice' '{"appId":"com.cobalt.youtube.adfree","pigImage":"","mvpdIcon":""}'
 ```
 
 Disable autostart:
 
 ```sh
-luna-send-pub -n 1 'luna://com.webos.service.eim/deleteDevice' '{"appId":"youtube.leanback.v4"}'
+luna-send-pub -n 1 'luna://com.webos.service.eim/deleteDevice' '{"appId":"com.cobalt.youtube.adfree"}'
 ```
 
 Autostart may improve startup time because the app can stay loaded in the background. This can increase idle memory usage.
@@ -243,12 +369,22 @@ The repository may include prebuilt Cobalt binaries in `cobalt-bin`.
 
 To build Cobalt yourself, the build process clones Cobalt, applies the patches from `cobalt-patches`, builds `libcobalt.so`, and packages the result.
 
-Example:
+Example (release/`gold` config):
 
 ```sh
 make BUILD_COBALT_DEBUG=0 WEBAPP_DEBUG=0 \
   cobalt-bin/23.lts.4-12/libcobalt.so \
   cobalt-bin/23.lts.4-12.xz
+```
+
+For a `qa` config with the remote-debugging server compiled in — see
+[Building a debug variant](#building-a-debug-variant-remote-devtools) above
+for why this specific flag, not `COBALT_DEBUG`, is what actually matters:
+
+```sh
+make BUILD_COBALT_TYPE=qa \
+  cobalt-bin/23.lts.4-12-logging/libcobalt.so \
+  cobalt-bin/23.lts.4-12-logging.xz
 ```
 
 For a clean rebuild after changing the Cobalt patch:
@@ -295,6 +431,10 @@ ares-setup-device -a webos \
   -i "port=22"
 ```
 
+Give each registered device a distinct, memorable name (`-a <name>`) if you
+work with more than one TV — every `ares-*` command and the dev tools above
+take a `--device <name>` argument.
+
 ## Project status
 
 This project is community maintained. YouTube TV, Cobalt and webOS can change at any time. Ad blocking, SponsorBlock, login behavior or playback features may break after updates from YouTube or LG.
@@ -305,11 +445,13 @@ This project builds on research and work from the webOS Homebrew, Cobalt and You
 
 Special thanks to these projects and maintainers whose work made this project possible:
 
+* [RF1705/youtube-webos-cobalt-adfree](https://github.com/RF1705/youtube-webos-cobalt-adfree) — the upstream project this fork tracks and builds on
 * [NicholasBly/youtube-webos](https://github.com/NicholasBly/youtube-webos)
 * [webosbrew/youtube-webos](https://github.com/webosbrew/youtube-webos)
 * [UltraHDR/youtube-webos-cobalt](https://github.com/UltraHDR/youtube-webos-cobalt)
+* [LawfulGremlin/youtube-webos](https://github.com/LawfulGremlin/youtube-webos) — source of this fork's shortcut-key registry and frame-stepping actions
 
-If this project helps you, you can support the maintainer here:
+If this project helps you, you can support the original maintainer here:
 
 <https://buymeacoffee.com/rf1705>
 
