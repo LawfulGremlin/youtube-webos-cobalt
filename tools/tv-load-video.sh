@@ -42,11 +42,16 @@ for i in $(seq 1 10); do
   sleep 1
 done
 
+ok=no
 for i in $(seq 1 25); do
   ok=$(tv_cdp_eval "$IP" "location.hash.indexOf('v=$VIDEO_ID') > -1 && document.querySelector('video') ? 'yes' : 'no'")
   [ "$ok" = "yes" ] && break
   sleep 1
 done
+if [ "$ok" != "yes" ]; then
+  echo "FAILED: watch page for $VIDEO_ID never appeared (stuck on: $(tv_cdp_eval "$IP" "location.hash.slice(0,50)"))" >&2
+  exit 1
+fi
 
 sleep 2
 if [ "$PAUSE_FLAG" = "--paused" ]; then
@@ -56,4 +61,24 @@ else
 fi
 
 sleep 2
-tv_cdp_eval "$IP" "JSON.stringify({videoID:(location.hash.match(/[?&]v=([^&#]+)/)||[])[1]||'', t:Math.floor(document.querySelector('video')?.currentTime||0), paused:!!document.querySelector('video')?.paused})"
+FINAL=$(tv_cdp_eval "$IP" "JSON.stringify({videoID:(location.hash.match(/[?&]v=([^&#]+)/)||[])[1]||'', t:Math.floor(document.querySelector('video')?.currentTime||0), paused:!!document.querySelector('video')?.paused, hasVideo:!!document.querySelector('video')})")
+echo "$FINAL"
+
+# Exit 0 only if the requested video is actually loaded, at roughly the
+# requested position and play/pause state — not just because the script
+# reached the end without an error.
+echo "$FINAL" | python3 -c "
+import sys, json
+s = json.load(sys.stdin)
+video_id, pos, want_paused = '$VIDEO_ID', $POS, '$PAUSE_FLAG' == '--paused'
+problems = []
+if not s.get('hasVideo'): problems.append('no video element')
+if s.get('videoID') != video_id: problems.append('wrong video: %r' % s.get('videoID'))
+if abs(s.get('t', 0) - pos) > 20: problems.append('position off: %ss vs requested %ss' % (s.get('t'), pos))
+if want_paused and not s.get('paused'): problems.append('should be paused but is playing')
+if not want_paused and s.get('paused'): problems.append('not playing')
+if problems:
+    print('FAILED: ' + '; '.join(problems), file=sys.stderr)
+    sys.exit(1)
+print('loaded OK')
+"
