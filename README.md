@@ -1,25 +1,12 @@
-> **This is a pull-only detached fork** of [RF1705/youtube-webos-cobalt-adfree](https://github.com/RF1705/youtube-webos-cobalt-adfree) — all credit for the original project goes there. This fork only adds hardware-verified fixes and features on top of it; see [FORK.md](FORK.md) for what's different and why.
+> **This is a detached fork** of [RF1705/youtube-webos-cobalt-adfree](https://github.com/RF1705/youtube-webos-cobalt-adfree) — all credit for the original project goes there. This fork adds hardware-specific fixes and features on top of it, for personal use on webOS 6.5.3.
 
-# YouTube webOS Cobalt AdFree (LawfulGremlin fork)
+# YouTube webOS Cobalt
 
 [![CI](https://github.com/LawfulGremlin/youtube-webos-cobalt/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/LawfulGremlin/youtube-webos-cobalt/actions/workflows/ci.yml)
 [![Fork CI](https://github.com/LawfulGremlin/youtube-webos-cobalt/actions/workflows/fork-ci.yml/badge.svg?branch=main)](https://github.com/LawfulGremlin/youtube-webos-cobalt/actions/workflows/fork-ci.yml)
 [![Latest release](https://img.shields.io/github/v/release/LawfulGremlin/youtube-webos-cobalt?label=latest%20release)](https://github.com/LawfulGremlin/youtube-webos-cobalt/releases/latest)
 
-Unofficial Cobalt-based YouTube app modification for LG webOS TVs with ad
-blocking and SponsorBlock support.
-
-This project patches the webOS YouTube application by replacing or modifying
-the Cobalt runtime used by YouTube TV on webOS. The goal is to keep the
-original YouTube TV experience while adding ad blocking, SponsorBlock support
-and related improvements.
-
-> This project is unofficial and is not affiliated with YouTube, Google, LG or webOS.
-
 ## Add to webOS Homebrew
-
-The easiest way to install this fork and keep it updated is through the
-webOS Homebrew Channel app:
 
 1. Open **Homebrew Channel** on your TV.
 2. Go to **Settings → Add repository**.
@@ -40,81 +27,43 @@ source. The full technical story for each (root causes, what didn't work
 first, exact engine quirks hit along the way) lives in [FORK.md](FORK.md);
 this is the summary.
 
-* **SponsorBlock markers that actually render.** Upstream's original marker
+Features:
+
+* **SponsorBlock category color key** in the settings menu — each toggle row
+  shows a swatch in the same color as its timeline marker.
+* **Shortcut-key registry** with frame-stepping actions (ported from
+  [LawfulGremlin/youtube-webos](https://github.com/LawfulGremlin/youtube-webos)'s
+  `fork-extensions`), plus upstream's own playback-speed shortcuts.
+
+Fixes:
+* **Menu focus that moves one row at a time.** The settings menu used to skip
+  a row on every Down/Up press on real hardware (not reproducible via a
+  synthetic key event — only a real remote press triggers it).
+* **SponsorBlock markers that render on local hardware** Upstream's original marker
   code silently never worked on any video — four separate, stacked DOM/engine
   issues, all fixed here. Markers are translucent and cover the whole
   segment, so the played portion shows through as a lighter tint instead of
   hiding your progress through it.
-* **SponsorBlock category color key** in the settings menu — each toggle row
-  shows a swatch in the same color as its timeline marker.
-* **Ad blocking that reaches the actual feed**, not just what the page's own
+* **Ad-blocking fixed for the feed**, not just what the page's own
   `JSON.parse` sees. The home/search/Shorts feed and in-video "shopping"
   overlays are filtered at the XHR response layer, which is the only point
   every consumer of that data actually passes through on this platform.
-* **Menu focus that moves one row at a time.** The settings menu used to skip
-  a row on every Down/Up press on real hardware (not reproducible via a
-  synthetic key event — only a real remote press triggers it).
-* **A shortcut-key registry** with frame-stepping actions (ported from
-  [LawfulGremlin/youtube-webos](https://github.com/LawfulGremlin/youtube-webos)'s
-  `fork-extensions`), plus upstream's own playback-speed shortcuts.
-* **Remove Shorts** toggle (shelves and feed tiles).
-* Distinct debug vs. release icons, so the two variants are unmistakable on
-  the home screen when both are installed side by side.
-* Return YouTube Dislike support, playback speed control, and optional
-  autostart integration (all from upstream, unchanged).
-
-Deliberately **not** ported: 4K/quality forcing (capped by the actual Cobalt
-binary and DRM tier, not something fixable from JavaScript), auto-login
-(Cobalt's native account flow already works), and cosmetic UI themes
-(WebView-specific, poor fit for Cobalt's CSS subset).
 
 ## Requirements
-
 * LG TV with webOS
 * Homebrew Channel, Developer Mode or root access
-* Docker (used automatically by the build — see [Development](#development) below)
-* Git
-* Linux or macOS build environment
-* Required tools:
-
-```sh
-sudo apt install jq git sed binutils squashfs-tools rename findutils xz-utils
-```
-
-This fork packages under its own app ID, `com.cobalt.youtube.adfree`, so it
-installs **alongside** the official YouTube app rather than replacing it.
-
-Community-reported device, firmware and feature results are collected in the
-[device compatibility matrix](docs/device-compatibility.md). The matrix also
-contains the reporting template and unpatched baseline test packages used for
-compatibility investigations.
 
 ## Installation
 
 Download a release `.ipk` from the
 [releases page](https://github.com/LawfulGremlin/youtube-webos-cobalt/releases)
-and install it with one of the methods below.
 
-```text
-com.cobalt.youtube.adfree_<version>_arm.ipk
-```
-
-The release also contains a webosbrew manifest for installing through the
-Homebrew Channel — see [Add to webOS Homebrew](#add-to-webos-homebrew) above,
-which is the recommended path since it keeps the app updatable.
-
-### Install via webOS Device Manager
-
-Use the webOS Device Manager and install the downloaded `.ipk` package.
-
-### Install via ares-cli
-
+ares-cli
 ```sh
 ares-install com.cobalt.youtube.adfree_*.ipk
 ```
 
-### Install via SSH on rooted/Homebrew webOS
-
+SSH on rooted/Homebrew webOS
 ```sh
 mkdir -p /media/developer/temp
 cd /media/developer/temp
@@ -124,6 +73,13 @@ rm /media/developer/temp/com.cobalt.youtube.adfree_*.ipk
 ```
 
 ## Development
+* Linux (Ubuntu)
+* Docker (Docker-compose)
+* Required tools: sudo apt install jq git sed binutils squashfs-tools rename findutils xz-utils
+
+This fork packages under its own app ID, com.cobalt.youtube.adfree, so it installs alongside the official YouTube app rather than replacing it.
+
+Community-reported device, firmware and feature results are collected in the device compatibility matrix. The matrix also contains the reporting template and unpatched baseline test packages used for compatibility investigations.
 
 ### Building the release package
 
@@ -446,10 +402,6 @@ since `tools/cdp-eval.py` connects over a raw WebSocket rather than through
 novacom. `tools/tv-app-restart.sh` needs both: the IP for the DevTools
 connection, and the `ares-*` device name for `ares-install`/`ares-launch`,
 as two separate arguments (`tv-app-restart.sh <tv-ip> <ares-device-name> [ipk]`).
-
-## Project status
-
-This project is community maintained. YouTube TV, Cobalt and webOS can change at any time. Ad blocking, SponsorBlock, login behavior or playback features may break after updates from YouTube or LG.
 
 ## Credits
 
