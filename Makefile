@@ -306,7 +306,11 @@ $(WORKDIR)/cobalt:
 	@! test -z $(PACKAGE_SB_API_VERSION) || (echo "" && echo "--" && echo "Cannot find SB_API_VERSION in IPK binary. You can try to specify it with: make PACKAGE_SB_API_VERSION=12" && exit 1)
 	tar -xJvf $(PACKAGE_COBALT_ARCHIVE) -C $@
 	if [ -n "$(COBALT_STRIP_ENABLED)" ] && [ -f "$@/libcobalt.so" ]; then \
-		docker run --rm -v "$$PWD:/work" -w /work cobalt-build-evergreen:latest sh -lc 'arm-linux-gnueabi-strip --strip-debug "$$1"' sh "/work/$@/libcobalt.so"; \
+		if docker image inspect cobalt-build-evergreen:latest >/dev/null 2>&1; then \
+			docker run --rm -v "$$PWD:/work" -w /work cobalt-build-evergreen:latest sh -lc 'arm-linux-gnueabi-strip --strip-debug "$$1"' sh "/work/$@/libcobalt.so"; \
+		else \
+			echo "cobalt-build-evergreen:latest not built locally (only produced by the from-source Cobalt build path) — skipping debug-symbol strip, shipping the prebuilt binary as-is."; \
+		fi; \
 	fi
 
 .PRECIOUS: $(WORKDIR)/ipk/content/app/cobalt/content/web/adblock
@@ -486,7 +490,11 @@ cobalt-bin/%/libcobalt.so: cobalt-bin $(WEBAPP_OUTPUT_STAMP)
 		cp "$$outdir/libcobalt.so" $@; \
 	fi; \
 	if [ -n "$(COBALT_STRIP_ENABLED)" ] && [ -f "$@" ]; then \
-		docker run --rm -v "$$PWD:/work" -w /work cobalt-build-evergreen:latest sh -lc 'arm-linux-gnueabi-strip --strip-debug "$$1"' sh "$@"; \
+		if docker image inspect cobalt-build-evergreen:latest >/dev/null 2>&1; then \
+			docker run --rm -v "$$PWD:/work" -w /work cobalt-build-evergreen:latest sh -lc 'arm-linux-gnueabi-strip --strip-debug "$$1"' sh "$@"; \
+		else \
+			echo "cobalt-build-evergreen:latest not built locally (only produced by the from-source Cobalt build path) — skipping debug-symbol strip, shipping the binary as-is."; \
+		fi; \
 	fi
 
 cobalt-bin/%.xz:
