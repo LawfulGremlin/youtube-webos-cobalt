@@ -9,12 +9,16 @@ PACKAGE_NAME_OFFICIAL=youtube.leanback.v4
 PACKAGE_NAME?=youtube.leanback.v4
 PACKAGE_NAME_TARGET=$(PACKAGE_NAME)
 PACKAGE_DISPLAY_NAME?=YouTube webOS Cobalt AdFree
-PROJECT_VERSION?=1.1.4
+PROJECT_VERSION?=1.1.5
 PACKAGE_COBALT_VERSION?=23.lts.4
 PACKAGE_VERSION?=$(PROJECT_VERSION)
 PACKAGE_IPK_BUILD=$(PACKAGE_NAME_TARGET)_$(PACKAGE_VERSION)_arm.ipk
 PACKAGE_OUTPUT_DIR?=output
 PACKAGE_TARGET?=$(PACKAGE_OUTPUT_DIR)/$(PACKAGE_IPK_BUILD)
+# webOS 5.5 rejects epoch-0 timestamps in IPK member archives. Use the build
+# time by default, while allowing release automation to pin a timestamp.
+IPK_MEMBER_MTIME?=$(shell date +%s)
+IPK_MTIME_NORMALIZER?=scripts/normalize-ipk-mtime.py
 PACKAGE_SB_API_VERSION?=$(shell strings $(WORKDIR)/image/usr/palm/applications/$(PACKAGE_NAME_OFFICIAL)/cobalt | grep sb_api | jq -r '.sb_api_version' | grep -v null || strings $(WORKDIR)/package/usr/palm/applications/$(PACKAGE_NAME_OFFICIAL)/cobalt | grep sb_api | jq -r '.sb_api_version' | grep -v null)
 YTAF_DEBUG?=0
 YTAF_DEBUG_ENABLED=$(filter 1 true yes on,$(YTAF_DEBUG))
@@ -363,6 +367,7 @@ ares-package-docker: docker-make.ares-package
 .PRECIOUS: $(PACKAGE_TARGET)
 $(PACKAGE_TARGET): FORCE $(WORKDIR)/image/usr/palm/applications/$(PACKAGE_NAME_OFFICIAL)/cobalt $(WORKDIR)/cobalt $(WORKDIR)/ipk/content/app/cobalt/content/web/adblock ares-package-docker
 	mkdir -p $(dir $@)
+	python3 $(IPK_MTIME_NORMALIZER) --mtime $(IPK_MEMBER_MTIME) $(WORKDIR)/ipk-output/$(PACKAGE_IPK_BUILD)
 	mv $(WORKDIR)/ipk-output/$(PACKAGE_IPK_BUILD) $@
 	@echo "Package can be installed with:"
 	@echo "  ares-install $(PACKAGE_TARGET)"
