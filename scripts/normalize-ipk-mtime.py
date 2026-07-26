@@ -12,20 +12,38 @@ import tarfile
 import tempfile
 
 
+def is_macos_metadata(member_name: str) -> bool:
+    """Return whether a tar member is Finder/AppleDouble metadata."""
+    parts = Path(member_name).parts
+    return (
+        "__MACOSX" in parts
+        or any(part.startswith("._") for part in parts)
+        or any(part == ".DS_Store" for part in parts)
+    )
+
+
 def normalize_tar_members(archive: Path, timestamp: int) -> None:
     temporary_archive = archive.with_suffix(archive.suffix + ".new")
 
     with tarfile.open(archive, "r:gz") as source:
-        with gzip.GzipFile(temporary_archive, "wb", mtime=timestamp) as compressed:
-            with tarfile.open(fileobj=compressed, mode="w", format=tarfile.GNU_FORMAT) as target:
-                for member in source.getmembers():
-                    member.mtime = timestamp
-                    member.uid = 0
-                    member.gid = 0
-                    member.uname = ""
-                    member.gname = ""
-                    contents = source.extractfile(member) if member.isfile() else None
-                    target.addfile(member, contents)
+        with temporary_archive.open("wb") as output:
+            with gzip.GzipFile(
+                filename="", fileobj=output, mode="wb", mtime=timestamp
+            ) as compressed:
+                with tarfile.open(
+                    fileobj=compressed, mode="w", format=tarfile.GNU_FORMAT
+                ) as target:
+                    for member in source.getmembers():
+                        if is_macos_metadata(member.name):
+                            continue
+                        member.mtime = timestamp
+                        member.uid = 0
+                        member.gid = 0
+                        member.uname = ""
+                        member.gname = ""
+                        member.pax_headers = {}
+                        contents = source.extractfile(member) if member.isfile() else None
+                        target.addfile(member, contents)
 
     os.replace(temporary_archive, archive)
 
