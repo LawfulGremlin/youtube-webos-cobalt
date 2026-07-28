@@ -60,6 +60,21 @@ export function slotForKeyCode(keyCode) {
   return null;
 }
 
+// Decides whether a stored slot binding should pick up a changed default.
+// Returns the new value, or null to leave the slot alone.
+//
+// 'none' is a real user choice, not just "unset" — a slot bound to 'none' lets
+// the key fall through to the TV app, which people deliberately want for the
+// colour buttons. So a changed default may only overwrite a slot whose value
+// is still EXACTLY the default it was given; anything else means the user
+// touched it. In particular a slot sitting at 'none' whose previous default
+// was a real action was definitely changed by hand, and must survive upgrades.
+export function migratedBinding(stored, previousDefault, nextDefault) {
+  if (stored !== previousDefault) return null;
+  if (nextDefault === previousDefault) return null;
+  return nextDefault;
+}
+
 // Cycles through registered actions in registration order ('none' first).
 // Unknown/stale bindings are treated as 'none' so cycling always recovers.
 export function cycleActionKey(current, delta) {

@@ -14,7 +14,8 @@ import {
   registerShortcutAction,
   getAction,
   slotForKeyCode,
-  cycleActionKey
+  cycleActionKey,
+  migratedBinding
 } from './shortcut-registry.mjs';
 
 const BOTH = { removeShorts: true, removeAds: true };
@@ -242,6 +243,18 @@ assert.equal(stepTarget(0, undefined, -1), 0);
   assert.equal(data.playerOverlays.shoppingTimelyActionRenderer, undefined, 'known keys are removed');
   resetUnmatchedShoppingKeys();
 }
+
+// Default migration: only a slot still holding the OLD default may be changed.
+// 'none' is a real binding (key falls through to the TV app), never "unset".
+assert.equal(migratedBinding('none', 'none', 'playback_speed_up'), 'playback_speed_up');
+// Deliberately cleared a slot whose default was a real action — must survive
+assert.equal(migratedBinding('none', 'frame_step_back', 'frame_step_back'), null);
+assert.equal(migratedBinding('none', 'frame_step_back', 'frame_skip_fwd'), null);
+// User picked something else — never overwritten
+assert.equal(migratedBinding('frame_skip_fwd', 'none', 'playback_speed_up'), null);
+assert.equal(migratedBinding('frame_step_back', 'frame_step_back', 'frame_step_back'), null);
+// Unchanged default is a no-op even when it matches
+assert.equal(migratedBinding('none', 'none', 'none'), null);
 
 // Playback speed: steps one position, clamps at both ends, never wraps
 assert.equal(nextPlaybackRate(1, 1), 1.25);
