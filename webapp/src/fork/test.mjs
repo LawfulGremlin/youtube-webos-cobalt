@@ -244,17 +244,29 @@ assert.equal(stepTarget(0, undefined, -1), 0);
   resetUnmatchedShoppingKeys();
 }
 
-// Default migration: only a slot still holding the OLD default may be changed.
+// Default migration: only a slot still holding a shipped default may change.
 // 'none' is a real binding (key falls through to the TV app), never "unset".
-assert.equal(migratedBinding('none', 'none', 'playback_speed_up'), 'playback_speed_up');
-// Deliberately cleared a slot whose default was a real action — must survive
-assert.equal(migratedBinding('none', 'frame_step_back', 'frame_step_back'), null);
-assert.equal(migratedBinding('none', 'frame_step_back', 'frame_skip_fwd'), null);
+assert.equal(migratedBinding('none', ['none'], 'frame_skip_back'), 'frame_skip_back');
+// Deliberately cleared a slot whose defaults were only ever real actions
+assert.equal(migratedBinding('none', ['frame_step_back'], 'frame_step_back'), null);
+assert.equal(migratedBinding('none', ['frame_step_back'], 'frame_skip_fwd'), null);
 // User picked something else — never overwritten
-assert.equal(migratedBinding('frame_skip_fwd', 'none', 'playback_speed_up'), null);
-assert.equal(migratedBinding('frame_step_back', 'frame_step_back', 'frame_step_back'), null);
+assert.equal(migratedBinding('frame_skip_fwd', ['none'], 'playback_speed_up'), null);
 // Unchanged default is a no-op even when it matches
-assert.equal(migratedBinding('none', 'none', 'none'), null);
+assert.equal(migratedBinding('none', ['none'], 'none'), null);
+assert.equal(migratedBinding('frame_step_back', ['frame_step_back'], 'frame_step_back'), null);
+// A config that skipped a version still migrates: key_1 shipped 'none' in v1
+// and 'playback_speed_down' in v2, so BOTH must be recognised as untouched
+assert.equal(
+  migratedBinding('none', ['none', 'playback_speed_down'], 'playback_speed_down'),
+  'playback_speed_down'
+);
+assert.equal(
+  migratedBinding('playback_speed_down', ['none', 'playback_speed_down'], 'playback_speed_down'),
+  null
+);
+// Missing history is treated as "user set it" rather than free to overwrite
+assert.equal(migratedBinding('none', undefined, 'frame_skip_fwd'), null);
 
 // Playback speed: steps one position, clamps at both ends, never wraps
 assert.equal(nextPlaybackRate(1, 1), 1.25);

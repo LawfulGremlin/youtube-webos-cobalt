@@ -65,13 +65,19 @@ export function slotForKeyCode(keyCode) {
 //
 // 'none' is a real user choice, not just "unset" — a slot bound to 'none' lets
 // the key fall through to the TV app, which people deliberately want for the
-// colour buttons. So a changed default may only overwrite a slot whose value
-// is still EXACTLY the default it was given; anything else means the user
-// touched it. In particular a slot sitting at 'none' whose previous default
-// was a real action was definitely changed by hand, and must survive upgrades.
-export function migratedBinding(stored, previousDefault, nextDefault) {
-  if (stored !== previousDefault) return null;
-  if (nextDefault === previousDefault) return null;
+// colour buttons. So a changed default may only overwrite a slot still holding
+// a default it was actually given; anything else means the user touched it. A
+// slot sitting at 'none' whose defaults have only ever been real actions was
+// definitely cleared by hand, and must survive upgrades.
+//
+// pastDefaults is EVERY default the slot has shipped with, not just the last
+// one: a config can skip versions (v2 was never released, so installs jump
+// v1 -> v3), and matching only the immediately-previous default would strand
+// those on the oldest binding forever.
+export function migratedBinding(stored, pastDefaults, nextDefault) {
+  const past = pastDefaults || [];
+  if (past.indexOf(stored) === -1) return null;
+  if (stored === nextDefault) return null;
   return nextDefault;
 }
 

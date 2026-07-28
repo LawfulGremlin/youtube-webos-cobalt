@@ -34,6 +34,8 @@ FORK_DEFAULTS[bindingConfigKey('blue')] = 'frame_step_fwd';
 // default, while leaving both slots rebindable like every other one.
 FORK_DEFAULTS[bindingConfigKey('key_1')] = 'playback_speed_down';
 FORK_DEFAULTS[bindingConfigKey('key_3')] = 'playback_speed_up';
+FORK_DEFAULTS[bindingConfigKey('key_4')] = 'frame_skip_back';
+FORK_DEFAULTS[bindingConfigKey('key_6')] = 'frame_skip_fwd';
 
 // Bump when a slot's DEFAULT binding changes, and record what the defaults
 // looked like BEFORE the bump. Seeding alone only ever fired for keys that
@@ -48,15 +50,21 @@ FORK_DEFAULTS[bindingConfigKey('key_3')] = 'playback_speed_up';
 // cleared colour buttons keeps them cleared rather than being "repaired".
 // That ambiguity is unresolvable from stored state alone, so the conservative
 // reading wins: never override something that might be intent.
-const SHORTCUT_DEFAULTS_VERSION = 2;
-const PREVIOUS_SLOT_DEFAULTS = (function () {
-  const previous = {};
+const SHORTCUT_DEFAULTS_VERSION = 3;
+
+// Every default each slot has ever shipped with, so a config that skipped a
+// version still migrates (v2 was never released — real installs jump v1 -> v3).
+// Append here rather than replacing when you change a default above.
+const PAST_SLOT_DEFAULTS = (function () {
+  const past = {};
   SLOTS.forEach((slot) => {
-    previous[bindingConfigKey(slot.id)] = 'none';
+    past[bindingConfigKey(slot.id)] = ['none'];
   });
-  previous[bindingConfigKey('red')] = 'frame_step_back';
-  previous[bindingConfigKey('blue')] = 'frame_step_fwd';
-  return previous;
+  past[bindingConfigKey('red')] = ['frame_step_back'];
+  past[bindingConfigKey('blue')] = ['frame_step_fwd'];
+  past[bindingConfigKey('key_1')] = ['none', 'playback_speed_down'];
+  past[bindingConfigKey('key_3')] = ['none', 'playback_speed_up'];
+  return past;
 })();
 
 // Seed fork-only keys: upstream's defaultConfig doesn't know them, so an
@@ -72,7 +80,7 @@ if ((configRead('forkShortcutDefaultsVersion') || 0) < SHORTCUT_DEFAULTS_VERSION
     const key = bindingConfigKey(slot.id);
     const next = migratedBinding(
       configRead(key),
-      PREVIOUS_SLOT_DEFAULTS[key],
+      PAST_SLOT_DEFAULTS[key],
       FORK_DEFAULTS[key]
     );
     if (next !== null) configWrite(key, next);
