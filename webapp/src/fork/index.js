@@ -37,8 +37,11 @@ const SLOT_DEFAULTS = {
   key_9: 'frame_step_fwd'
 };
 
-// Bump whenever SLOT_DEFAULTS changes. Every slot is then reset to its
-// default, custom bindings included.
+// Bump whenever SLOT_DEFAULTS changes — and also whenever the meaning of this
+// block changes, which is why v4 is skipped. A build that stamped v4 while
+// this code still tried to MIGRATE bindings left devices marked done, so they
+// would never see the reset that replaced it. Reusing a version number after
+// changing what it does silently strands every device already carrying it.
 //
 // ponytail: a full reset, deliberately. Preserving custom bindings means
 // telling "untouched" from "deliberately set to 'none'", and 'none' is a real
@@ -49,7 +52,7 @@ const SLOT_DEFAULTS = {
 // resetting instead. If bindings ever need to survive a bump, record the
 // defaults in force at each version and compare against the version the config
 // was written at — not against the values alone.
-const SHORTCUT_DEFAULTS_VERSION = 4;
+const SHORTCUT_DEFAULTS_VERSION = 5;
 
 const FORK_DEFAULTS = {
   forkRemoveShorts: false
