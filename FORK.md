@@ -277,6 +277,21 @@ web API exists:
 
 - **No `Element.prototype.closest`** — walk `parentElement` manually.
 - **No `NodeList.forEach`** — index loops only.
+
+  > These first two keep arriving from upstream, which develops against real
+  > Chromium. The v1.1.6 sync brought a DOM-level ad-tile hider in
+  > `adblock.js` using both; on Cobalt its `closest()` threw on every ad node,
+  > so `startOptionalHook`'s try/catch swallowed it and the whole path never
+  > ran (`hook-failed enableAdBlock` in the log). Rewritten in place with a
+  > `fork:`-marked `closestMatching()` parent walk and index loops. **Check
+  > every sync for new `.closest(` / `NodeList.forEach` in upstream files.**
+  > `sponsorblock.js` uses the optional-call form `node.closest?.(…)`, which
+  > degrades to `undefined` instead of throwing — safe, but it means that
+  > branch is permanently dead here.
+  >
+  > The same sync's `adblock.css` hides ad tiles with a `:has()` rule
+  > (lines 23-24), which never matches here — see the `:has()` entry below.
+  > Left as-is: it's dead but harmless, and the JS path above does the work.
 - **No `document.elementFromPoint`**, and the debug backend implements neither
   `Page.captureScreenshot` nor `DOM.getNodeForLocation`, so **paint order and
   anything visual cannot be checked from here** — prefer approaches that don't

@@ -21,8 +21,23 @@ const AD_TILE_SELECTOR = [
 
 let adSlotObserver = null;
 
+// fork: Cobalt has no Element.prototype.closest at all (confirmed live over
+// CDP — see FORK.md), so upstream's adRenderer.closest() threw on every ad
+// node and killed this whole DOM path. Walk parentElement manually instead,
+// same as ui.js getRowWrapper(). Element.prototype.matches IS assumed present
+// (upstream already relies on it in processAddedNode below) but has not been
+// confirmed on hardware — worth probing next CDP session.
+function closestMatching(node, selector) {
+  let current = node;
+  while (current && current.nodeType === 1) {
+    if (current.matches(selector)) return current;
+    current = current.parentElement;
+  }
+  return null;
+}
+
 function findAdTile(adRenderer) {
-  const semanticTile = adRenderer.closest(AD_TILE_SELECTOR);
+  const semanticTile = closestMatching(adRenderer, AD_TILE_SELECTOR);
   if (semanticTile) return semanticTile;
 
   /*
@@ -65,19 +80,22 @@ function processAddedNode(node) {
     hideAdRenderer(node);
   }
 
-  node.querySelectorAll(AD_RENDERER_SELECTOR).forEach(hideAdRenderer);
+  // fork: no NodeList.prototype.forEach on Cobalt — index loops only.
+  const found = node.querySelectorAll(AD_RENDERER_SELECTOR);
+  for (let i = 0; i < found.length; i += 1) hideAdRenderer(found[i]);
 }
 
 function startAdSlotObserver() {
   if (adSlotObserver || !document.body) return;
 
-  document
-    .querySelectorAll(AD_RENDERER_SELECTOR)
-    .forEach(hideAdRenderer);
+  // fork: index loops, not NodeList.forEach (unsupported on Cobalt).
+  const existing = document.querySelectorAll(AD_RENDERER_SELECTOR);
+  for (let i = 0; i < existing.length; i += 1) hideAdRenderer(existing[i]);
 
   adSlotObserver = new MutationObserver((mutations) => {
     mutations.forEach((mutation) => {
-      mutation.addedNodes.forEach(processAddedNode);
+      const added = mutation.addedNodes;
+      for (let i = 0; i < added.length; i += 1) processAddedNode(added[i]);
     });
   });
   adSlotObserver.observe(document.body, {
@@ -92,9 +110,10 @@ function stopAdSlotObserver() {
     adSlotObserver = null;
   }
 
-  document.querySelectorAll('.ytaf-hidden-ad-tile').forEach((tile) => {
-    tile.classList.remove('ytaf-hidden-ad-tile');
-  });
+  const hidden = document.querySelectorAll('.ytaf-hidden-ad-tile');
+  for (let i = 0; i < hidden.length; i += 1) {
+    hidden[i].classList.remove('ytaf-hidden-ad-tile');
+  }
 }
 
 function syncAdblockStyles() {
