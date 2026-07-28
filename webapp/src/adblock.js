@@ -24,9 +24,8 @@ let adSlotObserver = null;
 // fork: Cobalt has no Element.prototype.closest at all (confirmed live over
 // CDP — see FORK.md), so upstream's adRenderer.closest() threw on every ad
 // node and killed this whole DOM path. Walk parentElement manually instead,
-// same as ui.js getRowWrapper(). Element.prototype.matches IS assumed present
-// (upstream already relies on it in processAddedNode below) but has not been
-// confirmed on hardware — worth probing next CDP session.
+// same as ui.js getRowWrapper(). Element.prototype.matches IS present —
+// confirmed over CDP on lg75, along with closest/NodeList.forEach being absent.
 function closestMatching(node, selector) {
   let current = node;
   while (current && current.nodeType === 1) {

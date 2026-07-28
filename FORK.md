@@ -289,6 +289,14 @@ web API exists:
   > degrades to `undefined` instead of throwing — safe, but it means that
   > branch is permanently dead here.
   >
+  > Probed on lg75 while fixing this, so these no longer need re-deriving:
+  > `Element.prototype.matches` **is** present (`"function"`), `closest` and
+  > `NodeList.prototype.forEach` are both `undefined`, and the two-argument
+  > `classList.toggle(name, force)` **works**. End-to-end verified after the
+  > fix by injecting a `<ytlr-ad-slot-renderer>` inside a `[role="listitem"]`
+  > tile: the observer fired, the parent walk found the tile, and it went
+  > `display: none`.
+  >
   > The same sync's `adblock.css` hides ad tiles with a `:has()` rule
   > (lines 23-24), which never matches here — see the `:has()` entry below.
   > Left as-is: it's dead but harmless, and the JS path above does the work.
