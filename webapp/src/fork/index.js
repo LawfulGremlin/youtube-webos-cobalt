@@ -8,6 +8,7 @@ import { checkboxTools } from '../checkboxTools.js';
 import { showNotification } from '../ui.js';
 import { filterTvResponse, getUnmatchedShoppingKeys } from './filters.mjs';
 import { stepTarget } from './frame-step.mjs';
+import { nextPlaybackRate } from './playback-speed.mjs';
 import {
   SLOTS,
   registerShortcutAction,
@@ -28,6 +29,19 @@ SLOTS.forEach((slot) => {
 });
 FORK_DEFAULTS[bindingConfigKey('red')] = 'frame_step_back';
 FORK_DEFAULTS[bindingConfigKey('blue')] = 'frame_step_fwd';
+// Match upstream's hardwired digit-1/digit-3 speed keys as the out-of-box
+// default, while leaving both slots rebindable like every other one.
+FORK_DEFAULTS[bindingConfigKey('key_1')] = 'playback_speed_down';
+FORK_DEFAULTS[bindingConfigKey('key_3')] = 'playback_speed_up';
+
+// Bump when a slot's DEFAULT binding changes. Seeding alone only ever fired
+// for keys that were `undefined`, so any default added after a TV had already
+// written its config never landed: measured on lg75, where red/blue sat at
+// 'none' despite defaulting to frame stepping since they were introduced —
+// frame stepping was silently unbound on every upgraded install. On a version
+// bump we re-apply defaults to slots still holding 'none', which never
+// clobbers a binding the user actually chose.
+const SHORTCUT_DEFAULTS_VERSION = 2;
 
 // Seed fork-only keys: upstream's defaultConfig doesn't know them, so an
 // unseeded configRead would return undefined forever.
@@ -36,6 +50,16 @@ Object.keys(FORK_DEFAULTS).forEach((key) => {
     configWrite(key, FORK_DEFAULTS[key]);
   }
 });
+
+if ((configRead('forkShortcutDefaultsVersion') || 0) < SHORTCUT_DEFAULTS_VERSION) {
+  SLOTS.forEach((slot) => {
+    const key = bindingConfigKey(slot.id);
+    if (configRead(key) === 'none' && FORK_DEFAULTS[key] !== 'none') {
+      configWrite(key, FORK_DEFAULTS[key]);
+    }
+  });
+  configWrite('forkShortcutDefaultsVersion', SHORTCUT_DEFAULTS_VERSION);
+}
 
 // Chain onto JSON.parse after upstream adblock.js — same interception point
 // upstream uses, without editing upstream code. Shorts filtering is behind
@@ -204,6 +228,19 @@ registerShortcutAction({ key: 'frame_step_fwd', label: 'Frame Step Forward', sco
 registerShortcutAction({ key: 'frame_step_back', label: 'Frame Step Backward', scope: 'VIDEO', handler: () => performFrameStep(-1), burst: true });
 registerShortcutAction({ key: 'frame_skip_fwd', label: 'Skip 15 Frames Forward', scope: 'VIDEO', handler: () => performFrameStep(15), burst: true });
 registerShortcutAction({ key: 'frame_skip_back', label: 'Skip 15 Frames Backward', scope: 'VIDEO', handler: () => performFrameStep(-15), burst: true });
+
+// Playback speed. Upstream's ui.js version is not taken — see playback-speed.mjs.
+function adjustPlaybackRate(direction) {
+  const video = document.querySelector('video');
+  if (!video) return;
+  const next = nextPlaybackRate(video.playbackRate, direction);
+  if (next === Number(video.playbackRate)) return;
+  video.playbackRate = next;
+  showNotification('Playback speed: ' + next + 'x', 1800);
+}
+
+registerShortcutAction({ key: 'playback_speed_up', label: 'Playback Speed Up', scope: 'VIDEO', handler: () => adjustPlaybackRate(1), burst: true });
+registerShortcutAction({ key: 'playback_speed_down', label: 'Playback Speed Down', scope: 'VIDEO', handler: () => adjustPlaybackRate(-1), burst: true });
 
 // --- Key dispatch ------------------------------------------------------------
 

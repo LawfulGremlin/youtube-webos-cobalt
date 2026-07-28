@@ -8,6 +8,7 @@ import {
   resetUnmatchedShoppingKeys
 } from './filters.mjs';
 import { stepTarget, FRAME_DURATION_SEC } from './frame-step.mjs';
+import { nextPlaybackRate, PLAYBACK_RATES } from './playback-speed.mjs';
 import {
   SLOTS,
   registerShortcutAction,
@@ -242,4 +243,21 @@ assert.equal(stepTarget(0, undefined, -1), 0);
   resetUnmatchedShoppingKeys();
 }
 
-console.log('fork filters + frame step + shortcut registry: all tests passed');
+// Playback speed: steps one position, clamps at both ends, never wraps
+assert.equal(nextPlaybackRate(1, 1), 1.25);
+assert.equal(nextPlaybackRate(1, -1), 0.75);
+assert.equal(nextPlaybackRate(PLAYBACK_RATES[PLAYBACK_RATES.length - 1], 1), 2);
+assert.equal(nextPlaybackRate(PLAYBACK_RATES[0], -1), 0.25);
+
+// Off-list rates snap to the nearest listed one, then step from there
+assert.equal(nextPlaybackRate(1.3, 1), 1.5);
+assert.equal(nextPlaybackRate(1.3, -1), 1);
+
+// Garbage rates fall back to 1x rather than producing NaN
+assert.equal(nextPlaybackRate(undefined, 1), 1.25);
+assert.equal(nextPlaybackRate(0, 1), 1.25);
+assert.equal(nextPlaybackRate(NaN, -1), 0.75);
+
+console.log(
+  'fork filters + frame step + shortcut registry + playback speed: all tests passed'
+);
