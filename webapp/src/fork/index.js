@@ -14,65 +14,49 @@ import {
   registerShortcutAction,
   getAction,
   slotForKeyCode,
-  cycleActionKey,
-  migratedBinding
+  cycleActionKey
 } from './shortcut-registry.mjs';
 
 function bindingConfigKey(slotId) {
   return 'forkShortcut_' + slotId;
 }
 
+// Default slot bindings, laid out as back/forward pairs on the number pad.
+// Slots not listed default to 'none', which releases the key to the TV app —
+// that includes all three colour buttons.
+//
+//   1 / 3  playback speed down / up   (matches upstream's hardwired digits)
+//   4 / 6  skip 15 frames back / forward
+//   7 / 9  step 1 frame back / forward
+const SLOT_DEFAULTS = {
+  key_1: 'playback_speed_down',
+  key_3: 'playback_speed_up',
+  key_4: 'frame_skip_back',
+  key_6: 'frame_skip_fwd',
+  key_7: 'frame_step_back',
+  key_9: 'frame_step_fwd'
+};
+
+// Bump whenever SLOT_DEFAULTS changes. Every slot is then reset to its
+// default, custom bindings included.
+//
+// ponytail: a full reset, deliberately. Preserving custom bindings means
+// telling "untouched" from "deliberately set to 'none'", and 'none' is a real
+// binding here (it frees the key for the TV app), so the stored value alone
+// can't distinguish them — that ambiguity produced two separate clobbering
+// bugs. Per-version bookkeeping fixes it but is a lot of machinery for a
+// setting that changes about once a release, and the maintainer signed off on
+// resetting instead. If bindings ever need to survive a bump, record the
+// defaults in force at each version and compare against the version the config
+// was written at — not against the values alone.
+const SHORTCUT_DEFAULTS_VERSION = 4;
+
 const FORK_DEFAULTS = {
   forkRemoveShorts: false
 };
 SLOTS.forEach((slot) => {
-  FORK_DEFAULTS[bindingConfigKey(slot.id)] = 'none';
+  FORK_DEFAULTS[bindingConfigKey(slot.id)] = SLOT_DEFAULTS[slot.id] || 'none';
 });
-// All default bindings live on the number keys, laid out as back/forward pairs:
-//   1 / 3  playback speed down / up   (matches upstream's hardwired digits)
-//   4 / 6  skip 15 frames back / forward
-//   7 / 9  step 1 frame back / forward
-// The colour buttons default to 'none' so they fall through to the TV app.
-FORK_DEFAULTS[bindingConfigKey('key_1')] = 'playback_speed_down';
-FORK_DEFAULTS[bindingConfigKey('key_3')] = 'playback_speed_up';
-FORK_DEFAULTS[bindingConfigKey('key_4')] = 'frame_skip_back';
-FORK_DEFAULTS[bindingConfigKey('key_6')] = 'frame_skip_fwd';
-FORK_DEFAULTS[bindingConfigKey('key_7')] = 'frame_step_back';
-FORK_DEFAULTS[bindingConfigKey('key_9')] = 'frame_step_fwd';
-
-// Bump when a slot's DEFAULT binding changes, and record what the defaults
-// looked like BEFORE the bump. Seeding alone only ever fired for keys that
-// read back `undefined`, so a default added after a TV had already written its
-// config never landed — measured on lg75, where key_1/key_3 sat at 'none'.
-//
-// A slot only picks up the new default if it still holds the OLD one. 'none'
-// is a legitimate binding (it lets the key fall through to the TV app), so it
-// cannot be treated as "unset": red/blue default to frame stepping, and a
-// red/blue sitting at 'none' therefore means somebody deliberately cleared it.
-// Those survive untouched — which does mean a pre-existing install with
-// cleared colour buttons keeps them cleared rather than being "repaired".
-// That ambiguity is unresolvable from stored state alone, so the conservative
-// reading wins: never override something that might be intent.
-const SHORTCUT_DEFAULTS_VERSION = 4;
-
-// Every default each slot has ever shipped with, so a config that skipped a
-// version still migrates (v2 was never released — real installs jump v1 -> v3).
-// Append here rather than replacing when you change a default above.
-const PAST_SLOT_DEFAULTS = (function () {
-  const past = {};
-  SLOTS.forEach((slot) => {
-    past[bindingConfigKey(slot.id)] = ['none'];
-  });
-  // Frame stepping used to default to the colour buttons; it moved to 7/9 in
-  // v4, so an untouched red/blue is released back to the TV app.
-  past[bindingConfigKey('red')] = ['frame_step_back'];
-  past[bindingConfigKey('blue')] = ['frame_step_fwd'];
-  past[bindingConfigKey('key_1')] = ['none', 'playback_speed_down'];
-  past[bindingConfigKey('key_3')] = ['none', 'playback_speed_up'];
-  past[bindingConfigKey('key_4')] = ['none', 'frame_skip_back'];
-  past[bindingConfigKey('key_6')] = ['none', 'frame_skip_fwd'];
-  return past;
-})();
 
 // Seed fork-only keys: upstream's defaultConfig doesn't know them, so an
 // unseeded configRead would return undefined forever.
@@ -85,12 +69,7 @@ Object.keys(FORK_DEFAULTS).forEach((key) => {
 if ((configRead('forkShortcutDefaultsVersion') || 0) < SHORTCUT_DEFAULTS_VERSION) {
   SLOTS.forEach((slot) => {
     const key = bindingConfigKey(slot.id);
-    const next = migratedBinding(
-      configRead(key),
-      PAST_SLOT_DEFAULTS[key],
-      FORK_DEFAULTS[key]
-    );
-    if (next !== null) configWrite(key, next);
+    configWrite(key, FORK_DEFAULTS[key]);
   });
   configWrite('forkShortcutDefaultsVersion', SHORTCUT_DEFAULTS_VERSION);
 }
