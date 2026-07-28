@@ -25,6 +25,10 @@ export function userScriptStartUI() {
   window.__spatialNavigation__.keyMode = 'NONE';
 
   const ARROW_KEY_CODE = { 37: 'left', 38: 'up', 39: 'right', 40: 'down' };
+  // fork: upstream also declares PLAYBACK_RATES here for its digit-1/digit-3
+  // playback-speed shortcuts. Not taken — digits 48-57 are bindable slots in
+  // this fork's shortcut registry (webapp/src/fork/shortcut-registry.mjs).
+  let lastGreenKeyAt = 0;
 
   function getDirectionFromEvent(evt) {
     const key = (evt.key || '').toLowerCase();
@@ -78,14 +82,17 @@ export function userScriptStartUI() {
     }
 
     if (currentFocusIndex < 0 || currentFocusIndex >= focusableItems.length) {
-      const domIndex = focusableItems.findIndex((item) => item === document.activeElement);
-      currentFocusIndex = domIndex === -1 ? 0 : domIndex;
+      const activeIndex = focusableItems.findIndex(
+        (item) => item === document.activeElement
+      );
+      currentFocusIndex = activeIndex === -1 ? 0 : activeIndex;
     }
 
     if (dir === 'down' || dir === 'right') {
       currentFocusIndex = (currentFocusIndex + 1) % focusableItems.length;
     } else if (dir === 'up' || dir === 'left') {
-      currentFocusIndex = (currentFocusIndex - 1 + focusableItems.length) % focusableItems.length;
+      currentFocusIndex =
+        (currentFocusIndex - 1 + focusableItems.length) % focusableItems.length;
     }
 
     const nextItem = focusableItems[currentFocusIndex];
@@ -198,6 +205,14 @@ export function userScriptStartUI() {
       text('adblock'),
       configRead('enableAdBlock'),
       callbackConfig('enableAdBlock')
+    )
+  );
+  uiContainer.appendChild(
+    checkboxTools.add(
+      '__auto_login',
+      text('autoLogin'),
+      configRead('enableAutoLogin'),
+      callbackConfig('enableAutoLogin')
     )
   );
   uiContainer.appendChild(
@@ -370,6 +385,7 @@ export function userScriptStartUI() {
       currentFocusIndex = focusableItems.indexOf(target);
       updateRowWindow(target);
       target.focus();
+      currentFocusIndex = focusableItems.indexOf(target);
       if (target.tabIndex !== null && target.tabIndex > 0) {
         lastTabIndex = target.tabIndex;
       }
@@ -501,7 +517,9 @@ export function userScriptStartUI() {
       console.info('Taking over!');
       evt.preventDefault();
       evt.stopPropagation();
-      if (evt.type === 'keydown') {
+      const now = Date.now();
+      if (evt.type === 'keydown' && !evt.repeat && now - lastGreenKeyAt > 350) {
+        lastGreenKeyAt = now;
         if (!isContainerOpen()) {
           openContainer();
         } else {
