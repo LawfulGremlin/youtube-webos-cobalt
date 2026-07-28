@@ -28,14 +28,17 @@ const FORK_DEFAULTS = {
 SLOTS.forEach((slot) => {
   FORK_DEFAULTS[bindingConfigKey(slot.id)] = 'none';
 });
-FORK_DEFAULTS[bindingConfigKey('red')] = 'frame_step_back';
-FORK_DEFAULTS[bindingConfigKey('blue')] = 'frame_step_fwd';
-// Match upstream's hardwired digit-1/digit-3 speed keys as the out-of-box
-// default, while leaving both slots rebindable like every other one.
+// All default bindings live on the number keys, laid out as back/forward pairs:
+//   1 / 3  playback speed down / up   (matches upstream's hardwired digits)
+//   4 / 6  skip 15 frames back / forward
+//   7 / 9  step 1 frame back / forward
+// The colour buttons default to 'none' so they fall through to the TV app.
 FORK_DEFAULTS[bindingConfigKey('key_1')] = 'playback_speed_down';
 FORK_DEFAULTS[bindingConfigKey('key_3')] = 'playback_speed_up';
 FORK_DEFAULTS[bindingConfigKey('key_4')] = 'frame_skip_back';
 FORK_DEFAULTS[bindingConfigKey('key_6')] = 'frame_skip_fwd';
+FORK_DEFAULTS[bindingConfigKey('key_7')] = 'frame_step_back';
+FORK_DEFAULTS[bindingConfigKey('key_9')] = 'frame_step_fwd';
 
 // Bump when a slot's DEFAULT binding changes, and record what the defaults
 // looked like BEFORE the bump. Seeding alone only ever fired for keys that
@@ -50,7 +53,7 @@ FORK_DEFAULTS[bindingConfigKey('key_6')] = 'frame_skip_fwd';
 // cleared colour buttons keeps them cleared rather than being "repaired".
 // That ambiguity is unresolvable from stored state alone, so the conservative
 // reading wins: never override something that might be intent.
-const SHORTCUT_DEFAULTS_VERSION = 3;
+const SHORTCUT_DEFAULTS_VERSION = 4;
 
 // Every default each slot has ever shipped with, so a config that skipped a
 // version still migrates (v2 was never released — real installs jump v1 -> v3).
@@ -60,10 +63,14 @@ const PAST_SLOT_DEFAULTS = (function () {
   SLOTS.forEach((slot) => {
     past[bindingConfigKey(slot.id)] = ['none'];
   });
+  // Frame stepping used to default to the colour buttons; it moved to 7/9 in
+  // v4, so an untouched red/blue is released back to the TV app.
   past[bindingConfigKey('red')] = ['frame_step_back'];
   past[bindingConfigKey('blue')] = ['frame_step_fwd'];
   past[bindingConfigKey('key_1')] = ['none', 'playback_speed_down'];
   past[bindingConfigKey('key_3')] = ['none', 'playback_speed_up'];
+  past[bindingConfigKey('key_4')] = ['none', 'frame_skip_back'];
+  past[bindingConfigKey('key_6')] = ['none', 'frame_skip_fwd'];
   return past;
 })();
 
