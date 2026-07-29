@@ -73,15 +73,48 @@ explicitly instead of failing silently.
 
 ### Tested devices
 
-Community-confirmed results for the current release:
+The issue tracker contains the following explicit confirmations. A device is
+only listed here when a reporter confirmed that the app starts and is usable;
+reports that only confirm installation are not counted. Any reported
+limitations are included in the result column.
 
-| Model | webOS | Firmware | Release | Result |
+#### Current compatibility baseline
+
+| Model | webOS | Firmware | Release | Confirmed result |
 | --- | --- | --- | --- | --- |
-| LG C1 OLED | 6.5.0 | 03.51.16 | v1.2.0 | Clean installation, sign-in, playback, ad blocking and SponsorBlock confirmed working ([#33](https://github.com/RF1705/youtube-webos-cobalt-adfree/issues/33#issuecomment-5114026899)) |
+| LG C1 OLED | 6.5.0 | 03.51.16 | v1.2.0 | Clean installation, sign-in, playback, ad blocking and SponsorBlock work. ([#33](https://github.com/RF1705/youtube-webos-cobalt-adfree/issues/33#issuecomment-5114026899)) |
 
-Individual results may vary with firmware, installation method and device
-configuration. See the full compatibility matrix for older releases and
-additional reports.
+v1.2.1 uses the same Cobalt 23.lts.6 / Starboard 13 compatibility baseline as
+v1.2.0, but has not yet received a separate device confirmation in the issue
+tracker. A separate C1 report for v1.2.0 confirms that 4K was still unavailable
+on that device ([#2](https://github.com/RF1705/youtube-webos-cobalt-adfree/issues/2#issuecomment-5116177545)).
+
+#### Confirmed on earlier releases
+
+| Model | webOS | Firmware | Release | Confirmed result |
+| --- | --- | --- | --- | --- |
+| LG TV65QNED (exact suffix not reported) | 6.5.3 | 03.53.45 | v1.0.0 | Playback and ad blocking work; maximum quality is 1080p. ([#2](https://github.com/RF1705/youtube-webos-cobalt-adfree/issues/2)) |
+| LG 43UP8000PTB | 6.5.3-47 | 03.53.45 | v1.0.0 | Starts and works after installation through Developer Mode; reporter did not provide a feature-by-feature test. ([#7](https://github.com/RF1705/youtube-webos-cobalt-adfree/issues/7#issuecomment-4933125977)) |
+| LG C1 OLED | 6.5.3-47 | 03.53.45 | v1.0.0 | Playback and SponsorBlock work after the initial black-screen start; limited to 1080p and RYD did not work in this build. ([#3](https://github.com/RF1705/youtube-webos-cobalt-adfree/issues/3#issuecomment-4921907497)) |
+| LG 65QNED913PA | 6.5.3-47 | 03.53.45 | v1.0.0 | Playback works at up to 1080p; the stock app reaches 2160p on the same TV. ([#2](https://github.com/RF1705/youtube-webos-cobalt-adfree/issues/2#issuecomment-5010822714)) |
+| LG OLED55G19LA | 6.5.3 | 03.53.45 | v1.0.0 | Playback works at up to 1080p. ([#2](https://github.com/RF1705/youtube-webos-cobalt-adfree/issues/2#issuecomment-4951770514)) |
+| LG 7070NANO75SPA | 6.5.3-47 | Not reported | v1.0.0 | Playback works below 4K; sponsored recommendations were still visible. ([#2](https://github.com/RF1705/youtube-webos-cobalt-adfree/issues/2#issuecomment-4975618738)) |
+| LG OLED65A1PVA | 6.5.3 | 03.53.45 | v1.0.0 | Playback works at up to 1080p. ([#2](https://github.com/RF1705/youtube-webos-cobalt-adfree/issues/2#issuecomment-4991938401)) |
+| LG OLED55C1AUB | 6.5.3 | 03.53.45 | v1.1.1 | Playback works, including 4K on a tested AV1 video; a tested VP9 video was limited to 1080p. ([#2](https://github.com/RF1705/youtube-webos-cobalt-adfree/issues/2#issuecomment-5012585147)) |
+| LG OLED55C14LB | 6.5.3 | 03.53.45 | v1.1.0 | Playback works, but the 1/3 playback-speed shortcuts did not work in this release. ([#22](https://github.com/RF1705/youtube-webos-cobalt-adfree/issues/22#issuecomment-5063796296)) |
+| LG OLED55A16LA | Not reported | 03.53.45 | v1.1.1 / v1.1.2 | Signed-in playback and SponsorBlock work at up to 1080p; signed-out regular videos remain black. ([device report](https://github.com/RF1705/youtube-webos-cobalt-adfree/issues/20#issuecomment-5062212503), [working result](https://github.com/RF1705/youtube-webos-cobalt-adfree/issues/20#issuecomment-5062835221)) |
+| LG OLED55A19LA | 6.2.0-31 | Not reported | v1.1.3 | Sign-in, playback, 4K and HDR work; still working after a TV restart. ([test](https://github.com/RF1705/youtube-webos-cobalt-adfree/issues/29#issuecomment-5069526117), [restart](https://github.com/RF1705/youtube-webos-cobalt-adfree/issues/29#issuecomment-5069558549)) |
+| LG OLED48CXRLA | 5.5.0 | 04.50.90 | v1.1.4, repacked | Starts, plays video and survives reboot after repacking the IPK with non-epoch timestamps. The unmodified release IPK is rejected by this firmware. ([#29](https://github.com/RF1705/youtube-webos-cobalt-adfree/issues/29#issuecomment-5080405273)) |
+| LG OLED83C17LA | Not reported | 03.53.45 | v1.1.4 | Works normally; v1.1.5 crashes on the same TV. ([#30](https://github.com/RF1705/youtube-webos-cobalt-adfree/issues/30#issuecomment-5082975074)) |
+| LG OLED65C15LA | 6.5.3 | 03.53.45 | v1.1.0 | Works normally; later tested releases did not start on the same TV. ([#10](https://github.com/RF1705/youtube-webos-cobalt-adfree/issues/10#issuecomment-5094616714)) |
+| LG OLED48C14LB | 6.5.3-47 | Not reported | v1.1.1 | Playback works, but the progress bar and chapter scrubbing can become incorrect. ([#26](https://github.com/RF1705/youtube-webos-cobalt-adfree/issues/26#issuecomment-5120064232)) |
+| LG G1 | Not reported | Not reported | v1.1.6 | App and video controls work, but 4K is unavailable. ([#2](https://github.com/RF1705/youtube-webos-cobalt-adfree/issues/2#issuecomment-5106892684)) |
+| LG CineBeam HU710PB-GL | 6.3.1 | 03.00.27 | Custom v1.1.6 package | Home screen, playback and AdFree features work when packaged with the device's stock `k7lp` starter. Generic release packages still crash. ([#1](https://github.com/RF1705/youtube-webos-cobalt-adfree/issues/1#issuecomment-5099984588)) |
+
+These are individual community reports, not guarantees for every regional
+variant of the same model. Firmware, installation method, sign-in state and the
+exact release can change the result. In particular, the repacked webOS 5.5 and
+custom `k7lp` entries are not confirmations of the normal downloadable IPK.
 
 Community-reported device, firmware and feature results are collected in the
 [device compatibility matrix](docs/device-compatibility.md). The matrix also
