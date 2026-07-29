@@ -7,17 +7,17 @@
       "iconUri": "https://raw.githubusercontent.com/RF1705/youtube-webos-cobalt-adfree/main/assets/largeIcon.png",
       "manifest": {
         "id": "youtube.leanback.v4",
-        "version": "1.1.6",
+        "version": "1.2.0",
         "type": "native",
         "title": "YouTube Cobalt AdFree",
         "iconUri": "https://raw.githubusercontent.com/RF1705/youtube-webos-cobalt-adfree/main/assets/largeIcon.png",
         "sourceUrl": "https://github.com/RF1705/youtube-webos-cobalt-adfree",
         "rootRequired": false,
-        "ipkUrl": "https://github.com/RF1705/youtube-webos-cobalt-adfree/releases/download/v1.1.6/youtube.leanback.v4_1.1.6_arm.ipk",
+        "ipkUrl": "https://github.com/RF1705/youtube-webos-cobalt-adfree/releases/download/v1.2.0/youtube.leanback.v4_1.2.0_arm.ipk",
         "ipkHash": {
-          "sha256": "30e2639678dd33555c113dec5887a03c4e40d460b9c85e5771255905be254f4c"
+          "sha256": "af86a5d2683a99b038927b61b227274c74112b613bd36a41c70732d233d954c1"
         },
-        "ipkSize": 19617994
+        "ipkSize": 19722754
       }
     }
   ]
