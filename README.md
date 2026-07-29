@@ -53,10 +53,31 @@ The patched app uses `youtube.leanback.v4` and therefore replaces the official
 YouTube application. Keep a copy of the official package if you want to restore
 it later.
 
+## Tested Cobalt baseline
+
+The closest currently tested match to a working stock LG installation is:
+
+```text
+Cobalt:       23.lts.6
+Starboard:    API 13
+Architecture: ARMv7 softfp
+Starter:      original LG webOS Cobalt starter from the same stock runtime
+```
+
+This combination has been tested successfully on the TV from which the stock
+runtime was collected. The patched Cobalt library keeps the original ABI and
+raises Cobalt's combined persistent cookie/local-storage limit from 4 MiB to
+16 MiB. It also logs the serialized storage size and rejects oversized writes
+explicitly instead of failing silently.
+
 Community-reported device, firmware and feature results are collected in the
 [device compatibility matrix](docs/device-compatibility.md). The matrix also
 contains the reporting template and unpatched baseline test packages used for
 compatibility investigations.
+
+Owners of rooted TVs can help investigate older firmware by collecting the
+starter from a working stock YouTube installation. See the
+[stock starter collection guide](docs/collect-stock-youtube-starter.md).
 
 ## Installation
 
@@ -129,6 +150,21 @@ Patch your official YouTube IPK:
 ```sh
 make PACKAGE=./your-tv-youtube.ipk
 ```
+
+To package the tested `23.lts.6`/SB13 runtime with a privately collected stock
+application backup:
+
+```sh
+make package \
+  PACKAGE=./youtube-official-backup.tar.gz \
+  PACKAGE_COBALT_VERSION=23.lts.6 \
+  PACKAGE_SB_API_VERSION=13 \
+  PACKAGE_COBALT_ARCHIVE=cobalt-bin/23.lts.6-13.xz
+```
+
+Do not commit or publish the stock application backup. It can contain
+LG/YouTube-protected files such as `drm.nfz`; the packaging process removes
+that file from the patched IPK.
 
 By default the patched package uses:
 
@@ -229,19 +265,19 @@ To build Cobalt yourself, the build process clones Cobalt, applies the patches f
 Example:
 
 ```sh
-make BUILD_COBALT_DEBUG=0 WEBAPP_DEBUG=0 \
-  cobalt-bin/23.lts.4-12/libcobalt.so \
-  cobalt-bin/23.lts.4-12.xz
+make BUILD_COBALT_PARALLEL=4 BUILD_COBALT_DEBUG=0 WEBAPP_DEBUG=0 \
+  cobalt-bin/23.lts.6-13/libcobalt.so \
+  cobalt-bin/23.lts.6-13.xz
 ```
 
 For a clean rebuild after changing the Cobalt patch:
 
 ```sh
-make clean-workdir/cobalt-23.lts.4
-rm -rf cobalt-bin/23.lts.4-12 cobalt-bin/23.lts.4-12.xz
-make BUILD_COBALT_DEBUG=0 WEBAPP_DEBUG=0 \
-  cobalt-bin/23.lts.4-12/libcobalt.so \
-  cobalt-bin/23.lts.4-12.xz
+make clean-workdir/cobalt-23.lts.6
+rm -rf cobalt-bin/23.lts.6-13 cobalt-bin/23.lts.6-13.xz
+make BUILD_COBALT_PARALLEL=4 BUILD_COBALT_DEBUG=0 WEBAPP_DEBUG=0 \
+  cobalt-bin/23.lts.6-13/libcobalt.so \
+  cobalt-bin/23.lts.6-13.xz
 ```
 
 ## Development TV setup

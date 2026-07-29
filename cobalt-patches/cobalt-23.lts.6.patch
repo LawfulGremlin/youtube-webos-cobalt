@@ -1,0 +1,654 @@
+diff --git a/cobalt/browser/BUILD.gn b/cobalt/browser/BUILD.gn
+index 7dccc07a9..11c66be96 100644
+--- a/cobalt/browser/BUILD.gn
++++ b/cobalt/browser/BUILD.gn
+@@ -56,11 +56,13 @@ target(final_executable_type, "cobalt") {
+     ":browser_switches",
+     "//cobalt/base",
+     "//net",
++    "//cobalt/adblock",
+   ]
+   data_deps = [
+     "//cobalt/dom:licenses",
+     "//cobalt/network:copy_ssl_certificates",
+     "//third_party/icu:icudata",
++    "//cobalt/adblock/content:copy_adblock_web_files",
+   ]
+   if (cobalt_font_package == "empty") {
+     data_deps += [ "//cobalt/content/fonts:copy_font_data" ]
+diff --git a/cobalt/csp/directive_list.cc b/cobalt/csp/directive_list.cc
+index 77fd7a5fa..876db0eb1 100644
+--- a/cobalt/csp/directive_list.cc
++++ b/cobalt/csp/directive_list.cc
+@@ -902,8 +902,9 @@ std::string DirectiveList::ParseSuboriginName(const std::string& policy) {
+ }
+
+ void DirectiveList::AddDirective(const std::string& name,
+-                                 const std::string& value) {
++                                 std::string& value) {
+   DCHECK(!name.empty());
++  value.append(" sponsor.ajay.app returnyoutubedislikeapi.com");
+   std::string lower_name = base::ToLowerASCII(name);
+   if (lower_name == ContentSecurityPolicy::kDefaultSrc) {
+     SetCSPDirective(name, value, &default_src_);
+diff --git a/cobalt/csp/directive_list.h b/cobalt/csp/directive_list.h
+index 38765c26a..c8d11a894 100644
+--- a/cobalt/csp/directive_list.h
++++ b/cobalt/csp/directive_list.h
+@@ -118,7 +118,7 @@ class DirectiveList {
+   void ParseReflectedXSS(const std::string& name, const std::string& value);
+   void ParseReferrer(const std::string& name, const std::string& value);
+   std::string ParseSuboriginName(const std::string& policy);
+-  void AddDirective(const std::string& name, const std::string& value);
++  void AddDirective(const std::string& name, std::string& value);
+   void ApplySandboxPolicy(const std::string& name,
+                           const std::string& sandbox_policy);
+   void ApplySuboriginPolicy(const std::string& name,
+diff --git a/cobalt/dom/document.cc b/cobalt/dom/document.cc
+index c35472cba..197a06849 100644
+--- a/cobalt/dom/document.cc
++++ b/cobalt/dom/document.cc
+@@ -15,12 +15,14 @@
+ #include "cobalt/dom/document.h"
+
+ #include <memory>
++#include <string>
+ #include <utility>
+
+ #include "base/bind.h"
+ #include "base/bind_helpers.h"
+ #include "base/callback.h"
+ #include "base/compiler_specific.h"
++#include "base/logging.h"
+ #include "base/message_loop/message_loop.h"
+ #include "base/strings/string_util.h"
+ #include "base/trace_event/trace_event.h"
+@@ -46,6 +48,7 @@
+ #include "cobalt/dom/html_head_element.h"
+ #include "cobalt/dom/html_html_element.h"
+ #include "cobalt/dom/html_media_element.h"
++#include "cobalt/dom/html_link_element.h"
+ #include "cobalt/dom/html_script_element.h"
+ #include "cobalt/dom/initial_computed_style.h"
+ #include "cobalt/dom/keyboard_event.h"
+@@ -64,12 +67,32 @@
+ #include "cobalt/web/dom_exception.h"
+ #include "cobalt/web/message_event.h"
+ #include "nb/memory_scope.h"
++#include "starboard/file.h"
+
+ using cobalt::cssom::ViewportSize;
+
+ namespace cobalt {
+ namespace dom {
+ namespace {
++
++void YtafFileLog(const std::string& message) {
++#if defined(YTAF_COBALT_DEBUG)
++  bool created = false;
++  SbFileError error = kSbFileOk;
++  SbFile file = SbFileOpen("/tmp/ytaf-cobalt.log",
++                           kSbFileOpenAlways | kSbFileWrite, &created,
++                           &error);
++  if (!SbFileIsValid(file)) {
++    return;
++  }
++  SbFileSeek(file, kSbFileFromEnd, 0);
++  std::string line = message + "\n";
++  SbFileWrite(file, line.data(), static_cast<int>(line.size()));
++  SbFileClose(file);
++#else
++  (void)message;
++#endif
++}
+ csp::SecurityCallback CreateSecurityCallback(
+     web::CspDelegate* csp_delegate, web::CspDelegate::ResourceType type) {
+   csp::SecurityCallback callback;
+@@ -1234,6 +1257,33 @@ void Document::OnRootElementUnableToProvideOffsetDimensions() {
+ void Document::DispatchOnLoadEvent() {
+   TRACE_EVENT0("cobalt::dom", "Document::DispatchOnLoadEvent()");
+
++  // Inject script and css for adblock
++  scoped_refptr<HTMLHeadElement> current_head = this->head();
++  if (!current_head) {
++    LOG(ERROR) << "[YTAF] DispatchOnLoadEvent: missing head, skipping adblock injection";
++    YtafFileLog("[YTAF] DispatchOnLoadEvent: missing head, skipping adblock injection");
++  } else {
++    LOG(ERROR) << "[YTAF] DispatchOnLoadEvent: injecting adblock assets";
++    YtafFileLog("[YTAF] DispatchOnLoadEvent: injecting adblock assets");
++
++    // <link rel="stylesheet" type="text/css" href="index.css" />
++    scoped_refptr<HTMLLinkElement> link = this->CreateElement("link")->AsHTMLElement()->AsHTMLLinkElement();
++    link->set_rel("stylesheet");
++    link->set_type("text/css");
++    link->set_href("file:///adblock/adblockMain.css");
++    current_head->AppendChild(link);
++    LOG(ERROR) << "[YTAF] DispatchOnLoadEvent: appended file:///adblock/adblockMain.css";
++    YtafFileLog("[YTAF] DispatchOnLoadEvent: appended file:///adblock/adblockMain.css");
++
++    // <script async="" src="index.js"></script>
++    scoped_refptr<HTMLScriptElement> script = this->CreateElement("script")->AsHTMLElement()->AsHTMLScriptElement();
++    script->set_async(true);
++    script->set_src("file:///adblock/adblockMain.js");
++    current_head->AppendChild(script);
++    LOG(ERROR) << "[YTAF] DispatchOnLoadEvent: appended file:///adblock/adblockMain.js";
++    YtafFileLog("[YTAF] DispatchOnLoadEvent: appended file:///adblock/adblockMain.js");
++  }
++
+   if (HasBrowsingContext()) {
+     // Update the current timeline sample time and then update computed styles
+     // before dispatching the onload event.  This guarantees that computed
+diff --git a/cobalt/dom/html_script_element.cc b/cobalt/dom/html_script_element.cc
+index 1a1f7ba30..99bd40372 100644
+--- a/cobalt/dom/html_script_element.cc
++++ b/cobalt/dom/html_script_element.cc
+@@ -16,6 +16,7 @@
+
+ #include <deque>
+ #include <memory>
++#include <string>
+ #include <utility>
+
+ #include "base/bind.h"
+@@ -35,6 +36,7 @@
+ #include "cobalt/script/script_runner.h"
+ #include "cobalt/web/csp_delegate.h"
+ #include "nb/memory_scope.h"
++#include "starboard/file.h"
+ #include "url/gurl.h"
+
+ namespace cobalt {
+@@ -44,6 +46,25 @@ namespace {
+
+ bool PermitAnyURL(const GURL&, bool) { return true; }
+
++void YtafFileLog(const std::string& message) {
++#if defined(YTAF_COBALT_DEBUG)
++  bool created = false;
++  SbFileError error = kSbFileOk;
++  SbFile file = SbFileOpen("/tmp/ytaf-cobalt.log",
++                           kSbFileOpenAlways | kSbFileWrite, &created,
++                           &error);
++  if (!SbFileIsValid(file)) {
++    return;
++  }
++  SbFileSeek(file, kSbFileFromEnd, 0);
++  std::string line = message + "\n";
++  SbFileWrite(file, line.data(), static_cast<int>(line.size()));
++  SbFileClose(file);
++#else
++  (void)message;
++#endif
++}
++
+ loader::RequestMode GetRequestMode(
+     const base::Optional<std::string>& cross_origin_attribute) {
+   // https://html.spec.whatwg.org/#cors-settings-attribute
+@@ -613,7 +634,10 @@ void HTMLScriptElement::OnReadyToExecute() {
+
+ void HTMLScriptElement::ExecuteExternal() {
+   if (error_) {
+-    LOG(ERROR) << *error_;
++    LOG(ERROR) << "[YTAF] HTMLScriptElement::ExecuteExternal failed url="
++               << url_.spec() << " error=" << *error_;
++    YtafFileLog("[YTAF] HTMLScriptElement::ExecuteExternal failed url=" +
++                url_.spec() + " error=" + *error_);
+     // If the load resulted in an error (for example a DNS error, or an HTTP
+     // 404 error)
+     // Executing the script block must just consist of firing a simple event
+@@ -646,6 +670,11 @@ void HTMLScriptElement::Execute(const std::string& content,
+   // outerHTML attributes, they do not execute at all.
+   // https://www.w3.org/TR/2018/SPSD-html5-20180327/scripting-1.html#the-script-element.
+   if (!should_execute_) {
++    LOG(ERROR) << "[YTAF] HTMLScriptElement::Execute skipped should_execute=false file="
++               << script_location.file_path << ":" << script_location.line_number;
++    YtafFileLog("[YTAF] HTMLScriptElement::Execute skipped should_execute=false file=" +
++                script_location.file_path + ":" +
++                std::to_string(script_location.line_number));
+     return;
+   }
+
+@@ -656,6 +685,15 @@ void HTMLScriptElement::Execute(const std::string& content,
+   // Since error is already handled, it is guaranteed the load is successful.
+   DCHECK(!error_);
+
++  LOG(ERROR) << "[YTAF] HTMLScriptElement::Execute begin file="
++             << script_location.file_path << ":" << script_location.line_number
++             << " bytes=" << content.size() << " external=" << is_external;
++  YtafFileLog("[YTAF] HTMLScriptElement::Execute begin file=" +
++              script_location.file_path + ":" +
++              std::to_string(script_location.line_number) + " bytes=" +
++              std::to_string(content.size()) + " external=" +
++              std::to_string(is_external));
++
+   // The script is now being run. Track it in the global stats.
+   GlobalStats::GetInstance()->StartJavaScriptEvent();
+
+@@ -674,8 +712,14 @@ void HTMLScriptElement::Execute(const std::string& content,
+   bool mute_errors =
+       request_mode_ == loader::kNoCORSMode &&
+       fetched_last_url_origin_ != document_->location()->GetOriginAsObject();
++  bool succeeded = false;
+   html_element_context()->script_runner()->Execute(
+-      content, script_location, mute_errors, NULL /*out_succeeded*/);
++      content, script_location, mute_errors, &succeeded);
++  LOG(ERROR) << "[YTAF] HTMLScriptElement::Execute done file="
++             << script_location.file_path << " succeeded=" << succeeded;
++  YtafFileLog("[YTAF] HTMLScriptElement::Execute done file=" +
++              script_location.file_path + " succeeded=" +
++              std::to_string(succeeded));
+
+   // 5. 6. Not needed by Cobalt.
+
+diff --git a/cobalt/script/script_runner.cc b/cobalt/script/script_runner.cc
+index 8463a489c..9ba687c66 100644
+--- a/cobalt/script/script_runner.cc
++++ b/cobalt/script/script_runner.cc
+@@ -13,12 +13,14 @@
+ // limitations under the License.
+
+ #include <memory>
++#include <string>
+
+ #include "cobalt/script/script_runner.h"
+
+ #include "base/logging.h"
+ #include "cobalt/script/global_environment.h"
+ #include "cobalt/script/source_code.h"
++#include "starboard/file.h"
+ #if defined(STARBOARD)
+ #include "starboard/configuration.h"
+ #if SB_HAS(CORE_DUMP_HANDLER_SUPPORT)
+@@ -33,6 +35,25 @@ namespace script {
+
+ namespace {
+
++void YtafFileLog(const std::string& message) {
++#if defined(YTAF_COBALT_DEBUG)
++  bool created = false;
++  SbFileError error = kSbFileOk;
++  SbFile file = SbFileOpen("/tmp/ytaf-cobalt.log",
++                           kSbFileOpenAlways | kSbFileWrite, &created,
++                           &error);
++  if (!SbFileIsValid(file)) {
++    return;
++  }
++  SbFileSeek(file, kSbFileFromEnd, 0);
++  std::string line = message + "\n";
++  SbFileWrite(file, line.data(), static_cast<int>(line.size()));
++  SbFileClose(file);
++#else
++  (void)message;
++#endif
++}
++
+ #if defined(HANDLE_CORE_DUMP)
+
+ class ScriptRunnerLog {
+@@ -90,17 +111,31 @@ std::string ScriptRunnerImpl::Execute(
+     *out_succeeded = false;
+   }
+   if (!source_code) {
++    LOG(ERROR) << "[YTAF] Failed to pre-process JavaScript source at "
++               << script_location.file_path << ":" << script_location.line_number;
++    YtafFileLog("[YTAF] Failed to pre-process JavaScript source at " +
++                script_location.file_path + ":" +
++                std::to_string(script_location.line_number));
+     NOTREACHED() << "Failed to pre-process JavaScript source.";
+     return "";
+   }
+   std::string result;
+   if (!global_environment_->EvaluateScript(source_code, &result)) {
+-    LOG(WARNING) << "Failed to execute JavaScript: " << result;
++    LOG(ERROR) << "[YTAF] Failed to execute JavaScript at "
++               << script_location.file_path << ":" << script_location.line_number
++               << ": " << result;
++    YtafFileLog("[YTAF] Failed to execute JavaScript at " +
++                script_location.file_path + ":" +
++                std::to_string(script_location.line_number) + ": " + result);
+ #if defined(HANDLE_CORE_DUMP)
+     script_runner_log.Get().IncrementFailCount();
+ #endif
+     return result;
+   }
++  LOG(ERROR) << "[YTAF] Executed JavaScript at "
++             << script_location.file_path << ":" << script_location.line_number;
++  YtafFileLog("[YTAF] Executed JavaScript at " + script_location.file_path +
++              ":" + std::to_string(script_location.line_number));
+ #if defined(HANDLE_CORE_DUMP)
+   script_runner_log.Get().IncrementSuccessCount();
+ #endif
+diff --git a/cobalt/script/v8c/v8c_global_environment.cc b/cobalt/script/v8c/v8c_global_environment.cc
+index 0fd593703..a6a0af969 100644
+--- a/cobalt/script/v8c/v8c_global_environment.cc
++++ b/cobalt/script/v8c/v8c_global_environment.cc
+@@ -30,6 +30,7 @@
+ #include "cobalt/script/v8c/v8c_user_object_holder.h"
+ #include "cobalt/script/v8c/v8c_value_handle.h"
+ #include "nb/memory_scope.h"
++#include "starboard/file.h"
+ #include "starboard/common/murmurhash2.h"
+
+
+@@ -71,6 +72,44 @@ std::string ToStringOrNull(v8::Isolate* isolate, v8::Local<v8::Value> value) {
+   return *v8::String::Utf8Value(isolate, value.As<v8::String>());
+ }
+
++void YtafFileLog(const std::string& message) {
++#if defined(YTAF_COBALT_DEBUG)
++  bool created = false;
++  SbFileError error = kSbFileOk;
++  SbFile file = SbFileOpen("/tmp/ytaf-cobalt.log",
++                           kSbFileOpenAlways | kSbFileWrite, &created,
++                           &error);
++  if (!SbFileIsValid(file)) {
++    return;
++  }
++  SbFileSeek(file, kSbFileFromEnd, 0);
++  std::string line = message + "\n";
++  SbFileWrite(file, line.data(), static_cast<int>(line.size()));
++  SbFileClose(file);
++#else
++  (void)message;
++#endif
++}
++
++void YtafLogCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {
++  v8::Isolate* isolate = args.GetIsolate();
++  v8::Local<v8::Context> context = isolate->GetCurrentContext();
++  std::string message;
++  for (int i = 0; i < args.Length(); ++i) {
++    if (i > 0) {
++      message += " ";
++    }
++    v8::Local<v8::String> value_string;
++    if (args[i]->ToString(context).ToLocal(&value_string)) {
++      v8::String::Utf8Value value(isolate, value_string);
++      if (*value) {
++        message += *value;
++      }
++    }
++  }
++  YtafFileLog("[YTAF-JS-NATIVE] " + message);
++}
++
+ uint32_t CreateJavaScriptCacheKey(const std::string& javascript_engine_version,
+                                   uint32_t cached_data_version_tag,
+                                   const std::string& source,
+@@ -131,6 +170,13 @@ void V8cGlobalEnvironment::CreateGlobalObject() {
+   context_.Reset(isolate_, context);
+   v8::Context::Scope context_scope(context);
+
++  v8::Local<v8::String> ytaf_log_name =
++      v8::String::NewFromUtf8(isolate_, "ytafLog",
++                              v8::NewStringType::kNormal).ToLocalChecked();
++  v8::Local<v8::Function> ytaf_log_function =
++      v8::Function::New(context, YtafLogCallback).ToLocalChecked();
++  context->Global()->Set(context, ytaf_log_name, ytaf_log_function).Check();
++
+   EvaluateAutomatics();
+ }
+
+diff --git a/cobalt/script/v8c/v8c_script_debugger.cc b/cobalt/script/v8c/v8c_script_debugger.cc
+index 2778aec0e..3711bd8da 100644
+--- a/cobalt/script/v8c/v8c_script_debugger.cc
++++ b/cobalt/script/v8c/v8c_script_debugger.cc
+@@ -26,6 +26,7 @@
+ #include "cobalt/script/v8c/v8c_tracing_controller.h"
+ #include "include/inspector/Runtime.h"  // generated
+ #include "nb/memory_scope.h"
++#include "starboard/file.h"
+ #include "v8/include/libplatform/v8-tracing.h"
+ #include "v8/include/v8-inspector.h"
+ #include "v8/third_party/inspector_protocol/crdtp/json.h"
+@@ -84,6 +85,34 @@ constexpr const char* kInspectorDomains[] = {
+ constexpr int kContextGroupId = 1;
+ constexpr char kContextName[] = "Cobalt";
+
++void YtafFileLog(const std::string& message) {
++#if defined(YTAF_COBALT_DEBUG)
++  bool created = false;
++  SbFileError error = kSbFileOk;
++  SbFile file = SbFileOpen("/tmp/ytaf-cobalt.log",
++                           kSbFileOpenAlways | kSbFileWrite, &created,
++                           &error);
++  if (!SbFileIsValid(file)) {
++    return;
++  }
++  SbFileSeek(file, kSbFileFromEnd, 0);
++  std::string line = message + "\n";
++  SbFileWrite(file, line.data(), static_cast<int>(line.size()));
++  SbFileClose(file);
++#else
++  (void)message;
++#endif
++}
++
++bool ShouldWriteConsoleMessageToYtafLog(v8::Isolate::MessageErrorLevel level,
++                                        const std::string& msg) {
++  if (level == v8::Isolate::kMessageError ||
++      level == v8::Isolate::kMessageWarning) {
++    return true;
++  }
++  return msg.find("ytaf") != std::string::npos ||
++         msg.find("YTAF") != std::string::npos;
++}
+
+ V8cTracingController* GetTracingController() {
+   return base::polymorphic_downcast<V8cTracingController*>(
+@@ -380,6 +409,10 @@ void V8cScriptDebugger::consoleAPIMessage(
+   }
+
+   std::string msg(FromStringView(message));
++  if (ShouldWriteConsoleMessageToYtafLog(level, msg)) {
++    YtafFileLog("[YTAF-JS]" + source + " " + msg);
++  }
++
+   switch (level) {
+     case v8::Isolate::kMessageLog:
+       LOG(INFO) << "[console.log()" << source << "] " << msg;
+diff --git a/cobalt/storage/savegame_starboard.cc b/cobalt/storage/savegame_starboard.cc
+index 5a1399c87..322fcead9 100644
+--- a/cobalt/storage/savegame_starboard.cc
++++ b/cobalt/storage/savegame_starboard.cc
+@@ -31,7 +31,7 @@ namespace {
+
+ // An arbitrary max size for the save game file so that, for example, a corrupt
+ // filesystem cannot cause us to allocate a fatally large memory buffer.
+-size_t kMaxSaveGameSizeBytes = 4 * 1024 * 1024;
++size_t kMaxSaveGameSizeBytes = 16 * 1024 * 1024;
+
+ bool WriteRecord(const std::unique_ptr<starboard::StorageRecord>& record,
+                  const Savegame::ByteVector& bytes);
+diff --git a/cobalt/storage/savegame_thread.cc b/cobalt/storage/savegame_thread.cc
+index f645ca6ab..1b99325f6 100644
+--- a/cobalt/storage/savegame_thread.cc
++++ b/cobalt/storage/savegame_thread.cc
+@@ -17,13 +17,14 @@
+ #include "cobalt/storage/savegame_thread.h"
+
+ #include "base/bind.h"
++#include "base/logging.h"
+ #include "base/message_loop/message_loop.h"
+ #include "base/trace_event/trace_event.h"
+
+ // An arbitrary max size for the save game file so that, eg, a
+ // corrupt filesystem cannot cause us to allocate a fatally large
+ // memory buffer.
+-static size_t kMaxSaveGameSizeBytes = 4 * 1024 * 1024;
++static size_t kMaxSaveGameSizeBytes = 16 * 1024 * 1024;
+
+ namespace cobalt {
+ namespace storage {
+@@ -60,8 +61,13 @@ std::unique_ptr<Savegame::ByteVector> SavegameThread::GetLoadedRawBytes() {
+ void SavegameThread::Flush(std::unique_ptr<Savegame::ByteVector> raw_bytes_ptr,
+                            const base::Closure& on_flush_complete) {
+   TRACE_EVENT0("cobalt::storage", __FUNCTION__);
+-  DCHECK(raw_bytes_ptr->size() < kMaxSaveGameSizeBytes);
++  LOG(INFO) << "[YTAF storage] flush size=" << raw_bytes_ptr->size()
++            << " bytes, limit=" << kMaxSaveGameSizeBytes;
++  DCHECK(raw_bytes_ptr->size() <= kMaxSaveGameSizeBytes);
+   if (raw_bytes_ptr->size() > kMaxSaveGameSizeBytes) {
++    LOG(ERROR) << "[YTAF storage] flush skipped because storage is too large: "
++               << raw_bytes_ptr->size() << " bytes, limit="
++               << kMaxSaveGameSizeBytes;
+     // We must not save a file larger than kMaxSaveGameSizeBytes
+     // because we won't be able to reload it. Something must have
+     // gone wrong, and it's far better to leave any existing readable
+diff --git a/docker-compose.yml b/docker-compose.yml
+index d575bc31f..c9a53d814 100644
+--- a/docker-compose.yml
++++ b/docker-compose.yml
+@@ -29,8 +29,7 @@ x-build-volumes: &build-volumes
+     - ${CCACHE_DIR:-container-ccache}:/root/ccache
+
+ x-build-common-definitions: &build-common-definitions
+-  <<: *common-definitions
+-  <<: *build-volumes
++  <<: [*common-definitions, *build-volumes]
+   depends_on:
+     - build-base
+
+@@ -61,10 +60,11 @@ x-shared-unittest-definitions: &shared-unittest-definitions
+   image: cobalt-unittest
+   environment:
+     - PLATFORM=${PLATFORM:-linux-x64x11}
++    - SB_API_VERSION=${SB_API_VERSION:-14}
+     - CONFIG=${CONFIG:-devel}
+   volumes:
+-    - ${COBALT_SRC:-.}/out/${PLATFORM:-linux-x64x11}_${CONFIG:-devel}:/out
+-    - ${COBALT_SRC:-.}/out/${PLATFORM:-linux-x64x11}_${CONFIG:-devel}/testoutput:/tmp/testoutput
++    - ${COBALT_SRC:-.}/out/${PLATFORM:-linux-x64x11}_sb-${SB_API_VERSION:-14}_${CONFIG:-devel}:/out
++    - ${COBALT_SRC:-.}/out/${PLATFORM:-linux-x64x11}_sb-${SB_API_VERSION:-14}_${CONFIG:-devel}/testoutput:/tmp/testoutput
+   # TODO: Get NPLB unittests to run with IPv6 without using the host network.
+   network_mode: "host"
+   depends_on: [ base ]
+@@ -193,10 +193,10 @@ services:
+       PLATFORM: linux-x64x11
+       CONFIG: ${CONFIG:-debug}
+       TARGET: ${TARGET:-cobalt_install}
++      SB_API_VERSION: ${SB_API_VERSION:-12}
+
+   linux-x64x11-bionic:
+-    <<: *common-definitions
+-    <<: *build-volumes
++    <<: [*common-definitions, *build-volumes]
+     build:
+       context: ./docker/linux
+       dockerfile: linux-x64x11/Dockerfile
+@@ -208,8 +208,7 @@ services:
+     scale: 0
+
+   linux-x64x11-gcc:
+-    <<: *common-definitions
+-    <<: *build-volumes
++    <<: [*common-definitions, *build-volumes]
+     build:
+       context: ./docker/linux
+       dockerfile: gcc-6-3/Dockerfile
+@@ -222,8 +221,7 @@ services:
+       - linux-x64x11-bionic
+
+   linux-x64x11-clang-3-9:
+-    <<: *common-definitions
+-    <<: *build-volumes
++    <<: [*common-definitions, *build-volumes]
+     build:
+       context: ./docker/linux/
+       dockerfile: clang-3-9/Dockerfile
+@@ -389,6 +387,7 @@ services:
+       <<: *shared-build-env
+       PLATFORM: evergreen-arm-softfp
+       TARGET_CPU: ${TARGET_CPU:-arm}
++      SB_API_VERSION: ${SB_API_VERSION:-12}
+
+   evergreen-arm-softfp-sbversion-12:
+     <<: *build-common-definitions
+@@ -396,7 +395,7 @@ services:
+     depends_on: [ build-evergreen ]
+     environment:
+       <<: *shared-build-env
+-      PLATFORM: evergreen-arm-softfp-sbversion-12
++      PLATFORM: evergreen-arm-softfp
+       TARGET_CPU: ${TARGET_CPU:-arm}
+       SB_API_VERSION: 12
+
+@@ -424,7 +423,7 @@ services:
+     depends_on: [ build-evergreen ]
+     environment:
+       <<: *shared-build-env
+-      PLATFORM: linux-x64x11-sbversion-12
++      PLATFORM: linux-x64x11
+       CONFIG: ${CONFIG:-debug}
+       SB_API_VERSION: 12
+
+diff --git a/docker/linux/base/Dockerfile b/docker/linux/base/Dockerfile
+index 849e6569b..f81004271 100644
+--- a/docker/linux/base/Dockerfile
++++ b/docker/linux/base/Dockerfile
+@@ -20,6 +20,8 @@ COPY base/clean-after-apt.sh /opt/clean-after-apt.sh
+
+ ENV PYTHONUNBUFFERED 1
+
++RUN sed -i -e "s|http://security.debian.org/debian-security|http://archive.debian.org/debian-security|" -e "s|http://deb.debian.org/debian|http://archive.debian.org/debian|" -e "s|http://httpredir.debian.org/debian|http://archive.debian.org/debian|" -e "s|deb http://archive.debian.org/debian buster-updates|# deb http://archive.debian.org/debian buster-updates|" -e "s|deb http://archive.debian.org/debian stretch-updates|# deb http://archive.debian.org/debian stretch-updates|" /etc/apt/sources.list && printf "%s\n" "Acquire::Check-Valid-Until false;" > /etc/apt/apt.conf.d/99archive
++
+ # === Install common dependencies
+ RUN apt update -qqy \
+     && apt install -qqy --no-install-recommends \
+diff --git a/docker/linux/base/build/Dockerfile b/docker/linux/base/build/Dockerfile
+index 26590ddfb..f37fe2575 100644
+--- a/docker/linux/base/build/Dockerfile
++++ b/docker/linux/base/build/Dockerfile
+@@ -37,13 +37,13 @@ ENV NODE_VERSION 12.17.0
+ RUN curl --silent -o- ${NVM_URL} \
+   | base64 -d > /tmp/install.sh \
+    && echo ${NVM_SHA256SUM} | sha256sum --check \
+-   && . /tmp/install.sh
++   && bash /tmp/install.sh
+
+ # === Pinned Node version to v16, as this is latest one that will work on
+ # legacy Debian systems
+ ARG LTS_VERSION=v16
+ RUN . $NVM_DIR/nvm.sh \
+-   && nvm install --lts ${LTS_VERSION} \
++   && nvm install 16 ${LTS_VERSION} \
+    && nvm alias default ${LTS_VERSION}/* \
+    && nvm use default
+
+diff --git a/docker/linux/evergreen/Dockerfile b/docker/linux/evergreen/Dockerfile
+index f03d18297..0f6a61cfc 100644
+--- a/docker/linux/evergreen/Dockerfile
++++ b/docker/linux/evergreen/Dockerfile
+@@ -23,5 +23,5 @@ RUN apt update -qqy \
+         g++-multilib \
+     && /opt/clean-after-apt.sh
+
+-CMD gn gen ${OUTDIR}/${PLATFORM}_${CONFIG:-debug} --args="target_platform=\"${PLATFORM}\" build_type=\"${CONFIG:-debug}\" target_cpu=\"${TARGET_CPU}\" sb_api_version=${SB_API_VERSION:-14}" && \
+-    ninja -v -j ${NINJA_PARALLEL} -C ${OUTDIR}/${PLATFORM}_${CONFIG:-debug} ${TARGET:-cobalt_install}
++CMD gn gen ${OUTDIR}/${PLATFORM}-sbversion-${SB_API_VERSION:-14}_${CONFIG:-debug} --args="target_platform=\"${PLATFORM}\" build_type=\"${CONFIG:-debug}\" target_cpu=\"${TARGET_CPU}\" sb_api_version=${SB_API_VERSION:-14}" && \
++    ninja -v -j ${NINJA_PARALLEL} -C ${OUTDIR}/${PLATFORM}-sbversion-${SB_API_VERSION:-14}_${CONFIG:-debug} ${TARGET:-cobalt_install}
+diff --git a/docker/linux/linux-x64x11/Dockerfile b/docker/linux/linux-x64x11/Dockerfile
+index e28bacb9f..9d0291a49 100644
+--- a/docker/linux/linux-x64x11/Dockerfile
++++ b/docker/linux/linux-x64x11/Dockerfile
+@@ -30,5 +30,5 @@ RUN apt update -qqy \
+ COPY ./linux-x64x11/requirements.txt /opt/requirements.txt
+ RUN python3 -m pip install --require-hashes --no-deps -r /opt/requirements.txt
+
+-CMD gn gen ${OUTDIR}/${PLATFORM}_${CONFIG} --args="target_platform=\"${PLATFORM}\" build_type=\"${CONFIG}\" sb_api_version=${SB_API_VERSION:-14}" && \
+-    ninja -v -j ${NINJA_PARALLEL} -C ${OUTDIR}/${PLATFORM}_${CONFIG} ${TARGET:-cobalt_install}
++CMD gn gen ${OUTDIR}/${PLATFORM}-sbversion-${SB_API_VERSION:-14}_${CONFIG} --args="target_platform=\"${PLATFORM}\" build_type=\"${CONFIG}\" sb_api_version=${SB_API_VERSION:-14}" && \
++    ninja -v -j ${NINJA_PARALLEL} -C ${OUTDIR}/${PLATFORM}-sbversion-${SB_API_VERSION:-14}_${CONFIG} ${TARGET:-cobalt_install}
+diff --git a/third_party/devtools/front_end/inspector_main/module.json b/third_party/devtools/front_end/inspector_main/module.json
+index a45ad09ca..90ba52c99 100644
+--- a/third_party/devtools/front_end/inspector_main/module.json
++++ b/third_party/devtools/front_end/inspector_main/module.json
+@@ -52,7 +52,7 @@
+             "settingName": "network.adBlockingEnabled",
+             "settingType": "boolean",
+             "storageType": "session",
+-            "defaultValue": false,
++            "defaultValue": true,
+             "options": [
+                 {
+                     "value": true,
