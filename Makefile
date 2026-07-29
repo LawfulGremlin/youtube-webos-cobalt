@@ -107,9 +107,9 @@ ares-install:
 	if [ "$$aresCmd" == "" ]; then \
 		npmCmd=$$(command -v npm); \
 		if [ "$$npmCmd" == "" ]; then \
-			echo "\"npm\" is required to install ares-cli"; \
+			echo "\"npm\" is required to install the webOS CLI"; \
 		fi; \
-		npm install @webosose/ares-cli; \
+		npm install --save-dev @webos-tools/cli; \
 		aresCmd=node_modules/.bin/ares-install; \
 	fi; \
 	$$aresCmd ./output/$(shell ls --sort=time output | head -n 1)
@@ -264,10 +264,10 @@ $(STANDALONE_PACKAGE): FORCE $(STANDALONE_WORKDIR)
 	if [ "$$aresCmd" == "" ]; then \
 		npmCmd=$$(command -v npm); \
 		if [ "$$npmCmd" == "" ]; then \
-			echo "\"npm\" is required to install ares-cli"; \
+			echo "\"npm\" is required to install the webOS CLI"; \
 			exit 1; \
 		fi; \
-		npm install @webosose/ares-cli; \
+		npm install --save-dev @webos-tools/cli; \
 		aresCmd=node_modules/.bin/ares-package; \
 	fi; \
 	mkdir -p $(STANDALONE_OUTPUT_DIR) $(WORKDIR)/standalone-output; \
@@ -352,9 +352,9 @@ ares-package:
 	if [ "$$aresCmd" == "" ]; then \
 		npmCmd=$$(command -v npm); \
 		if [ "$$npmCmd" == "" ]; then \
-			echo "\"npm\" is required to install ares-cli"; \
+			echo "\"npm\" is required to install the webOS CLI"; \
 		fi; \
-		npm install @webosose/ares-cli; \
+		npm install --save-dev @webos-tools/cli; \
 		aresCmd=node_modules/.bin/ares-package; \
 	fi; \
 	$$aresCmd -v -c $(WORKDIR)/ipk; \
