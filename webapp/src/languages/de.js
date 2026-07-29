@@ -14,6 +14,9 @@ export default {
     preview: 'Vorschau/Rückblick überspringen',
     filler: 'Füller/Abschweifung überspringen',
     hook: 'Hook/Begrüßung überspringen',
+    subtitleOn: 'Untertitel: EIN',
+    subtitleOff: 'Untertitel: AUS',
+    subtitleUnavailable: 'Untertitel nicht verfügbar',
     openHint: 'Grün drücken für YouTube-Extras'
   },
   sponsorBlock: {

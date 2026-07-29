@@ -6,6 +6,8 @@ export default {
     interaction: 'Abonnements- en likeherinneringen overslaan', selfpromo: 'Zelfpromotie overslaan',
     musicOfftopic: 'Muziek/off-topic overslaan', preview: 'Vooruitblik/samenvatting overslaan',
     filler: 'Opvulling/uitweidingen overslaan', hook: 'Intro/groet overslaan',
+    subtitleOn: 'Ondertitels: AAN', subtitleOff: 'Ondertitels: UIT',
+    subtitleUnavailable: 'Ondertitels niet beschikbaar',
     openHint: 'Druk op [GROEN] voor YouTube-extra’s'
   },
   sponsorBlock: {

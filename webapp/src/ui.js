@@ -9,6 +9,10 @@ import { configRead, configWrite } from './config.js';
 import { checkboxTools } from './checkboxTools.js';
 import { text as languageText } from './languages/index.js';
 import { sponsorBlockCategoryColors } from './sponsorblock-categories.js';
+import {
+  isSubtitleShortcut,
+  toggleSubtitles
+} from './subtitle-shortcut.js';
 
 let lastTabIndex = 0;
 
@@ -521,6 +525,27 @@ export function userScriptStartUI() {
           closeContainer();
         }
       }
+      return false;
+    }
+
+    if (
+      !menuOpen &&
+      isSubtitleShortcut(evt) &&
+      toggleSubtitles((state, trackName) => {
+        const messageKey = {
+          on: 'subtitleOn',
+          off: 'subtitleOff',
+          unavailable: 'subtitleUnavailable'
+        }[state];
+        let message = text(messageKey || 'subtitleUnavailable');
+        if (state === 'on' && trackName) {
+          message += ` (${trackName})`;
+        }
+        showNotification(message, 1800, 'green');
+      })
+    ) {
+      evt.preventDefault();
+      evt.stopPropagation();
       return false;
     }
 

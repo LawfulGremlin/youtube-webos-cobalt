@@ -78,6 +78,15 @@ An installation rejection or installer hang does not prove runtime
 incompatibility. The useful distinction is whether a package installs
 successfully and then fails to start or play video.
 
+## Collecting a compatible starter from a rooted TV
+
+The available 2022 and 2023 stock packages do not provide a compatible starter
+for the reported webOS 3.4 device. If the current official YouTube app still
+works on an affected rooted TV, follow the
+[stock starter collection guide](collect-stock-youtube-starter.md). The guide
+collects the executable and package metadata without account data or the
+device-specific `drm.nfz` file.
+
 ## Reporting a new result
 
 Please include all fields below when opening or updating an issue:

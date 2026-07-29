@@ -14,6 +14,9 @@ export default {
     preview: 'Skip Preview/Recap',
     filler: 'Skip Filler/Tangent',
     hook: 'Skip Hook/Greeting',
+    subtitleOn: 'Subtitles: ON',
+    subtitleOff: 'Subtitles: OFF',
+    subtitleUnavailable: 'Subtitles unavailable',
     openHint: 'Press [GREEN] for YouTube extras'
   },
   sponsorBlock: {

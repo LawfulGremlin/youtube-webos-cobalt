@@ -10,7 +10,7 @@ This project patches the webOS YouTube application by replacing or modifying the
 
 > This project is unofficial and is not affiliated with YouTube, Google, LG or webOS.
 
-## v1.2.0
+## v1.2.1
 
 The latest release is available from the GitHub releases page:
 
@@ -34,7 +34,8 @@ official YouTube application with the patched version.
 
 The configuration screen can be opened with the **GREEN** button on the LG remote.
 While a video is playing, press **1** to decrease the playback speed or **3** to
-increase it. The available speeds range from 0.25× to 2×.
+increase it. Press **0** to toggle subtitles on or off. The available playback
+speeds range from 0.25× to 2×.
 
 ## Requirements
 
@@ -70,6 +71,18 @@ raises Cobalt's combined persistent cookie/local-storage limit from 4 MiB to
 16 MiB. It also logs the serialized storage size and rejects oversized writes
 explicitly instead of failing silently.
 
+### Tested devices
+
+Community-confirmed results for the current release:
+
+| Model | webOS | Firmware | Release | Result |
+| --- | --- | --- | --- | --- |
+| LG C1 OLED | 6.5.0 | 03.51.16 | v1.2.0 | Clean installation, sign-in, playback, ad blocking and SponsorBlock confirmed working ([#33](https://github.com/RF1705/youtube-webos-cobalt-adfree/issues/33#issuecomment-5114026899)) |
+
+Individual results may vary with firmware, installation method and device
+configuration. See the full compatibility matrix for older releases and
+additional reports.
+
 Community-reported device, firmware and feature results are collected in the
 [device compatibility matrix](docs/device-compatibility.md). The matrix also
 contains the reporting template and unpatched baseline test packages used for
@@ -86,7 +99,7 @@ Download a release `.ipk` package and install it using one of the following meth
 Recommended release package:
 
 ```text
-youtube.leanback.v4_1.2.0_arm.ipk
+youtube.leanback.v4_1.2.1_arm.ipk
 ```
 
 The release also contains `youtube.leanback.v4.manifest.json` for installation
@@ -126,14 +139,14 @@ the webOS app install service:
 ```sh
 mkdir -p /media/developer/temp
 cd /media/developer/temp
-wget https://github.com/RF1705/youtube-webos-cobalt-adfree/releases/download/v1.2.0/youtube.leanback.v4_1.2.0_arm.ipk
-luna-send-pub -i 'luna://com.webos.appInstallService/dev/install' '{"id":"com.ares.defaultName","ipkUrl":"/media/developer/temp/youtube.leanback.v4_1.2.0_arm.ipk","subscribe":true}'
+wget https://github.com/RF1705/youtube-webos-cobalt-adfree/releases/download/v1.2.1/youtube.leanback.v4_1.2.1_arm.ipk
+luna-send-pub -i 'luna://com.webos.appInstallService/dev/install' '{"id":"com.ares.defaultName","ipkUrl":"/media/developer/temp/youtube.leanback.v4_1.2.1_arm.ipk","subscribe":true}'
 ```
 
 After installation, the downloaded package can be removed:
 
 ```sh
-rm /media/developer/temp/youtube.leanback.v4_1.2.0_arm.ipk
+rm /media/developer/temp/youtube.leanback.v4_1.2.1_arm.ipk
 ```
 
 ## Patch an official YouTube IPK
