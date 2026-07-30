@@ -36,9 +36,20 @@ jobs:
       - name: Check required directories
         run: |
           test -d assets
-          test -d cobalt-bin
           test -d cobalt-patches
+          test -d scripts
           test -d webapp
+
+      - name: Check private image separation
+        run: |
+          if git ls-files | grep -E '\.(ipk|xz|tar|tar\.gz|tgz|img|crx)$'; then
+            echo "Build images must not be tracked in the public repository."
+            exit 1
+          fi
+
+          grep -F 'RF1705/YouTube-webos-images.git' Makefile
+          grep -F 'youtube-official-1.1.5.tar.gz' Makefile
+          python3 scripts/verify-pjtr-starter.py --help
 
       - name: Build injected web app
         working-directory: webapp
