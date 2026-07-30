@@ -191,26 +191,57 @@ git clone https://github.com/RF1705/youtube-webos-cobalt-adfree.git
 cd youtube-webos-cobalt-adfree
 ```
 
+Maintainer build images are stored separately in the private
+`RF1705/YouTube-webos-images` repository. Authorized maintainers can clone or
+update them with:
+
+```sh
+make images
+```
+
+The files are checked out into the ignored `.private-images` directory and
+verified against that repository's `SHA256SUMS`. Locally built Cobalt archives
+in `cobalt-bin/` take precedence over the private copy.
+
 Patch your official YouTube IPK:
 
 ```sh
-make PACKAGE=./your-tv-youtube.ipk
+make package PACKAGE=./your-tv-youtube.ipk
 ```
 
-To package the tested `23.lts.6`/SB13 runtime with a privately collected stock
-application backup:
+For maintainers, a plain `make` builds the current standard package from the
+private `youtube-official-1.1.5.tar.gz` base and the tested
+`23.lts.6`/Starboard 13 runtime:
 
 ```sh
-make package \
-  PACKAGE=./youtube-official-backup.tar.gz \
-  PACKAGE_COBALT_VERSION=23.lts.6 \
-  PACKAGE_SB_API_VERSION=13 \
-  PACKAGE_COBALT_ARCHIVE=cobalt-bin/23.lts.6-13.xz
+make
 ```
 
 Do not commit or publish the stock application backup. It can contain
 LG/YouTube-protected files such as `drm.nfz`; the packaging process removes
 that file from the patched IPK.
+
+### k7lp/PJTR package
+
+The HU710PB-GL stock starter uses the application id
+`youtube.leanback.v4-pjtr`, ARMv7 softfp and Starboard API 12. Build its
+separate package with:
+
+```sh
+make pjtr-package
+```
+
+The target updates the private images, verifies the exact starter contents and
+uses `.private-images/cobalt-bin/23.lts.6-12.xz` to create:
+
+```text
+output/youtube.leanback.v4-pjtr_1.2.1_arm.ipk
+```
+
+Override `PROJECT_VERSION` when preparing another release. The starter archive
+is private input and must remain outside Git. The build checks the exact file
+list, app id, k7lp metadata and known SHA-256 hashes of `cobalt` and
+`appinfo.json` before packaging.
 
 By default the patched package uses:
 
@@ -274,7 +305,7 @@ make standalone-package \
 ```
 
 For a compatibility proof of concept that uses the extracted webOS starter with
-the matching `23.lts.4-12` runtime:
+the matching `23.lts.6-12` runtime:
 
 ```sh
 make standalone-poc-package
@@ -309,6 +340,14 @@ The repository may include prebuilt Cobalt binaries in `cobalt-bin`.
 To build Cobalt yourself, the build process clones Cobalt, applies the patches from `cobalt-patches`, builds `libcobalt.so`, and packages the result.
 
 Example:
+
+```sh
+make BUILD_COBALT_PARALLEL=4 BUILD_COBALT_DEBUG=0 WEBAPP_DEBUG=0 \
+  cobalt-bin/23.lts.6-12/libcobalt.so \
+  cobalt-bin/23.lts.6-12.xz
+```
+
+For the standard SB13 runtime:
 
 ```sh
 make BUILD_COBALT_PARALLEL=4 BUILD_COBALT_DEBUG=0 WEBAPP_DEBUG=0 \

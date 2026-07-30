@@ -68,8 +68,11 @@ problems.
 Before diagnosing a starter, runtime or injected JavaScript failure, affected
 users can test the unmodified official packages used by the project:
 
-- [Official YouTube 1.1.4 (2022 package)](https://raw.githubusercontent.com/RF1705/youtube-webos-cobalt-adfree/main/ipks-official/2022-12-01-youtube.leanback.v4-1.1.4.ipk)
-- [Official YouTube 1.1.7 (2023 package)](https://raw.githubusercontent.com/RF1705/youtube-webos-cobalt-adfree/main/ipks-official/2023-07-30-youtube.leanback.v4-1.1.7.ipk)
+- Official YouTube 1.1.4 (2022 package)
+- Official YouTube 1.1.7 (2023 package)
+
+These proprietary reference packages are no longer stored in the public source
+repository. Authorized maintainers can retrieve them with `make images`.
 
 Both packages use the original `youtube.leanback.v4` app ID and may replace the
 installed YouTube application. Test only if you can restore or reinstall it.
