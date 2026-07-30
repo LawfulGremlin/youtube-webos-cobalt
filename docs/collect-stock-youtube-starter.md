@@ -105,11 +105,22 @@ Reply to the relevant GitHub issue with:
 - the SHA-256 printed for `data.img`;
 - the contents of `youtube-webos-stock-info.txt`.
 
+Upload `youtube-webos-stock-data.img` and
+`youtube-webos-stock-info.txt` through the private Dropbox file request:
+
+**[Upload the stock YouTube files privately](https://www.dropbox.com/request/z1tox8du5h3mv4uyupk4)**
+
+No Dropbox account is required. Keep both files unchanged after calculating
+their SHA-256 hashes so the maintainer can verify the transfer.
+
 Do not attach `data.img` to a public issue or commit it to a public fork. It is
 the complete protected LG/YouTube application image and may include
-`drm.nfz`. Ask the maintainer in the issue for a private transfer method. The
-maintainer can extract only the required starter locally and verify the
-published SHA-256 after receiving the image.
+`drm.nfz`.
+
+Uploaded images are kept as private compatibility inputs. They are used to
+analyze the device's Cobalt starter and system ABI and to create new
+device-specific AdFree patches and test packages. The original stock image is
+not published as a public download.
 
 After confirming that both files reached the computer, the temporary TV files
 can be removed:
@@ -124,4 +135,5 @@ The starter will first be checked against the webOS firmware symbol database.
 If it matches the affected firmware, it can be combined with the patched
 Evergreen `libcobalt.so` in a separate legacy test package. The first test
 package should remain separate from the normal release until startup and video
-playback have both been confirmed.
+playback have both been confirmed. Successful test results can then be used to
+support new compatibility patches for the affected device family.
