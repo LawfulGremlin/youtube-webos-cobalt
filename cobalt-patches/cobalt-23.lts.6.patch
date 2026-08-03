@@ -1,3 +1,32 @@
+diff --git a/cobalt/adblock/BUILD.gn b/cobalt/adblock/BUILD.gn
+new file mode 100644
+index 000000000..a465b03e0
+--- /dev/null
++++ b/cobalt/adblock/BUILD.gn
+@@ -0,0 +1,7 @@
++
++static_library("adblock") {
++  deps = [
++    "//cobalt/base",
++    "//cobalt/adblock/content:copy_adblock_web_files",
++  ]
++}
+diff --git a/cobalt/adblock/content/BUILD.gn b/cobalt/adblock/content/BUILD.gn
+new file mode 100644
+index 000000000..7ea7d955
+--- /dev/null
++++ b/cobalt/adblock/content/BUILD.gn
+@@ -0,0 +1,10 @@
++copy("copy_adblock_web_files") {
++  install_content = true
++
++  sources = [
++    "adblockMain.js",
++    "adblockMain.css",
++  ]
++
++  outputs = [ "$sb_static_contents_output_data_dir/web/adblock/{{source_target_relative}}" ]
++}
 diff --git a/cobalt/browser/BUILD.gn b/cobalt/browser/BUILD.gn
 index 7dccc07a9..11c66be96 100644
 --- a/cobalt/browser/BUILD.gn
