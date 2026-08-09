@@ -240,6 +240,67 @@ index 1a1f7ba30..99bd40372 100644
 
    // 5. 6. Not needed by Cobalt.
 
+diff --git a/cobalt/media/media_module.cc b/cobalt/media/media_module.cc
+index aedc5c6f5..2b9cfd1f6 100644
+--- a/cobalt/media/media_module.cc
++++ b/cobalt/media/media_module.cc
+@@ -91,6 +91,36 @@ static std::string ExtractEncryptionScheme(const std::string& key_system) {
+   return "";
+ }
+ 
++static bool IsVp9VideoMimeType(const std::string& mime_type) {
++  if (mime_type.find("video/") == std::string::npos) {
++    return false;
++  }
++
++  const std::vector<std::string> codecs = ExtractCodecs(mime_type);
++  for (const auto& codec : codecs) {
++    if (codec.find("vp9") == 0 || codec.find("vp09") == 0) {
++      return true;
++    }
++  }
++  return false;
++}
++
++static bool Has4kVideoOutput() {
++  system_window::SystemWindow* window =
++      system_window::SystemWindow::PrimaryWindow();
++  if (!window) {
++    LOG(WARNING) << "[YTAF] Cannot probe VP9 UHD output: no primary window";
++    return false;
++  }
++
++  const math::Size output_resolution = window->GetVideoOutputResolution();
++  LOG(WARNING) << "[YTAF] VP9 video output probe: "
++               << output_resolution.width() << "x"
++               << output_resolution.height();
++  return output_resolution.width() >= 3840 &&
++         output_resolution.height() >= 2160;
++}
++
+ class CanPlayTypeHandlerStarboard : public CanPlayTypeHandler {
+  public:
+   void SetDisabledMediaCodecs(
+@@ -171,6 +201,19 @@ class CanPlayTypeHandlerStarboard : public CanPlayTypeHandler {
+     }
+     SbMediaSupportType type =
+         SbMediaCanPlayMimeAndKeySystem(mime_type.c_str(), key_system.c_str());
++
++    // Some LG webOS Starboard implementations report VP9 as unsupported for
++    // UHD profiles even though the same hardware plays VP9 UHD in the stock
++    // YouTube application.  Only override clear VP9 queries on devices whose
++    // effective video output is at least 3840x2160.  The graphics/UI surface
++    // may remain 1920x1080; GetVideoOutputResolution() accounts for the
++    // platform's video pixel ratio.
++    if (type == kSbMediaSupportTypeNotSupported && key_system.empty() &&
++        IsVp9VideoMimeType(mime_type) && Has4kVideoOutput()) {
++      LOG(WARNING) << "[YTAF] Forcing VP9 support on UHD output: "
++                   << mime_type;
++      return kSbMediaSupportTypeProbably;
++    }
+     return type;
+   }
+ 
 diff --git a/cobalt/script/script_runner.cc b/cobalt/script/script_runner.cc
 index 8463a489c..9ba687c66 100644
 --- a/cobalt/script/script_runner.cc
