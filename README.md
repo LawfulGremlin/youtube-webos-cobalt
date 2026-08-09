@@ -16,9 +16,13 @@ The latest release is available from the GitHub releases page:
 
 <https://github.com/RF1705/youtube-webos-cobalt-adfree/releases>
 
-The release uses the original Leanback app id, `youtube.leanback.v4`, to keep
-YouTube sign-in and phone pairing compatible. Installing it replaces the
-official YouTube application with the patched version.
+The standard package uses the original Leanback app id, `youtube.leanback.v4`,
+to keep YouTube sign-in and phone pairing compatible. Installing it replaces
+the official YouTube application with the patched version.
+
+A separate compatibility package is available for the LG CineBeam HU710PB-GL
+and potentially other PJTR/k7lp devices. It uses the stock PJTR app id,
+`youtube.leanback.v4-pjtr`, and must only be used on compatible devices.
 
 ## Features
 
@@ -50,13 +54,15 @@ speeds range from 0.25× to 2×.
 sudo apt install jq git sed binutils squashfs-tools rename findutils xz-utils
 ```
 
-The patched app uses `youtube.leanback.v4` and therefore replaces the official
-YouTube application. Keep a copy of the official package if you want to restore
-it later.
+The standard patched app uses `youtube.leanback.v4` and therefore replaces the
+official YouTube application. The PJTR compatibility package uses
+`youtube.leanback.v4-pjtr` and replaces the stock PJTR YouTube application.
+Keep a copy of the appropriate official package if you want to restore it later.
 
 ## Tested Cobalt baseline
 
-The closest currently tested match to a working stock LG installation is:
+The closest currently tested match to a working stock LG installation for the
+standard package is:
 
 ```text
 Cobalt:       23.lts.6
@@ -71,6 +77,16 @@ raises Cobalt's combined persistent cookie/local-storage limit from 4 MiB to
 16 MiB. It also logs the serialized storage size and rejects oversized writes
 explicitly instead of failing silently.
 
+The separate PJTR/k7lp compatibility package uses:
+
+```text
+Cobalt:       23.lts.6
+Starboard:    API 12
+Architecture: ARMv7 softfp
+Starter:      stock LG k7lp/PJTR Cobalt starter
+App ID:       youtube.leanback.v4-pjtr
+```
+
 ### Tested devices
 
 The issue tracker contains the following explicit confirmations. A device is
@@ -82,12 +98,14 @@ limitations are included in the result column.
 
 | Model | webOS | Firmware | Release | Confirmed result |
 | --- | --- | --- | --- | --- |
-| LG C1 OLED | 6.5.0 | 03.51.16 | v1.2.0 | Clean installation, sign-in, playback, ad blocking and SponsorBlock work. ([#33](https://github.com/RF1705/youtube-webos-cobalt-adfree/issues/33#issuecomment-5114026899)) |
+| LG C1 OLED | 6.5.0 | 03.51.16 | v1.2.0 standard package | Clean installation, sign-in, playback, ad blocking and SponsorBlock work. ([#33](https://github.com/RF1705/youtube-webos-cobalt-adfree/issues/33#issuecomment-5114026899)) |
+| LG CineBeam HU710PB-GL | 6.3.1 | 03.00.27 | v1.2.1 PJTR package | Installation, home screen, sign-in, playback, ad blocking, SponsorBlock and launch after restart work. webOS required selecting **Update** in the Content Store prompt before the first successful launch. ([#1](https://github.com/RF1705/youtube-webos-cobalt-adfree/issues/1#issuecomment-5155709661)) |
 
-v1.2.1 uses the same Cobalt 23.lts.6 / Starboard 13 compatibility baseline as
-v1.2.0, but has not yet received a separate device confirmation in the issue
-tracker. A separate C1 report for v1.2.0 confirms that 4K was still unavailable
-on that device ([#2](https://github.com/RF1705/youtube-webos-cobalt-adfree/issues/2#issuecomment-5116177545)).
+The standard v1.2.1 package uses the same Cobalt 23.lts.6 / Starboard 13
+compatibility baseline as v1.2.0, but has not yet received a separate standard
+package device confirmation in the issue tracker. A C1 report for v1.2.0
+confirms that 4K was still unavailable on that device
+([#2](https://github.com/RF1705/youtube-webos-cobalt-adfree/issues/2#issuecomment-5116177545)).
 
 #### Confirmed on earlier releases
 
@@ -109,12 +127,11 @@ on that device ([#2](https://github.com/RF1705/youtube-webos-cobalt-adfree/issue
 | LG OLED65C15LA | 6.5.3 | 03.53.45 | v1.1.0 | Works normally; later tested releases did not start on the same TV. ([#10](https://github.com/RF1705/youtube-webos-cobalt-adfree/issues/10#issuecomment-5094616714)) |
 | LG OLED48C14LB | 6.5.3-47 | Not reported | v1.1.1 | Playback works, but the progress bar and chapter scrubbing can become incorrect. ([#26](https://github.com/RF1705/youtube-webos-cobalt-adfree/issues/26#issuecomment-5120064232)) |
 | LG G1 | Not reported | Not reported | v1.1.6 | App and video controls work, but 4K is unavailable. ([#2](https://github.com/RF1705/youtube-webos-cobalt-adfree/issues/2#issuecomment-5106892684)) |
-| LG CineBeam HU710PB-GL | 6.3.1 | 03.00.27 | Custom v1.1.6 package | Home screen, playback and AdFree features work when packaged with the device's stock `k7lp` starter. Generic release packages still crash. ([#1](https://github.com/RF1705/youtube-webos-cobalt-adfree/issues/1#issuecomment-5099984588)) |
 
 These are individual community reports, not guarantees for every regional
 variant of the same model. Firmware, installation method, sign-in state and the
-exact release can change the result. In particular, the repacked webOS 5.5 and
-custom `k7lp` entries are not confirmations of the normal downloadable IPK.
+exact release can change the result. In particular, the repacked webOS 5.5
+entry is not a confirmation of the normal downloadable standard IPK.
 
 Community-reported device, firmware and feature results are collected in the
 [device compatibility matrix](docs/device-compatibility.md). The matrix also
@@ -127,20 +144,49 @@ starter from a working stock YouTube installation. See the
 
 ## Installation
 
-Download a release `.ipk` package and install it using one of the following methods.
+Download the package matching your device from the release page and install it
+using one of the following methods.
 
-Recommended release package:
+### Standard package
+
+Use this package for the standard `youtube.leanback.v4` application:
 
 ```text
 youtube.leanback.v4_1.2.1_arm.ipk
 ```
 
 The release also contains `youtube.leanback.v4.manifest.json` for installation
-through the webOS Homebrew Channel.
+of the standard package through the webOS Homebrew Channel.
+
+### PJTR/k7lp compatibility package
+
+Use this package only for the LG CineBeam HU710PB-GL or another confirmed
+PJTR/k7lp device using the stock app id `youtube.leanback.v4-pjtr`:
+
+```text
+youtube.leanback.v4-pjtr_1.2.1_arm.ipk
+```
+
+SHA-256:
+
+```text
+6dce6805b13cc008743d3cfb5d9ec45018728303e0b89c4fb0655636fb4589cb
+```
+
+Because this package uses the same app id as the stock PJTR YouTube
+application, webOS may display an **Update or Launch** prompt after installation.
+On the tested HU710PB-GL, selecting **Update** and completing the Content Store
+update was required before the application could be launched. The patched app
+continued to work normally afterwards.
+
+The PJTR package is an unofficial community compatibility build containing a
+stock LG Cobalt starter. The original starter archive and standalone proprietary
+binaries are not distributed separately.
 
 ### Custom Homebrew Channel repository
 
-This project also provides a custom Homebrew Channel repository:
+This project also provides a custom Homebrew Channel repository for the
+standard package:
 
 ```text
 https://raw.githubusercontent.com/RF1705/youtube-webos-cobalt-adfree/main/repo.json
@@ -149,10 +195,13 @@ https://raw.githubusercontent.com/RF1705/youtube-webos-cobalt-adfree/main/repo.j
 In Homebrew Channel, open **Settings**, choose **Add repository**, and enter
 the URL above.
 
-> **Important:** This app uses the same app id (`youtube.leanback.v4`) as the
-> YouTube AdFree entry in the default WebOSBrew repository. Do not install both
-> variants at the same time: choose one repository entry and uninstall the
-> other variant first.
+> **Important:** The standard package uses the same app id
+> (`youtube.leanback.v4`) as the YouTube AdFree entry in the default WebOSBrew
+> repository. Do not install both variants at the same time: choose one
+> repository entry and uninstall the other variant first.
+
+The PJTR/k7lp package is currently available as a manual release download and
+is not included in the custom Homebrew Channel repository.
 
 ### Install via webOS Device Manager
 
@@ -160,14 +209,24 @@ Use the webOS Device Manager and install the downloaded `.ipk` package.
 
 ### Install via ares-cli
 
+Standard package:
+
 ```sh
-ares-install youtube.leanback.v4_*.ipk
+ares-install youtube.leanback.v4_1.2.1_arm.ipk
+```
+
+PJTR/k7lp package:
+
+```sh
+ares-install youtube.leanback.v4-pjtr_1.2.1_arm.ipk
 ```
 
 ### Install via SSH on rooted/Homebrew webOS
 
-Download the release package to `/media/developer/temp` and install it through
-the webOS app install service:
+Download the appropriate release package to `/media/developer/temp` and install
+it through the webOS app install service.
+
+Standard package:
 
 ```sh
 mkdir -p /media/developer/temp
@@ -176,10 +235,19 @@ wget https://github.com/RF1705/youtube-webos-cobalt-adfree/releases/download/v1.
 luna-send-pub -i 'luna://com.webos.appInstallService/dev/install' '{"id":"com.ares.defaultName","ipkUrl":"/media/developer/temp/youtube.leanback.v4_1.2.1_arm.ipk","subscribe":true}'
 ```
 
+PJTR/k7lp package:
+
+```sh
+mkdir -p /media/developer/temp
+cd /media/developer/temp
+wget https://github.com/RF1705/youtube-webos-cobalt-adfree/releases/download/v1.2.1/youtube.leanback.v4-pjtr_1.2.1_arm.ipk
+luna-send-pub -i 'luna://com.webos.appInstallService/dev/install' '{"id":"com.ares.defaultName","ipkUrl":"/media/developer/temp/youtube.leanback.v4-pjtr_1.2.1_arm.ipk","subscribe":true}'
+```
+
 After installation, the downloaded package can be removed:
 
 ```sh
-rm /media/developer/temp/youtube.leanback.v4_1.2.1_arm.ipk
+rm /media/developer/temp/youtube.leanback.v4*_1.2.1_arm.ipk
 ```
 
 ## Patch an official YouTube IPK
@@ -242,6 +310,9 @@ Override `PROJECT_VERSION` when preparing another release. The starter archive
 is private input and must remain outside Git. The build checks the exact file
 list, app id, k7lp metadata and known SHA-256 hashes of `cobalt` and
 `appinfo.json` before packaging.
+
+Only the finished compatibility IPK is published. Do not publish the original
+starter archive, a standalone stock `cobalt` binary or device dump files.
 
 By default the patched package uses:
 
@@ -319,17 +390,20 @@ webOS Cobalt starter is available.
 
 Autostart can make the app appear as an input source next to HDMI/Live TV.
 
-Enable autostart:
+Enable autostart for the standard package:
 
 ```sh
 luna-send-pub -n 1 'luna://com.webos.service.eim/addDevice' '{"appId":"youtube.leanback.v4","pigImage":"","mvpdIcon":""}'
 ```
 
-Disable autostart:
+Disable autostart for the standard package:
 
 ```sh
 luna-send-pub -n 1 'luna://com.webos.service.eim/deleteDevice' '{"appId":"youtube.leanback.v4"}'
 ```
+
+For the PJTR package, replace `youtube.leanback.v4` with
+`youtube.leanback.v4-pjtr` in these commands.
 
 Autostart may improve startup time because the app can stay loaded in the background. This can increase idle memory usage.
 
@@ -412,6 +486,9 @@ Special thanks to these projects and maintainers whose work made this project po
 * [NicholasBly/youtube-webos](https://github.com/NicholasBly/youtube-webos)
 * [webosbrew/youtube-webos](https://github.com/webosbrew/youtube-webos)
 * [UltraHDR/youtube-webos-cobalt](https://github.com/UltraHDR/youtube-webos-cobalt)
+
+Thanks to the contributors in [issue #1](https://github.com/RF1705/youtube-webos-cobalt-adfree/issues/1)
+for providing the PJTR starter, device information and compatibility testing.
 
 If this project helps you, you can support the maintainer here:
 
