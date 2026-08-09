@@ -87,6 +87,27 @@ jobs:
           test -f "base-package/$base_name"
           echo "BASE_IPK=base-package/$base_name" >> "$GITHUB_ENV"
 
+      - name: Prepare Cobalt source and build containers
+        env:
+          BUILD_PARALLEL: ${{ inputs.build_parallel }}
+        run: |
+          mkdir -p output workdir
+          git clone --depth 1 --branch 23.lts.6 \
+            https://github.com/youtube/cobalt.git \
+            workdir/cobalt-23.lts.6
+          git -C workdir/cobalt-23.lts.6 apply --recount \
+            "$GITHUB_WORKSPACE/cobalt-patches/cobalt-23.lts.6.patch"
+          touch workdir/cobalt-23.lts.6/.patched
+
+          (
+            cd workdir/cobalt-23.lts.6
+            export NINJA_PARALLEL="$BUILD_PARALLEL"
+            export SB_API_VERSION=13
+            docker-compose build base
+            docker-compose build build-base
+            docker-compose build build-evergreen
+          ) 2>&1 | tee output/vp9-4k-cobalt-build.log
+
       - name: Build patched Cobalt runtime
         env:
           BUILD_PARALLEL: ${{ inputs.build_parallel }}
@@ -94,7 +115,7 @@ jobs:
           mkdir -p output
           make cobalt-bin/23.lts.6-13/libcobalt.so \
             BUILD_COBALT_PARALLEL="$BUILD_PARALLEL" \
-            2>&1 | tee output/vp9-4k-cobalt-build.log
+            2>&1 | tee -a output/vp9-4k-cobalt-build.log
           test -s cobalt-bin/23.lts.6-13/libcobalt.so
 
       - name: Archive patched runtime
