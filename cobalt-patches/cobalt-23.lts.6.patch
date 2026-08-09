@@ -706,16 +706,17 @@ index 26590ddfb..f37fe2575 100644
     && nvm use default
 
 diff --git a/docker/linux/evergreen/Dockerfile b/docker/linux/evergreen/Dockerfile
-index f03d18297..0f6a61cfc 100644
+index f03d18297..050ca8b8e 100644
 --- a/docker/linux/evergreen/Dockerfile
 +++ b/docker/linux/evergreen/Dockerfile
-@@ -23,5 +23,5 @@ RUN apt update -qqy \
+@@ -23,5 +23,6 @@ RUN apt update -qqy \
          g++-multilib \
      && /opt/clean-after-apt.sh
 
 -CMD gn gen ${OUTDIR}/${PLATFORM}_${CONFIG:-debug} --args="target_platform=\"${PLATFORM}\" build_type=\"${CONFIG:-debug}\" target_cpu=\"${TARGET_CPU}\" sb_api_version=${SB_API_VERSION:-14}" && \
 -    ninja -v -j ${NINJA_PARALLEL} -C ${OUTDIR}/${PLATFORM}_${CONFIG:-debug} ${TARGET:-cobalt_install}
-+CMD gn gen ${OUTDIR}/${PLATFORM}-sbversion-${SB_API_VERSION:-14}_${CONFIG:-debug} --args="target_platform=\"${PLATFORM}\" build_type=\"${CONFIG:-debug}\" target_cpu=\"${TARGET_CPU}\" sb_api_version=${SB_API_VERSION:-14}" && \
++CMD git config --global --add safe.directory /code && \
++    gn gen ${OUTDIR}/${PLATFORM}-sbversion-${SB_API_VERSION:-14}_${CONFIG:-debug} --args="target_platform=\"${PLATFORM}\" build_type=\"${CONFIG:-debug}\" target_cpu=\"${TARGET_CPU}\" sb_api_version=${SB_API_VERSION:-14}" && \
 +    ninja -v -j ${NINJA_PARALLEL} -C ${OUTDIR}/${PLATFORM}-sbversion-${SB_API_VERSION:-14}_${CONFIG:-debug} ${TARGET:-cobalt_install}
 diff --git a/docker/linux/linux-x64x11/Dockerfile b/docker/linux/linux-x64x11/Dockerfile
 index e28bacb9f..9d0291a49 100644
