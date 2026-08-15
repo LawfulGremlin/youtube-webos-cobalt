@@ -3,6 +3,8 @@
 # .github/workflows/sync-upstream.yml).
 .gitattributes merge=ours
 FORK.md merge=ours
+AGENTS.md merge=ours
+CLAUDE.md merge=ours
 README.md merge=ours
 repo.json merge=ours
 .github/workflows/sync-upstream.yml merge=ours
