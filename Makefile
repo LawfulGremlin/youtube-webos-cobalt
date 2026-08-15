@@ -14,10 +14,7 @@ PACKAGE_NAME?=youtube.leanback.v4
 PACKAGE_NAME_TARGET=$(PACKAGE_NAME)
 PACKAGE_DISPLAY_NAME?=YouTube webOS Cobalt AdFree
 PROJECT_VERSION?=1.2.1
-# fork: upstream's 23.lts.6 prebuilts live only in their private images
-# repo; stay on our checked-in 23.lts.4 until we build 23.lts.6 from
-# source (cobalt-patches/cobalt-23.lts.6.patch) and commit the archive.
-PACKAGE_COBALT_VERSION?=23.lts.4
+PACKAGE_COBALT_VERSION?=23.lts.6
 PACKAGE_VERSION?=$(PROJECT_VERSION)
 PACKAGE_IPK_BUILD=$(PACKAGE_NAME_TARGET)_$(PACKAGE_VERSION)_arm.ipk
 PACKAGE_OUTPUT_DIR?=output
