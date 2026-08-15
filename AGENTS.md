@@ -38,6 +38,10 @@ touching fork features. The rules below are the working routine.
    default binding — rebindable and clearable — never as upstream's hard listener.
 5. Build the bundle and run `node webapp/src/fork/test.mjs` before committing; hardware-verify
    on a real TV before any release (IPKs are ARM-only — the emulator cannot run them).
+   **When the Cobalt runtime or its patch changed, "verifies" includes the quality ladder**:
+   check the player's quality menu against the same video in a desktop browser. v1.1.0
+   launched and played fine yet capped at 720p, because an unreleased upstream VP9
+   experiment in the patch broke format selection — a launch check alone said nothing.
 
 ## Releases
 
