@@ -13,7 +13,7 @@
       "iconUri": "https://raw.githubusercontent.com/LawfulGremlin/youtube-webos-cobalt/main/assets/largeIcon.png",
       "manifest": {
         "id": "com.cobalt.youtube.adfree",
-        "version": "1.1.0",
+        "version": "1.0.3",
         "type": "web",
         "title": "YouTube Cobalt AdFree",
         "appDescription": "Cobalt-based YouTube client for webOS with ad blocking and SponsorBlock support.",
@@ -21,9 +21,9 @@
         "sourceUrl": "https://github.com/LawfulGremlin/youtube-webos-cobalt",
         "rootRequired": false,
         "ipkHash": {
-          "sha256": "7a0a5d427b9564b6a7609d78b2c869b5ec23d7ed46f9315949337abf695f02e6"
+          "sha256": "834520e49b44224620f9962fccf6d24f4fc3b3d715926f42e2b8f64ac49f823c"
         },
-        "ipkUrl": "https://github.com/LawfulGremlin/youtube-webos-cobalt/releases/download/v1.1.0/com.cobalt.youtube.adfree_1.1.0_arm.ipk"
+        "ipkUrl": "https://github.com/LawfulGremlin/youtube-webos-cobalt/releases/download/v1.0.3/com.cobalt.youtube.adfree_1.0.3_arm.ipk"
       }
     }
   ]
