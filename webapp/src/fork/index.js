@@ -6,6 +6,8 @@ import { configRead, configWrite } from '../config.js';
 import './fork.css';
 import { checkboxTools } from '../checkboxTools.js';
 import { showNotification } from '../ui.js';
+import { text as languageText } from '../languages/index.js';
+import { toggleSubtitles } from '../subtitle-shortcut.js';
 import { filterTvResponse, getUnmatchedShoppingKeys } from './filters.mjs';
 import { stepTarget } from './frame-step.mjs';
 import { nextPlaybackRate } from './playback-speed.mjs';
@@ -25,10 +27,12 @@ function bindingConfigKey(slotId) {
 // Slots not listed default to 'none', which releases the key to the TV app —
 // that includes all three colour buttons.
 //
+//   0      subtitles on/off           (matches upstream's hardwired digit 0)
 //   1 / 3  playback speed down / up   (matches upstream's hardwired digits)
 //   4 / 6  skip 15 frames back / forward
 //   7 / 9  step 1 frame back / forward
 const SLOT_DEFAULTS = {
+  key_0: 'subtitles_toggle',
   key_1: 'playback_speed_down',
   key_3: 'playback_speed_up',
   key_4: 'frame_skip_back',
@@ -52,7 +56,7 @@ const SLOT_DEFAULTS = {
 // resetting instead. If bindings ever need to survive a bump, record the
 // defaults in force at each version and compare against the version the config
 // was written at — not against the values alone.
-const SHORTCUT_DEFAULTS_VERSION = 5;
+const SHORTCUT_DEFAULTS_VERSION = 6;
 
 const FORK_DEFAULTS = {
   forkRemoveShorts: false
@@ -257,6 +261,28 @@ function adjustPlaybackRate(direction) {
 
 registerShortcutAction({ key: 'playback_speed_up', label: 'Playback Speed Up', scope: 'VIDEO', handler: () => adjustPlaybackRate(1), burst: true });
 registerShortcutAction({ key: 'playback_speed_down', label: 'Playback Speed Down', scope: 'VIDEO', handler: () => adjustPlaybackRate(-1), burst: true });
+
+// Subtitle toggle, upstream's subtitle-shortcut.js (v1.2.1). Upstream
+// hardwires it to digit 0 in ui.js; per this fork's principle, upstream's
+// hardcoded keys become registry actions with that key as the (rebindable,
+// clearable) default — see SLOT_DEFAULTS. Reuses upstream's localized
+// notification strings from languages/*.js.
+function doToggleSubtitles() {
+  toggleSubtitles((state, trackName) => {
+    const messageKey = {
+      on: 'subtitleOn',
+      off: 'subtitleOff',
+      unavailable: 'subtitleUnavailable'
+    }[state];
+    let message = languageText('ui', messageKey || 'subtitleUnavailable');
+    if (state === 'on' && trackName) {
+      message += ' (' + trackName + ')';
+    }
+    showNotification(message, 1800);
+  });
+}
+
+registerShortcutAction({ key: 'subtitles_toggle', label: 'Subtitles On/Off', scope: 'VIDEO', handler: doToggleSubtitles, burst: false });
 
 // --- Key dispatch ------------------------------------------------------------
 

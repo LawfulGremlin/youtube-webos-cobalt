@@ -189,12 +189,17 @@ adding features itself.
 - Shortcut keys: the settings menu has a binding row per bindable remote key —
   red/yellow/blue color buttons (green opens the menu itself) and number keys 0-9.
   Enter/left/right on a row cycles its action: None, Frame Step Forward/Backward,
-  Skip 15 Frames Forward/Backward. Defaults: red = 1 frame back, blue = 1 frame
-  forward; everything else None (unbound keys fall through to the TV app
-  untouched). New features should `registerShortcutAction()` in
-  `webapp/src/fork/index.js` instead of installing their own key listeners —
-  same API as youtube-webos's `fork-extensions/shortcut-registry.js`, so
-  actions port across the two forks unchanged.
+  Skip 15 Frames Forward/Backward, Playback Speed Up/Down, Subtitles On/Off.
+  Defaults are number-pad back/forward pairs: 0 = subtitles, 1/3 = playback
+  speed, 4/6 = 15-frame skip, 7/9 = single-frame step; colour buttons and
+  everything else None (unbound keys fall through to the TV app untouched).
+  New features should `registerShortcutAction()` in `webapp/src/fork/index.js`
+  instead of installing their own key listeners — same API as youtube-webos's
+  `fork-extensions/shortcut-registry.js`, so actions port across the two forks
+  unchanged. Principle: when upstream ships a feature on a hardcoded key (its
+  subtitle toggle on digit 0, playback speed on 1/3), we adopt it as a registry
+  action defaulting to upstream's key — rebindable and clearable — rather than
+  taking the hardcoded listener.
 - Deliberately not ported: 4K/quality forcing (capped by the Cobalt binary + DRM,
   not fixable in JS), auto-login (Cobalt's native account flow already works), UI
   themes/OLED/cosmetic CSS (WebView-specific, poor fit for Cobalt's CSS subset).
