@@ -101,99 +101,13 @@ JSON.parse = function () {
   return result;
 };
 
-// fork: the JSON.parse chain above never sees the feed. Measured live on
-// hardware: a full home-feed scroll produced 3 JSON.parse calls, none of them
-// carrying adSlotRenderer — while an XHR tap saw /youtubei/v1/browse return a
-// body containing one, and the sponsored tile sat on screen inside
-// ytlr-ad-slot-renderer the whole time. The app parses its network responses
-// with something private, so string-level hooks on the page's JSON.parse
-// (upstream adblock.js included) are blind to feed payloads. The one place
-// every consumer must pass is the XHR object itself: shadow the instance's
-// responseText/response getters at open() time (verified live: the prototype
-// getters are reachable and an own accessor shadows them), filter lazily on
-// first read, cache per raw body. Player/stats endpoints are deliberately not
-// touched — feed surfaces only.
-const YOUTUBEI_FEED_RE = /\/youtubei\/v1\/(browse|search|next|reel\/reel_item_watch)/;
-window.__ytafXhrFiltered = 0; // dev counter, checked over CDP
-(function () {
-  const proto = XMLHttpRequest.prototype;
-  const textDesc = Object.getOwnPropertyDescriptor(proto, 'responseText');
-  const respDesc = Object.getOwnPropertyDescriptor(proto, 'response');
-  if (!textDesc || !textDesc.get) return;
-  const origOpen = proto.open;
-
-  function makeFilteredGetter(xhr) {
-    return function () {
-      const raw = textDesc.get.call(xhr);
-      if (typeof raw !== 'string' || !raw) return raw;
-      if (xhr.__ytafFilteredFor === raw) return xhr.__ytafFiltered;
-
-      let out = raw;
-      try {
-        const removeAds = configRead('enableAdBlock');
-        const removeShorts = configRead('forkRemoveShorts');
-        if (removeAds || removeShorts) {
-          // prevParse, NOT the chained JSON.parse: the chain's filter would
-          // mutate during parsing and leave our own removed-count at 0, which
-          // would skip the re-stringify and hand back the unfiltered raw.
-          const data = prevParse(raw);
-          const removed = filterTvResponse(data, { removeAds, removeShorts });
-          if (removed) {
-            out = JSON.stringify(data);
-            window.__ytafXhrFiltered += removed;
-            console.info(
-              '[ytaf-fork] filtered ' + removed + ' item(s) from ' + (xhr.__ytafUrl || 'youtubei')
-            );
-          }
-        }
-      } catch (err) {
-        // fail open: hand back the raw body rather than break the feed
-      }
-      xhr.__ytafFilteredFor = raw;
-      xhr.__ytafFiltered = out;
-      return out;
-    };
-  }
-
-  proto.open = function (method, url) {
-    // Instances are reusable: open() decides scope per request, so a shadow
-    // installed for a feed URL must come off (with its cache) when the same
-    // instance is reopened for anything else — deleting the configurable own
-    // accessors falls back to the prototype getters.
-    if (this.__ytafUrl !== undefined) {
-      delete this.__ytafUrl;
-      delete this.__ytafFilteredFor;
-      delete this.__ytafFiltered;
-      try {
-        delete this.responseText;
-        delete this.response;
-      } catch (err) {
-        // not ours to delete — leave it
-      }
-    }
-    if (YOUTUBEI_FEED_RE.test(String(url))) {
-      this.__ytafUrl = String(url).slice(0, 100);
-      try {
-        const filtered = makeFilteredGetter(this);
-        Object.defineProperty(this, 'responseText', { configurable: true, get: filtered });
-        if (respDesc && respDesc.get) {
-          const xhr = this;
-          Object.defineProperty(this, 'response', {
-            configurable: true,
-            get: function () {
-              // text responses only; a structured responseType passes through
-              if (!xhr.responseType || xhr.responseType === 'text') return filtered();
-              return respDesc.get.call(xhr);
-            }
-          });
-        }
-      } catch (err) {
-        // engine refused the shadow — the JSON.parse chain still covers what it covers
-      }
-    }
-    return origOpen.apply(this, arguments);
-  };
-})();
+// fork: an XHR responseText-shadow feed filter used to live here. Removed
+// 2026-08-15 as measured dead code: instrumenting XMLHttpRequest.open on
+// hardware showed 0 of 73 requests hitting the /youtubei/v1/(browse|search|
+// next|reel) endpoints it scoped — this client fetches its feed through some
+// other transport, so the shadow never filtered anything. Feed-ad and Shorts
+// removal ride upstream's DOM hider plus the JSON.parse chain above for
+// whatever payloads do pass through it.
 
 // fork: belt-and-braces for the in-video shopping QR card. The JSON filter above
 // keys off shoppingTimelyActionRenderer, which is *inferred* from the DOM tag
@@ -268,17 +182,13 @@ registerShortcutAction({ key: 'playback_speed_down', label: 'Playback Speed Down
 // clearable) default — see SLOT_DEFAULTS. Reuses upstream's localized
 // notification strings from languages/*.js.
 function doToggleSubtitles() {
-  toggleSubtitles((state, trackName) => {
+  toggleSubtitles((state) => {
     const messageKey = {
       on: 'subtitleOn',
       off: 'subtitleOff',
       unavailable: 'subtitleUnavailable'
     }[state];
-    let message = languageText('ui', messageKey || 'subtitleUnavailable');
-    if (state === 'on' && trackName) {
-      message += ' (' + trackName + ')';
-    }
-    showNotification(message, 1800);
+    showNotification(languageText('ui', messageKey || 'subtitleUnavailable'), 1800);
   });
 }
 
@@ -287,7 +197,14 @@ registerShortcutAction({ key: 'subtitles_toggle', label: 'Subtitles On/Off', sco
 // --- Key dispatch ------------------------------------------------------------
 
 function isWatchContext() {
-  return /[?&#]v=/.test(String(window.location.href) + String(window.location.hash));
+  // Shorts pages carry no v= in the URL; upstream's equivalent gate
+  // (isPlayerPage) accepts them via the body class, so ours does too.
+  return (
+    /[?&#]v=/.test(String(window.location.href) + String(window.location.hash)) ||
+    Boolean(
+      document.body && document.body.classList.contains('WEB_PAGE_TYPE_SHORTS')
+    )
+  );
 }
 
 function isMenuOpen() {

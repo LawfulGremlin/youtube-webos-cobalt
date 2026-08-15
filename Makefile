@@ -112,7 +112,9 @@ STANDALONE_POC_STARTER_SOURCE?=workdir/ipk/cobalt
 
 
 .PHONY: all
-all: images
+# fork: no `images` prerequisite — upstream clones its private images repo
+# here; every input this fork needs is checked in.
+all:
 	$(MAKE) package PACKAGE="$(PACKAGE)"
 
 .PHONY: help
@@ -167,7 +169,8 @@ package: check-package
 	$(MAKE) $(PACKAGE_TARGET)
 
 .PHONY: compatibility-test-package
-compatibility-test-package: images
+# fork: no `images` prerequisite — the compat base IPK is checked in.
+compatibility-test-package:
 	$(MAKE) package \
 	  PACKAGE="$(COMPAT_TEST_OFFICIAL_YOUTUBE_IPK)" \
 	  PACKAGE_NAME="$(COMPAT_TEST_PACKAGE_NAME)" \
@@ -475,8 +478,8 @@ ares-package:
 		npm install --save-dev @webos-tools/cli; \
 		aresCmd=node_modules/.bin/ares-package; \
 	fi; \
-	python3 $(PACKAGE_MTIME_NORMALIZER) --mtime $(IPK_MEMBER_MTIME) $(WORKDIR)/ipk; \
-	$$aresCmd -v -c $(WORKDIR)/ipk; \
+	python3 $(PACKAGE_MTIME_NORMALIZER) --mtime $(IPK_MEMBER_MTIME) $(WORKDIR)/ipk && \
+	$$aresCmd -v -c $(WORKDIR)/ipk && \
 	$$aresCmd -v --outdir $(WORKDIR)/ipk-output $(WORKDIR)/ipk
 
 .PHONY: ares-package-docker

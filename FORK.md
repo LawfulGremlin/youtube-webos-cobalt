@@ -35,17 +35,15 @@ adding features itself.
   `test.mjs` (run by `fork-ci.yml`).
 - Current fork features: **Remove Shorts** toggle (shelves + tiles), **feed ad item
   removal** (adSlotRenderer/reel ads + sponsored tiles, rides the existing
-  AdBlock toggle — note it must intercept at the **XHR layer**, not JSON.parse:
-  measured live, a full feed scroll produced 3 JSON.parse calls with no
-  adSlotRenderer in any of them while /youtubei/v1/browse returned one over
-  XHR and the sponsored tile rendered on screen. The app parses network
-  responses privately, so the page's JSON.parse chain — upstream adblock.js
-  included — never sees feed payloads. fork/index.js shadows responseText/
-  response per XHR instance at open() time for feed endpoints only
-  (browse/search/next/reel), filters lazily on first read, caches per body,
-  and fails open. Verified live: prototype getters reachable, own accessor
-  shadows them against a real network read, shadow present on feed XHRs and
-  absent on others), a
+  AdBlock toggle — via the JSON.parse chain in fork/index.js plus upstream's
+  DOM hider. An XHR responseText-shadow layer scoped to
+  /youtubei/v1/(browse|search|next|reel) was built on an early live
+  measurement that saw /browse carry an ad node over XHR, but a later
+  instrumented pass showed the app never calls those endpoints at all
+  (0 of 73 XMLHttpRequest.open calls matched — the feed arrives by some
+  transport JS-level hooks don't see), so the shadow was removed 2026-08-15
+  as measured dead code; the practical ad-block story on the feed is
+  upstream's DOM hider), a
   **shortcut-key registry** with **frame stepping** actions (both ported from
   LawfulGremlin/youtube-webos fork-extensions), and an end-of-video clamp in
   `sponsorblock.js` that stops outro skips from looping the video. These are the
