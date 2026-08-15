@@ -420,7 +420,10 @@ $(WORKDIR)/ipk/content/app/cobalt/content/web/adblock: $(WEBAPP_OUTPUT_STAMP)
 	fi
 
 ifneq ("$(PACKAGE_NAME_TARGET)","$(PACKAGE_NAME_OFFICIAL)")
-	grep -l -R "$(PACKAGE_NAME_OFFICIAL)" $(WORKDIR)/ipk | grep .json | xargs -n 1 sed -i.bak "s/$(PACKAGE_NAME_OFFICIAL)/$(PACKAGE_NAME_TARGET)/g"
+# fork: -r (no-run-if-empty) — upstream's jq now writes .id directly, so this
+# sweep can match zero files; upstream never runs it (their builds keep the
+# official id) and bare xargs errors on empty input.
+	grep -l -R "$(PACKAGE_NAME_OFFICIAL)" $(WORKDIR)/ipk | grep .json | xargs -r -n 1 sed -i.bak "s/$(PACKAGE_NAME_OFFICIAL)/$(PACKAGE_NAME_TARGET)/g"
 	find $(WORKDIR)/ipk -name '*.bak' -delete
 endif
 
