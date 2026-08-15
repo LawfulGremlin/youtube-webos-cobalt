@@ -102,7 +102,10 @@ if s1.get('videoID') != video_id:
     problems.append('wrong video: %r' % s1.get('videoID'))
 if abs(s1.get('t', 0) - pos) > 20:
     problems.append('position off: %ss vs requested %ss' % (s1.get('t'), pos))
-if s1.get('readyState', 0) < 2 or s2.get('readyState', 0) < 2:
+# Judge readiness on the second sample only: a slow load can legitimately
+# still be at readyState 1 when the first sample is taken (seen on lg48),
+# and the video then plays fine.
+if s2.get('readyState', 0) < 2:
     problems.append(
         'media not actually loaded (readyState %s -> %s, need >=2/HAVE_CURRENT_DATA)'
         % (s1.get('readyState'), s2.get('readyState'))
