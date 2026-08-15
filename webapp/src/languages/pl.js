@@ -6,6 +6,8 @@ export default {
     interaction: 'Pomiń przypomnienia o subskrypcji i polubieniu', selfpromo: 'Pomiń autopromocję',
     musicOfftopic: 'Pomiń muzykę/treści nie na temat', preview: 'Pomiń zapowiedź/podsumowanie',
     filler: 'Pomiń wypełniacze/dygresje', hook: 'Pomiń wstęp/powitanie',
+    subtitleOn: 'Napisy: WŁĄCZONE', subtitleOff: 'Napisy: WYŁĄCZONE',
+    subtitleUnavailable: 'Napisy niedostępne',
     openHint: 'Naciśnij [ZIELONY], aby otworzyć dodatki YouTube'
   },
   sponsorBlock: {

@@ -9,6 +9,10 @@ import { configRead, configWrite } from './config.js';
 import { checkboxTools } from './checkboxTools.js';
 import { text as languageText } from './languages/index.js';
 import { categoryColors } from './sponsorblock.js';
+// fork: upstream wires its subtitle toggle here as a hardcoded digit-0
+// listener (isSubtitleShortcut/toggleSubtitles from subtitle-shortcut.js).
+// Not taken — it's registered as a bindable shortcut-registry action in
+// webapp/src/fork/index.js instead, defaulting to key 0.
 
 let lastTabIndex = 0;
 

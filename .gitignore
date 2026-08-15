@@ -10,11 +10,14 @@
 /webapp/node_modules
 /webapp/output
 /cobalt-bin/*
+# fork: we commit prebuilt runtime archives and official base IPKs (upstream
+# keeps them in a private images repo we can't access).
 !/cobalt-bin/*.xz
 .DS_Store
 
 # Local device settings and generated build artifacts
 /.webos/
+/.private-images/
 /downloads/
 /ipks-official/*.tar.gz
 /webapp/.build-stamp*

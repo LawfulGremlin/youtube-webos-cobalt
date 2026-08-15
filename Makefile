@@ -4,22 +4,31 @@ SHELL=/bin/bash
 
 CURRENT_DIR := $(CURDIR)
 
-PACKAGE?=
-PACKAGE_NAME_OFFICIAL=youtube.leanback.v4
+PRIVATE_IMAGES_REPOSITORY?=https://github.com/RF1705/YouTube-webos-images.git
+PRIVATE_IMAGES_DIR?=.private-images
+PRIVATE_IMAGES_REF?=main
+
+PACKAGE?=$(OFFICAL_YOUTUBE_IPK)
+PACKAGE_NAME_OFFICIAL?=youtube.leanback.v4
 PACKAGE_NAME?=youtube.leanback.v4
 PACKAGE_NAME_TARGET=$(PACKAGE_NAME)
 PACKAGE_DISPLAY_NAME?=YouTube webOS Cobalt AdFree
-PROJECT_VERSION?=1.1.6
+PROJECT_VERSION?=1.2.1
+# fork: upstream's 23.lts.6 prebuilts live only in their private images
+# repo; stay on our checked-in 23.lts.4 until we build 23.lts.6 from
+# source (cobalt-patches/cobalt-23.lts.6.patch) and commit the archive.
 PACKAGE_COBALT_VERSION?=23.lts.4
 PACKAGE_VERSION?=$(PROJECT_VERSION)
 PACKAGE_IPK_BUILD=$(PACKAGE_NAME_TARGET)_$(PACKAGE_VERSION)_arm.ipk
 PACKAGE_OUTPUT_DIR?=output
 PACKAGE_TARGET?=$(PACKAGE_OUTPUT_DIR)/$(PACKAGE_IPK_BUILD)
+PACKAGE_SOURCE_FORMAT?=auto
 # webOS 5.5 rejects epoch-0 timestamps in IPK member archives. Use the build
 # time by default, while allowing release automation to pin a timestamp.
 IPK_MEMBER_MTIME?=$(shell date +%s)
-IPK_MTIME_NORMALIZER?=scripts/normalize-ipk-mtime.py
-PACKAGE_SB_API_VERSION?=$(shell strings $(WORKDIR)/image/usr/palm/applications/$(PACKAGE_NAME_OFFICIAL)/cobalt | grep sb_api | jq -r '.sb_api_version' | grep -v null || strings $(WORKDIR)/package/usr/palm/applications/$(PACKAGE_NAME_OFFICIAL)/cobalt | grep sb_api | jq -r '.sb_api_version' | grep -v null)
+PACKAGE_MTIME_NORMALIZER?=scripts/normalize-package-mtime.py
+IPK_CONTAINER_VERIFIER?=scripts/verify-ipk-container.py
+PACKAGE_SB_API_VERSION?=$(shell strings $(WORKDIR)/image/usr/palm/applications/$(PACKAGE_NAME_OFFICIAL)/cobalt 2>/dev/null | grep sb_api | jq -r '.sb_api_version' | grep -v null || strings $(WORKDIR)/package/usr/palm/applications/$(PACKAGE_NAME_OFFICIAL)/cobalt 2>/dev/null | grep sb_api | jq -r '.sb_api_version' | grep -v null)
 YTAF_DEBUG?=0
 YTAF_DEBUG_ENABLED=$(filter 1 true yes on,$(YTAF_DEBUG))
 COBALT_DEBUG?=$(YTAF_DEBUG)
@@ -39,12 +48,26 @@ ICON_DIR=$(if $(COBALT_DEBUG_ENABLED),assets/debug,assets)
 # to test whether it honors them at all before investing in a debug build.
 REMOTE_DEBUG?=0
 REMOTE_DEBUG_ENABLED=$(filter 1 true yes on,$(REMOTE_DEBUG))
-PACKAGE_COBALT_ARCHIVE?=cobalt-bin/$(PACKAGE_COBALT_VERSION)-$(PACKAGE_SB_API_VERSION)$(COBALT_DEBUG_SUFFIX).xz
+LOCAL_PACKAGE_COBALT_ARCHIVE=cobalt-bin/$(PACKAGE_COBALT_VERSION)-$(PACKAGE_SB_API_VERSION)$(COBALT_DEBUG_SUFFIX).xz
+PRIVATE_PACKAGE_COBALT_ARCHIVE=$(PRIVATE_IMAGES_DIR)/cobalt-bin/$(PACKAGE_COBALT_VERSION)-$(PACKAGE_SB_API_VERSION)$(COBALT_DEBUG_SUFFIX).xz
+PACKAGE_COBALT_ARCHIVE?=$(or $(wildcard $(LOCAL_PACKAGE_COBALT_ARCHIVE)),$(PRIVATE_PACKAGE_COBALT_ARCHIVE))
+# fork: this repo keeps the official base IPK checked in; upstream moved
+# theirs to a private images repo we have no access to.
 OFFICAL_YOUTUBE_IPK?=ipks-official/2023-07-30-youtube.leanback.v4-1.1.7.ipk
+
+# k7lp/PJTR builds use the privately collected stock starter and its matching
+# Starboard 12 ABI. The private archive must never be committed to this repo.
+PJTR_STARTER_ARCHIVE?=$(PRIVATE_IMAGES_DIR)/starters/k7lp-pjtr/youtube-webos-stock-starter.tar
+PJTR_PACKAGE_NAME?=youtube.leanback.v4-pjtr
+PJTR_PACKAGE_DISPLAY_NAME?=YouTube webOS Cobalt AdFree PJTR
+PJTR_COBALT_VERSION?=23.lts.6
+PJTR_SB_API_VERSION?=12
+PJTR_COBALT_ARCHIVE?=$(or $(wildcard cobalt-bin/23.lts.6-12.xz),$(PRIVATE_IMAGES_DIR)/cobalt-bin/23.lts.6-12.xz)
 
 # A separate build for testing compatibility with older webOS releases.  It
 # retains the starter binary from the older official YouTube package instead
 # of replacing the installed YouTube app.
+# fork: checked in here, not in upstream's private images repo.
 COMPAT_TEST_OFFICIAL_YOUTUBE_IPK?=ipks-official/2022-12-01-youtube.leanback.v4-1.1.4.ipk
 COMPAT_TEST_PACKAGE_NAME?=com.cobalt.youtube.adfree.compat
 COMPAT_TEST_DISPLAY_NAME?=YouTube Cobalt AdFree Compatibility Test
@@ -85,24 +108,32 @@ STANDALONE_YOUTUBE_URL?=https://www.youtube.com/tv?launch=menu
 STANDALONE_WORKDIR?=$(WORKDIR)/standalone
 STANDALONE_OUTPUT_DIR?=$(PACKAGE_OUTPUT_DIR)
 STANDALONE_PACKAGE?=$(STANDALONE_OUTPUT_DIR)/$(STANDALONE_APP_ID)_$(STANDALONE_VERSION)_arm.ipk
-STANDALONE_POC_COBALT_VERSION?=23.lts.4-12
+STANDALONE_POC_COBALT_VERSION?=23.lts.6-12
 STANDALONE_POC_RUNTIME_SOURCE?=cobalt-bin/$(STANDALONE_POC_COBALT_VERSION)
 STANDALONE_POC_COBALT_DIR?=$(WORKDIR)/standalone-poc-cobalt/$(STANDALONE_POC_COBALT_VERSION)
 STANDALONE_POC_STARTER_SOURCE?=workdir/ipk/cobalt
 
 
 .PHONY: all
-all: package ;
+all: images
+	$(MAKE) package PACKAGE="$(PACKAGE)"
 
 .PHONY: help
 help:
+	@echo "To build the current standard package, use:"
+	@echo "  make"
+	@echo ""
 	@echo "To patch your ipk, use:"
-	@echo "  make PACKAGE=./my-tv-youtube-application.ipk"
+	@echo "  make package PACKAGE=./my-tv-youtube-application.ipk"
 	@echo ""
 	@echo "To build the standalone Cobalt launcher, use:"
 	@echo "  make standalone-package"
 	@echo "To build the proof-of-concept app with the extracted webOS starter, use:"
 	@echo "  make standalone-poc-package"
+	@echo "To build the k7lp/PJTR package with a private stock starter, use:"
+	@echo "  make images pjtr-package"
+	@echo "To clone or update the private build images, use:"
+	@echo "  make images"
 	@echo "To check the standalone runtime files, use:"
 	@echo "  make standalone-runtime-status"
 	@echo ""
@@ -120,16 +151,16 @@ ares-install:
 	if [ "$$aresCmd" == "" ]; then \
 		npmCmd=$$(command -v npm); \
 		if [ "$$npmCmd" == "" ]; then \
-			echo "\"npm\" is required to install ares-cli"; \
+			echo "\"npm\" is required to install the webOS CLI"; \
 		fi; \
-		npm install @webosose/ares-cli; \
+		npm install --save-dev @webos-tools/cli; \
 		aresCmd=node_modules/.bin/ares-install; \
 	fi; \
 	$$aresCmd ./output/$(shell ls --sort=time output | head -n 1)
 
 .PHONY: check-package
 check-package:
-	@test ! -z "$(PACKAGE)" || (echo "\"make PACKAGE=./my-tv-youtube-application.ipk\" is required" && echo "--" && echo "" && $(MAKE) help && exit 1)
+	@test ! -z "$(PACKAGE)" || (echo "\"make package PACKAGE=./my-tv-youtube-application.ipk\" is required" && echo "--" && echo "" && $(MAKE) help && exit 1)
 	@test -f $(PACKAGE) || (echo "File \"$(PACKAGE)\" does not exist" && echo "--" && echo "" && exit 1)
 	@echo ""
 
@@ -139,12 +170,46 @@ package: check-package
 	$(MAKE) $(PACKAGE_TARGET)
 
 .PHONY: compatibility-test-package
-compatibility-test-package:
+compatibility-test-package: images
 	$(MAKE) package \
 	  PACKAGE="$(COMPAT_TEST_OFFICIAL_YOUTUBE_IPK)" \
 	  PACKAGE_NAME="$(COMPAT_TEST_PACKAGE_NAME)" \
 	  PACKAGE_DISPLAY_NAME="$(COMPAT_TEST_DISPLAY_NAME)" \
 	  PROJECT_VERSION="$(COMPAT_TEST_VERSION)"
+
+.PHONY: pjtr-package
+pjtr-package: images
+	@test -n "$(PJTR_STARTER_ARCHIVE)" || (echo "PJTR_STARTER_ARCHIVE is required" && exit 1)
+	@test -f "$(PJTR_STARTER_ARCHIVE)" || (echo "File \"$(PJTR_STARTER_ARCHIVE)\" does not exist" && exit 1)
+	@test -f "$(PJTR_COBALT_ARCHIVE)" || (echo "File \"$(PJTR_COBALT_ARCHIVE)\" does not exist" && exit 1)
+	python3 scripts/verify-pjtr-starter.py "$(PJTR_STARTER_ARCHIVE)"
+	$(MAKE) package \
+	  PACKAGE="$(PJTR_STARTER_ARCHIVE)" \
+	  PACKAGE_SOURCE_FORMAT=stock-starter \
+	  PACKAGE_NAME_OFFICIAL="$(PJTR_PACKAGE_NAME)" \
+	  PACKAGE_NAME="$(PJTR_PACKAGE_NAME)" \
+	  PACKAGE_DISPLAY_NAME="$(PJTR_PACKAGE_DISPLAY_NAME)" \
+	  PACKAGE_COBALT_VERSION="$(PJTR_COBALT_VERSION)" \
+	  PACKAGE_SB_API_VERSION="$(PJTR_SB_API_VERSION)" \
+	  PACKAGE_COBALT_ARCHIVE="$(PJTR_COBALT_ARCHIVE)"
+
+.PHONY: images
+images:
+	@set -e; \
+	if [ -d "$(PRIVATE_IMAGES_DIR)/.git" ]; then \
+		git -C "$(PRIVATE_IMAGES_DIR)" fetch --depth 1 origin "$(PRIVATE_IMAGES_REF)"; \
+		git -C "$(PRIVATE_IMAGES_DIR)" switch --detach FETCH_HEAD; \
+	else \
+		git clone --depth 1 --branch "$(PRIVATE_IMAGES_REF)" "$(PRIVATE_IMAGES_REPOSITORY)" "$(PRIVATE_IMAGES_DIR)"; \
+	fi
+	@if command -v sha256sum >/dev/null 2>&1; then \
+		(cd "$(PRIVATE_IMAGES_DIR)" && sha256sum -c SHA256SUMS); \
+	elif command -v shasum >/dev/null 2>&1; then \
+		(cd "$(PRIVATE_IMAGES_DIR)" && shasum -a 256 -c SHA256SUMS); \
+	else \
+		echo "sha256sum or shasum is required to verify private images"; \
+		exit 1; \
+	fi
 
 .PHONY: clean-ipk
 clean-ipk:
@@ -277,10 +342,10 @@ $(STANDALONE_PACKAGE): FORCE $(STANDALONE_WORKDIR)
 	if [ "$$aresCmd" == "" ]; then \
 		npmCmd=$$(command -v npm); \
 		if [ "$$npmCmd" == "" ]; then \
-			echo "\"npm\" is required to install ares-cli"; \
+			echo "\"npm\" is required to install the webOS CLI"; \
 			exit 1; \
 		fi; \
-		npm install @webosose/ares-cli; \
+		npm install --save-dev @webos-tools/cli; \
 		aresCmd=node_modules/.bin/ares-package; \
 	fi; \
 	mkdir -p $(STANDALONE_OUTPUT_DIR) $(WORKDIR)/standalone-output; \
@@ -292,7 +357,10 @@ $(STANDALONE_PACKAGE): FORCE $(STANDALONE_WORKDIR)
 .PRECIOUS: $(WORKDIR)/image/usr/palm/applications/$(PACKAGE_NAME_OFFICIAL)/cobalt
 $(WORKDIR)/image/usr/palm/applications/$(PACKAGE_NAME_OFFICIAL)/cobalt:
 	mkdir -p $(WORKDIR)/unpacked_ipk $(WORKDIR)/package $(WORKDIR)/image
-	if [[ "$(PACKAGE)" == *.tar.gz || "$(PACKAGE)" == *.tgz ]]; then \
+	if [[ "$(PACKAGE_SOURCE_FORMAT)" == "stock-starter" ]]; then \
+		mkdir -p $(WORKDIR)/package/usr/palm/applications/$(PACKAGE_NAME_OFFICIAL); \
+		tar -xf $(PACKAGE) -C $(WORKDIR)/package/usr/palm/applications/$(PACKAGE_NAME_OFFICIAL); \
+	elif [[ "$(PACKAGE)" == *.tar.gz || "$(PACKAGE)" == *.tgz ]]; then \
 		mkdir -p $(WORKDIR)/package/usr/palm/applications; \
 		tar xzpf $(PACKAGE) -C $(WORKDIR)/package/usr/palm/applications; \
 	else \
@@ -308,6 +376,7 @@ $(WORKDIR)/image/usr/palm/applications/$(PACKAGE_NAME_OFFICIAL)/cobalt:
 $(WORKDIR)/cobalt:
 	mkdir -p $@
 	@! test -z $(PACKAGE_SB_API_VERSION) || (echo "" && echo "--" && echo "Cannot find SB_API_VERSION in IPK binary. You can try to specify it with: make PACKAGE_SB_API_VERSION=12" && exit 1)
+	@test -f "$(PACKAGE_COBALT_ARCHIVE)" || (echo "" && echo "--" && echo "Missing Cobalt archive: $(PACKAGE_COBALT_ARCHIVE)" && echo "Run \"make images\" or build the matching runtime locally." && exit 1)
 	tar -xJvf $(PACKAGE_COBALT_ARCHIVE) -C $@
 	if [ -n "$(COBALT_STRIP_ENABLED)" ] && [ -f "$@/libcobalt.so" ]; then \
 		if docker image inspect cobalt-build-evergreen:latest >/dev/null 2>&1; then \
@@ -329,7 +398,7 @@ $(WORKDIR)/ipk/content/app/cobalt/content/web/adblock: $(WEBAPP_OUTPUT_STAMP)
 	rm -f $(WORKDIR)/ipk/drm.nfz
 	sed -i.bak 's/YouTube/$(PACKAGE_DISPLAY_NAME)/g' $(WORKDIR)/ipk/appinfo.json
 	rm -f $(WORKDIR)/ipk/appinfo.json.bak
-	jq --arg version "$(PACKAGE_VERSION)" 'del(.fileSystemType) | .version = $$version | .iconColor = "#ff0000" | .vendorExtension.userAgent = "$$browserName$$/$$browserVersion$$ ($$platformName$$-$$platformVersion$$), _TV_O18/$$firmwareVersion$$ (LG, $$modelName$$, $$networkMode$$)" | .vendorExtension.allowCrossDomain = true | .support360Content = true | .trustLevel = "netcast" | .privilegedJail = true | .supportGIP = true' < $(WORKDIR)/ipk/appinfo.json > $(WORKDIR)/ipk/appinfo2.json
+	jq --arg version "$(PACKAGE_VERSION)" --arg id "$(PACKAGE_NAME_TARGET)" 'del(.fileSystemType, .internalInstallationOnly, .requiredEULA, .binId, .appsize) | .id = $$id | .version = $$version | .iconColor = "#ff0000" | .vendorExtension.userAgent = "$$browserName$$/$$browserVersion$$ ($$platformName$$-$$platformVersion$$), _TV_O18/$$firmwareVersion$$ (LG, $$modelName$$, $$networkMode$$)" | .vendorExtension.allowCrossDomain = true | .support360Content = true | .trustLevel = "netcast" | .privilegedJail = true | .supportGIP = true' < $(WORKDIR)/ipk/appinfo.json > $(WORKDIR)/ipk/appinfo2.json
 	mv $(WORKDIR)/ipk/appinfo2.json $(WORKDIR)/ipk/appinfo.json
 
 # fork: debug builds get red-tinted icons (assets/debug/*.png) so they're
@@ -341,6 +410,8 @@ $(WORKDIR)/ipk/content/app/cobalt/content/web/adblock: $(WEBAPP_OUTPUT_STAMP)
 	cp $(ICON_DIR)/extraLargeIcon.png $(WORKDIR)/ipk/$$(jq -r '.extraLargeIcon' < $(WORKDIR)/ipk/appinfo.json)
 	cp assets/playIcon.png $(WORKDIR)/ipk/$$(jq -r '.playIcon' < $(WORKDIR)/ipk/appinfo.json)
 	cp assets/imageForRecents.png $(WORKDIR)/ipk/$$(jq -r '.imageForRecents' < $(WORKDIR)/ipk/appinfo.json)
+	cp assets/bgImage.png $(WORKDIR)/ipk/$$(jq -r '.bgImage' < $(WORKDIR)/ipk/appinfo.json)
+	cp assets/splashBackground.png $(WORKDIR)/ipk/$$(jq -r '.splashBackground' < $(WORKDIR)/ipk/appinfo.json)
 
 	echo " --evergreen_lite" >> $(WORKDIR)/ipk/switches
 	if [ -n "$(COBALT_DEBUG_ENABLED)" ] || [ -n "$(REMOTE_DEBUG_ENABLED)" ]; then \
@@ -353,9 +424,12 @@ ifneq ("$(PACKAGE_NAME_TARGET)","$(PACKAGE_NAME_OFFICIAL)")
 	find $(WORKDIR)/ipk -name '*.bak' -delete
 endif
 
-	libcobalt=$$(find $(WORKDIR)/ipk -name libcobalt.so); \
-	! test -z "$$libcobalt" || (echo "" && echo "--" && echo "File \"libcobalt.so\" is not present in your IPK. This patch is not compatible with your IPK version." && exit 1) && \
-	cp $(WORKDIR)/cobalt/libcobalt.so $$libcobalt
+	libcobalt=$$(find $(WORKDIR)/ipk -name libcobalt.so -print -quit); \
+	if test -z "$$libcobalt"; then \
+		libcobalt="$(WORKDIR)/ipk/content/app/cobalt/lib/libcobalt.so"; \
+		mkdir -p "$$(dirname "$$libcobalt")"; \
+	fi; \
+	cp $(WORKDIR)/cobalt/libcobalt.so "$$libcobalt"
 	cp -r $(WORKDIR)/cobalt/content $(WORKDIR)/ipk/content/app/cobalt
 # fork: a debug (non-gold) Cobalt build bundles its own DevTools frontend
 # under content/web/debug_remote/devtools/ — needed to actually use the
@@ -387,16 +461,19 @@ endif
 	fi
 
 .PHONY: ares-package
+# fork: upstream's -c check line reads `$aresCmd` (single $), which expands
+# to literal "resCmd" and silently skips the check; kept $$aresCmd.
 ares-package:
 	@aresCmd=$$(command -v ares-package); \
 	if [ "$$aresCmd" == "" ]; then \
 		npmCmd=$$(command -v npm); \
 		if [ "$$npmCmd" == "" ]; then \
-			echo "\"npm\" is required to install ares-cli"; \
+			echo "\"npm\" is required to install the webOS CLI"; \
 		fi; \
-		npm install @webosose/ares-cli; \
+		npm install --save-dev @webos-tools/cli; \
 		aresCmd=node_modules/.bin/ares-package; \
 	fi; \
+	python3 $(PACKAGE_MTIME_NORMALIZER) --mtime $(IPK_MEMBER_MTIME) $(WORKDIR)/ipk; \
 	$$aresCmd -v -c $(WORKDIR)/ipk; \
 	$$aresCmd -v --outdir $(WORKDIR)/ipk-output $(WORKDIR)/ipk
 
@@ -407,7 +484,7 @@ ares-package-docker: docker-make.ares-package
 .PRECIOUS: $(PACKAGE_TARGET)
 $(PACKAGE_TARGET): FORCE $(WORKDIR)/image/usr/palm/applications/$(PACKAGE_NAME_OFFICIAL)/cobalt $(WORKDIR)/cobalt $(WORKDIR)/ipk/content/app/cobalt/content/web/adblock ares-package-docker
 	mkdir -p $(dir $@)
-	python3 $(IPK_MTIME_NORMALIZER) --mtime $(IPK_MEMBER_MTIME) $(WORKDIR)/ipk-output/$(PACKAGE_IPK_BUILD)
+	python3 $(IPK_CONTAINER_VERIFIER) $(WORKDIR)/ipk-output/$(PACKAGE_IPK_BUILD)
 	mv $(WORKDIR)/ipk-output/$(PACKAGE_IPK_BUILD) $@
 	@echo "Package can be installed with:"
 	@echo "  ares-install $(PACKAGE_TARGET)"
@@ -418,7 +495,7 @@ $(PACKAGE_TARGET): FORCE $(WORKDIR)/image/usr/palm/applications/$(PACKAGE_NAME_O
 
 # Part to build the injected adblock web app
 # Example of usage
-# make cobalt-bin/23.lts.4-12/libcobalt.so:
+# make cobalt-bin/23.lts.6-12/libcobalt.so:
 
 .PHONY: docker-make.%
 docker-make.%:
@@ -428,7 +505,9 @@ docker-make.%:
 # `make package ... COBALT_DEBUG=1` silently built as if COBALT_DEBUG were
 # unset, since the DevTools-stub step above (gated on COBALT_DEBUG_ENABLED)
 # runs via this target too.
-	docker run --rm -i -u $$(id -u):$$(id -g) -e HOME=/app -e npm_config_cache=/app/.npm -e WEBAPP_DEBUG="$(WEBAPP_DEBUG)" -e COBALT_DEBUG="$(COBALT_DEBUG)" -v "$$PWD:/app" -w /app $(NODE_DOCKER_IMAGE) sh -lc 'mkdir -p /app/.webos /app/.npm && make $*'
+# fork: upstream's version says $PWD (expands to "WD" in make — mounts an
+# empty named volume instead of the repo); kept $$PWD.
+	docker run --rm -i -u $$(id -u):$$(id -g) -e HOME=/app -e npm_config_cache=/app/.npm -e WEBAPP_DEBUG="$(WEBAPP_DEBUG)" -e COBALT_DEBUG="$(COBALT_DEBUG)" -e IPK_MEMBER_MTIME="$(IPK_MEMBER_MTIME)" -v "$$PWD:/app" -w /app $(NODE_DOCKER_IMAGE) sh -lc 'mkdir -p /app/.webos /app/.npm && make $*'
 .PHONY: npm
 npm:
 	( \
@@ -448,8 +527,8 @@ npm-docker: docker-make.npm
 
 # Part to build cobalt
 # Example of usage
-# make cobalt-bin/23.lts.4-12/libcobalt.so
-# make cobalt-bin/23.lts.4-12-x64x11/cobalt
+# make cobalt-bin/23.lts.6-12/libcobalt.so
+# make cobalt-bin/23.lts.6-12-x64x11/cobalt
 
 clean-$(WORKDIR)/cobalt-%:
 	cd $(WORKDIR)/cobalt-$* && git checkout . && git clean -d -f

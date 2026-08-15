@@ -6,6 +6,8 @@ export default {
     interaction: 'Pular lembretes de inscrição e curtir', selfpromo: 'Pular autopromoção',
     musicOfftopic: 'Pular música/fora do assunto', preview: 'Pular prévias/resumos',
     filler: 'Pular enrolação/desvios', hook: 'Pular gancho/saudação',
+    subtitleOn: 'Legendas: ATIVADAS', subtitleOff: 'Legendas: DESATIVADAS',
+    subtitleUnavailable: 'Legendas indisponíveis',
     openHint: 'Pressione [VERDE] para os extras do YouTube'
   },
   sponsorBlock: {

@@ -14,6 +14,9 @@ export default {
     preview: 'Salta anteprima/riassunto',
     filler: 'Salta riempitivi/divagazioni',
     hook: 'Salta hook/saluto',
+    subtitleOn: 'Sottotitoli: ATTIVI',
+    subtitleOff: 'Sottotitoli: DISATTIVI',
+    subtitleUnavailable: 'Sottotitoli non disponibili',
     openHint: 'Premi [VERDE] per gli extra di YouTube'
   },
   sponsorBlock: {

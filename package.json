@@ -1,5 +1,7 @@
 {
-  "dependencies": {
-    "@webosose/ares-cli": "^2.4.0"
+  "name": "app",
+  "private": true,
+  "devDependencies": {
+    "@webos-tools/cli": "^3.2.5"
   }
 }

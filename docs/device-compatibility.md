@@ -68,8 +68,11 @@ problems.
 Before diagnosing a starter, runtime or injected JavaScript failure, affected
 users can test the unmodified official packages used by the project:
 
-- [Official YouTube 1.1.4 (2022 package)](https://raw.githubusercontent.com/RF1705/youtube-webos-cobalt-adfree/main/ipks-official/2022-12-01-youtube.leanback.v4-1.1.4.ipk)
-- [Official YouTube 1.1.7 (2023 package)](https://raw.githubusercontent.com/RF1705/youtube-webos-cobalt-adfree/main/ipks-official/2023-07-30-youtube.leanback.v4-1.1.7.ipk)
+- Official YouTube 1.1.4 (2022 package)
+- Official YouTube 1.1.7 (2023 package)
+
+These proprietary reference packages are no longer stored in the public source
+repository. Authorized maintainers can retrieve them with `make images`.
 
 Both packages use the original `youtube.leanback.v4` app ID and may replace the
 installed YouTube application. Test only if you can restore or reinstall it.
@@ -77,6 +80,15 @@ installed YouTube application. Test only if you can restore or reinstall it.
 An installation rejection or installer hang does not prove runtime
 incompatibility. The useful distinction is whether a package installs
 successfully and then fails to start or play video.
+
+## Collecting a compatible starter from a rooted TV
+
+The available 2022 and 2023 stock packages do not provide a compatible starter
+for the reported webOS 3.4 device. If the current official YouTube app still
+works on an affected rooted TV, follow the
+[stock starter collection guide](collect-stock-youtube-starter.md). The guide
+collects the executable and package metadata without account data or the
+device-specific `drm.nfz` file.
 
 ## Reporting a new result
 

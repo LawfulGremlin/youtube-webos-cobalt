@@ -6,6 +6,8 @@ export default {
     interaction: 'Saltar recordatorios de suscripción y me gusta', selfpromo: 'Saltar autopromoción',
     musicOfftopic: 'Saltar música/fuera de tema', preview: 'Saltar avances/resúmenes',
     filler: 'Saltar relleno/desvíos', hook: 'Saltar gancho/saludo',
+    subtitleOn: 'Subtítulos: ACTIVADOS', subtitleOff: 'Subtítulos: DESACTIVADOS',
+    subtitleUnavailable: 'Subtítulos no disponibles',
     openHint: 'Pulsa [VERDE] para los extras de YouTube'
   },
   sponsorBlock: {
