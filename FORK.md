@@ -200,6 +200,14 @@ adding features itself.
   subtitle toggle on digit 0, playback speed on 1/3), we adopt it as a registry
   action defaulting to upstream's key — rebindable and clearable — rather than
   taking the hardcoded listener.
+- `ipks-official/2026-08-15-upstream-v1.2.1-sb13.ipk` is upstream's public
+  v1.2.1 release asset, archived because it contains everything their private
+  images repo gates: the official-1.1.5 app tree with the **Starboard 13**
+  starter (verified `sb_api_version:13` in the binary) and their prebuilt
+  23.lts.6-13 `libcobalt.so`. Our shipping base stays the SB12 official 1.1.7
+  IPK — upstream's v1.2.x launch-crash wave (their issues #36/#37/#41) is tied
+  to this SB13 base, so it's insurance and a future Cobalt 24.lts experiment
+  base (24.lts needs SB≥13), not a migration.
 - Deliberately not ported: 4K/quality forcing (capped by the Cobalt binary + DRM,
   not fixable in JS), auto-login (Cobalt's native account flow already works), UI
   themes/OLED/cosmetic CSS (WebView-specific, poor fit for Cobalt's CSS subset).

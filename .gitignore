@@ -2,6 +2,7 @@
 /cobalt
 /workdir
 .npm
+/.cache
 /.env
 /.vscode
 *.pyc
