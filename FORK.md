@@ -211,6 +211,16 @@ adding features itself.
 - Deliberately not ported: 4K/quality forcing (capped by the Cobalt binary + DRM,
   not fixable in JS), auto-login (Cobalt's native account flow already works), UI
   themes/OLED/cosmetic CSS (WebView-specific, poor fit for Cobalt's CSS subset).
+- `cobalt-patches/cobalt-23.lts.6.patch` is deliberately held at upstream's
+  `37a27f1` state — **without** their later VP9-4K-force addition (`0f9e01a`),
+  which upstream itself never shipped (it exists only in their dispatch-only
+  test IPK for their issue #42). Shipped by accident in our v1.1.0: it rewrites
+  every platform "NotSupported" for clear VP9 into "Probably" on 4K-output
+  devices (99999×99999 included), YouTube then attempts formats the hardware
+  can't decode, and playback caps at 720p h264 (measured on lg75; rolled back
+  same day, fixed in v1.1.1). If upstream graduates the experiment, re-evaluate
+  against a real quality-menu check on hardware — never re-adopt on a green
+  build alone.
 - If upstream ships its own version of a fork feature, delete ours in the same
   sync PR.
 
