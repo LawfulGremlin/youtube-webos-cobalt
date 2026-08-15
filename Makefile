@@ -410,8 +410,10 @@ $(WORKDIR)/ipk/content/app/cobalt/content/web/adblock: $(WEBAPP_OUTPUT_STAMP)
 	cp $(ICON_DIR)/extraLargeIcon.png $(WORKDIR)/ipk/$$(jq -r '.extraLargeIcon' < $(WORKDIR)/ipk/appinfo.json)
 	cp assets/playIcon.png $(WORKDIR)/ipk/$$(jq -r '.playIcon' < $(WORKDIR)/ipk/appinfo.json)
 	cp assets/imageForRecents.png $(WORKDIR)/ipk/$$(jq -r '.imageForRecents' < $(WORKDIR)/ipk/appinfo.json)
-	cp assets/bgImage.png $(WORKDIR)/ipk/$$(jq -r '.bgImage' < $(WORKDIR)/ipk/appinfo.json)
-	cp assets/splashBackground.png $(WORKDIR)/ipk/$$(jq -r '.splashBackground' < $(WORKDIR)/ipk/appinfo.json)
+# fork: upstream also overwrites bgImage/splashBackground with its branded
+# art (needed for their tar.gz starter base, which ships none). Our base is
+# the full official IPK, which has the stock YouTube splash — keep it
+# (user preference, 2026-08-15).
 
 	echo " --evergreen_lite" >> $(WORKDIR)/ipk/switches
 	if [ -n "$(COBALT_DEBUG_ENABLED)" ] || [ -n "$(REMOTE_DEBUG_ENABLED)" ]; then \
