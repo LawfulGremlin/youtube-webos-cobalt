@@ -69,7 +69,15 @@ fi
 # reported, and when playing, currentTime must have actually *advanced*
 # between samples — not just be nonzero once.
 SNAPSHOT='JSON.stringify({videoID:(location.hash.match(/[?&]v=([^&#]+)/)||[])[1]||"", t:document.querySelector("video")?.currentTime||0, paused:!!document.querySelector("video")?.paused, hasVideo:!!document.querySelector("video"), readyState:document.querySelector("video")?.readyState||0})'
-sleep 2
+# Wait for real media data before sampling — sampling while readyState is
+# still 0 reported "position off: 0s" on a restore that its own second
+# sample showed had succeeded. Bounded: a genuinely stalled load falls
+# through and the verdict below still fails on readyState.
+for i in $(seq 1 15); do
+  rs=$(tv_cdp_eval "$IP" "(document.querySelector('video')?.readyState||0) >= 2 ? 'yes' : 'no'")
+  [ "$rs" = "yes" ] && break
+  sleep 1
+done
 SAMPLE1=$(tv_cdp_eval "$IP" "$SNAPSHOT")
 sleep 3
 SAMPLE2=$(tv_cdp_eval "$IP" "$SNAPSHOT")
