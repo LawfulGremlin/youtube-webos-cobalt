@@ -34,6 +34,9 @@ export function userScriptStartUI() {
   let menuScrollFrame = null;
   let menuOffset = 0;
   let menuContent = null;
+  let heldDirection = null;
+  let heldDirectionAt = 0;
+  let directionMoveFrame = null;
 
   function getDirectionFromEvent(evt) {
     const key = (evt.key || '').toLowerCase();
@@ -176,6 +179,35 @@ export function userScriptStartUI() {
       queueMenuItemScroll(nextItem);
       lastTabIndex = nextItem.tabIndex;
     }
+  }
+
+  function queueDirectionMove(direction) {
+    if (directionMoveFrame !== null) return;
+
+    const focusBeforeEvent = document.activeElement;
+    directionMoveFrame = window.requestAnimationFrame(() => {
+      directionMoveFrame = null;
+      const focusAfterEvent = document.activeElement;
+
+      // Some Cobalt versions perform native spatial navigation before the
+      // cancelled key event settles. Accept that move instead of adding one.
+      if (
+        focusAfterEvent &&
+        focusAfterEvent !== focusBeforeEvent &&
+        uiContainer.contains(focusAfterEvent) &&
+        focusAfterEvent.tabIndex > 0
+      ) {
+        const focusableItems = Array.from(
+          uiContainer.querySelectorAll('[tabindex]')
+        ).filter((item) => item.tabIndex > 0);
+        currentFocusIndex = focusableItems.indexOf(focusAfterEvent);
+        lastTabIndex = focusAfterEvent.tabIndex;
+        queueMenuItemScroll(focusAfterEvent);
+        return;
+      }
+
+      moveFocus(direction);
+    });
   }
 
   const uiContainer = document.createElement('div');
@@ -509,9 +541,14 @@ export function userScriptStartUI() {
       window.cancelAnimationFrame(focusGuardFrame);
       focusGuardFrame = null;
     }
+    if (directionMoveFrame !== null) {
+      window.cancelAnimationFrame(directionMoveFrame);
+      directionMoveFrame = null;
+    }
     uiContainer.style.display = 'none';
     uiContainer.style.visibility = 'hidden';
     uiContainer.style.pointerEvents = 'none';
+    heldDirection = null;
     const menuFocus = document.activeElement;
     if (menuFocus && uiContainer.contains(menuFocus) && typeof menuFocus.blur === 'function') {
       menuFocus.blur();
@@ -537,6 +574,16 @@ export function userScriptStartUI() {
   const eventHandler = (evt) => {
     const menuOpen = isContainerOpen();
     const focusInsideMenu = menuOpen && menuHasFocus();
+    const eventDirection = menuOpen ? getDirectionFromEvent(evt) : null;
+
+    if (evt.type === 'keyup' && eventDirection) {
+      if (heldDirection === eventDirection) {
+        heldDirection = null;
+      }
+      evt.preventDefault();
+      evt.stopPropagation();
+      return false;
+    }
 
     if (evt.type === 'keydown' && menuOpen) {
       if (!focusInsideMenu) {
@@ -545,11 +592,20 @@ export function userScriptStartUI() {
         captureMenuFocus();
       }
 
-      const direction = getDirectionFromEvent(evt);
+      const direction = eventDirection;
       if (direction) {
         evt.preventDefault();
         evt.stopPropagation();
-        moveFocus(direction);
+        const now = Date.now();
+        if (
+          evt.repeat ||
+          (heldDirection === direction && now - heldDirectionAt < 400)
+        ) {
+          return false;
+        }
+        heldDirection = direction;
+        heldDirectionAt = now;
+        queueDirectionMove(direction);
         return false;
       }
 
