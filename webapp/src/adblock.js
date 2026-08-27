@@ -127,12 +127,20 @@ function hideShortsRenderer(node) {
   node.classList.add('ytaf-hidden-shorts');
 }
 
-function processShortsNode(node) {
+function syncShortsNode(node) {
   if (!node || node.nodeType !== 1) return;
 
   if (node.matches(SHORTS_RENDERER_SELECTOR)) {
     hideShortsRenderer(node);
+  } else {
+    node.classList.remove('ytaf-hidden-shorts');
   }
+}
+
+function processShortsNode(node) {
+  if (!node || node.nodeType !== 1) return;
+
+  syncShortsNode(node);
   node.querySelectorAll(SHORTS_RENDERER_SELECTOR).forEach(hideShortsRenderer);
 }
 
@@ -142,10 +150,19 @@ function startShortsObserver() {
   processShortsNode(document.body);
   shortsObserver = new MutationObserver((mutations) => {
     mutations.forEach((mutation) => {
-      mutation.addedNodes.forEach(processShortsNode);
+      if (mutation.type === 'attributes') {
+        syncShortsNode(mutation.target);
+      } else {
+        mutation.addedNodes.forEach(processShortsNode);
+      }
     });
   });
-  shortsObserver.observe(document.body, { childList: true, subtree: true });
+  shortsObserver.observe(document.body, {
+    attributes: true,
+    attributeFilter: ['data-renderer-type'],
+    childList: true,
+    subtree: true
+  });
 }
 
 function stopShortsObserver() {
