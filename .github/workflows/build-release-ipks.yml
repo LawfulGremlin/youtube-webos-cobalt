@@ -1,0 +1,146 @@
+name: Build release IPKs
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to build and upload
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build-release:
+    name: Build standard and PJTR packages
+    runs-on: ubuntu-latest
+
+    env:
+      RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+
+    steps:
+      - name: Check out release source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name || inputs.tag }}
+
+      - name: Check out private build images
+        uses: actions/checkout@v4
+        with:
+          repository: RF1705/YouTube-webos-images
+          ref: main
+          path: .private-images
+          token: ${{ secrets.PRIVATE_IMAGES_TOKEN }}
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            jq \
+            git \
+            sed \
+            binutils \
+            squashfs-tools \
+            rename \
+            findutils \
+            xz-utils \
+            python3
+
+      - name: Verify private build images
+        run: |
+          cd .private-images
+          sha256sum -c SHA256SUMS
+
+      - name: Prepare build version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${RELEASE_TAG#v}"
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Release tag must be vMAJOR.MINOR.PATCH or MAJOR.MINOR.PATCH, got: $RELEASE_TAG" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Building release $RELEASE_TAG as package version $version"
+
+      - name: Prepare ARM strip helper image
+        run: |
+          docker build -t cobalt-build-evergreen:latest - <<'EOF'
+          FROM ubuntu:24.04
+          RUN apt-get update \
+              && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends binutils-arm-linux-gnueabi \
+              && rm -rf /var/lib/apt/lists/*
+          EOF
+
+      - name: Ensure Docker source mount uses the repository path
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('Makefile')
+          content = path.read_text()
+          old = '-v "$PWD:/app"'
+          new = '-v "$(CURRENT_DIR):/app"'
+          if old in content:
+              path.write_text(content.replace(old, new))
+          PY
+
+      - name: Build standard IPK
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          make package \
+            PROJECT_VERSION="$VERSION" \
+            PACKAGE=".private-images/ipks-official/youtube-official-1.1.5.tar.gz"
+
+      - name: Build PJTR IPK
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          python3 scripts/verify-pjtr-starter.py \
+            ".private-images/starters/k7lp-pjtr/youtube-webos-stock-starter.tar"
+
+          make package \
+            PROJECT_VERSION="$VERSION" \
+            PACKAGE=".private-images/starters/k7lp-pjtr/youtube-webos-stock-starter.tar" \
+            PACKAGE_SOURCE_FORMAT=stock-starter \
+            PACKAGE_NAME_OFFICIAL="youtube.leanback.v4-pjtr" \
+            PACKAGE_NAME="youtube.leanback.v4-pjtr" \
+            PACKAGE_DISPLAY_NAME="YouTube webOS Cobalt AdFree PJTR" \
+            PACKAGE_COBALT_VERSION="23.lts.6" \
+            PACKAGE_SB_API_VERSION="12" \
+            PACKAGE_COBALT_ARCHIVE=".private-images/cobalt-bin/23.lts.6-12.xz"
+
+      - name: Verify release outputs
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          standard="output/youtube.leanback.v4_${VERSION}_arm.ipk"
+          pjtr="output/youtube.leanback.v4-pjtr_${VERSION}_arm.ipk"
+          test -f "$standard"
+          test -f "$pjtr"
+          sha256sum "$standard" "$pjtr"
+          ls -lh "$standard" "$pjtr"
+
+      - name: Upload IPKs to GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          gh release upload "$RELEASE_TAG" \
+            "output/youtube.leanback.v4_${VERSION}_arm.ipk" \
+            "output/youtube.leanback.v4-pjtr_${VERSION}_arm.ipk" \
+            --repo "$GITHUB_REPOSITORY" \
+            --clobber
+
+      - name: Keep packages as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-ipks-${{ steps.version.outputs.version }}
+          path: output/*.ipk
+          if-no-files-found: error
