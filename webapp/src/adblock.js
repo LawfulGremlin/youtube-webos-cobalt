@@ -141,6 +141,7 @@ function processShortsNode(node) {
   if (!node || node.nodeType !== 1) return;
 
   syncShortsNode(node);
+  node.querySelectorAll('.ytaf-hidden-shorts').forEach(syncShortsNode);
   node.querySelectorAll(SHORTS_RENDERER_SELECTOR).forEach(hideShortsRenderer);
 }
 
