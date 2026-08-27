@@ -388,6 +388,9 @@ export function userScriptStartUI() {
   menuViewport.classList.add('ytaf-ui-viewport');
   menuViewport.style.position = 'relative';
   menuViewport.style.overflow = 'hidden';
+  menuViewport.style.boxSizing = 'border-box';
+  menuViewport.style.paddingLeft = '4px';
+  menuViewport.style.paddingRight = '4px';
   menuViewport.appendChild(menuContent);
   uiContainer.appendChild(menuViewport);
 
