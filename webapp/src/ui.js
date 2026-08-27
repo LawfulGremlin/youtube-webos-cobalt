@@ -34,6 +34,7 @@ export function userScriptStartUI() {
   let menuScrollFrame = null;
   let menuOffset = 0;
   let menuContent = null;
+  let menuViewport = null;
   let heldDirection = null;
   let heldDirectionAt = 0;
   let directionMoveFrame = null;
@@ -109,24 +110,20 @@ export function userScriptStartUI() {
   }
 
   function scrollMenuItemIntoView(item) {
-    if (!item || !menuContent || !uiContainer.contains(item)) return;
+    if (!item || !menuContent || !menuViewport || !uiContainer.contains(item)) return;
 
     // Cobalt resets an overflow container's scrollTop after programmatic focus.
     // Keep the viewport fixed and move its inner panel instead.
     uiContainer.scrollTop = 0;
 
-    const visibleMargin = 24;
+    const visibleMargin = 8;
     const row = item.parentElement && uiContainer.contains(item.parentElement)
       ? item.parentElement
       : item;
-    const containerRect = uiContainer.getBoundingClientRect();
-    const titleRect = divTitle.getBoundingClientRect();
+    const viewportRect = menuViewport.getBoundingClientRect();
     const itemRect = row.getBoundingClientRect();
-    const visibleTop = Math.max(
-      containerRect.top + visibleMargin,
-      titleRect.bottom + 12
-    );
-    const visibleBottom = containerRect.bottom - visibleMargin;
+    const visibleTop = viewportRect.top + visibleMargin;
+    const visibleBottom = viewportRect.bottom - visibleMargin;
 
     if (itemRect.top < visibleTop) {
       menuOffset += itemRect.top - visibleTop;
@@ -387,7 +384,12 @@ export function userScriptStartUI() {
   while (uiContainer.children.length > 1) {
     menuContent.appendChild(uiContainer.children[1]);
   }
-  uiContainer.appendChild(menuContent);
+  menuViewport = document.createElement('div');
+  menuViewport.classList.add('ytaf-ui-viewport');
+  menuViewport.style.position = 'relative';
+  menuViewport.style.overflow = 'hidden';
+  menuViewport.appendChild(menuContent);
+  uiContainer.appendChild(menuViewport);
 
   (document.body || document.documentElement).appendChild(uiContainer);
 
@@ -434,6 +436,7 @@ export function userScriptStartUI() {
       bottom: 'auto',
       width: '720px',
       maxWidth: '80vw',
+      height: '80vh',
       maxHeight: '80vh',
       boxSizing: 'border-box',
       overflow: 'hidden',
@@ -450,6 +453,12 @@ export function userScriptStartUI() {
       animation: 'none',
       boxShadow: '0 0 0 9999px rgba(0,0,0,0.55)'
     });
+
+    const viewportHeight = Math.max(
+      0,
+      uiContainer.clientHeight - 48 - divTitle.offsetHeight - 12
+    );
+    menuViewport.style.height = `${viewportHeight}px`;
   }
 
   function focusMenuItem(preferredTabIndex = lastTabIndex) {
