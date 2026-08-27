@@ -2,6 +2,7 @@ export default {
   ui: {
     title: 'YouTube webOS Cobalt AdFree',
     adblock: 'Enable AdBlocking',
+    sponsoredQrCodeBlock: 'Block sponsored QR code popups',
     autoLogin: 'Automatically skip account selection',
     sponsorblock: 'Enable SponsorBlock',
     ryd: 'Show dislike counts',

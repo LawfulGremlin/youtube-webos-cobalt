@@ -185,6 +185,14 @@ export function userScriptStartUI() {
   );
   uiContainer.appendChild(
     checkboxTools.add(
+      '__sponsored_qr_code_block',
+      text('sponsoredQrCodeBlock'),
+      configRead('enableSponsoredQrCodeBlock'),
+      callbackConfig('enableSponsoredQrCodeBlock')
+    )
+  );
+  uiContainer.appendChild(
+    checkboxTools.add(
       '__auto_login',
       text('autoLogin'),
       configRead('enableAutoLogin'),

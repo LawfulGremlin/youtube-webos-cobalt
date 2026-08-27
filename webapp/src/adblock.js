@@ -221,6 +221,30 @@ function stripAdditionalYouTubeAds(value, depth = 0) {
   return changed;
 }
 
+// YouTube TV sends contextual Shop/sponsored QR popups as timely actions in
+// player and next responses. Removing the collection prevents the overlays
+// from being scheduled while leaving the rest of the player overlay intact.
+function stripSponsoredQrCodePopups(value, depth = 0) {
+  if (!value || typeof value !== 'object' || depth > 16) return false;
+
+  let changed = false;
+  Object.keys(value).forEach((key) => {
+    const child = value[key];
+    if (
+      key === 'playerOverlayRenderer' &&
+      child &&
+      Object.prototype.hasOwnProperty.call(child, 'timelyActionRenderers')
+    ) {
+      delete child.timelyActionRenderers;
+      changed = true;
+    }
+
+    changed = stripSponsoredQrCodePopups(child, depth + 1) || changed;
+  });
+
+  return changed;
+}
+
 /**
  * This is a minimal reimplementation of the following uBlock Origin rule:
  * https://github.com/uBlockOrigin/uAssets/blob/3497eebd440f4871830b9b45af0afc406c6eb593/filters/filters.txt#L116
@@ -234,16 +258,21 @@ const origParse = JSON.parse;
 JSON.parse = function () {
   const r = origParse.apply(this, arguments);
 
-  if (!configRead('enableAdBlock')) {
-    return r;
+  if (configRead('enableAdBlock')) {
+    if (stripYouTubeAds(r)) {
+      console.log('Adblock Removed !');
+    }
+
+    if (stripAdditionalYouTubeAds(r)) {
+      console.log('Adblock Removed additional renderers !');
+    }
   }
 
-  if (stripYouTubeAds(r)) {
-    console.log('Adblock Removed !');
-  }
-
-  if (stripAdditionalYouTubeAds(r)) {
-    console.log('Adblock Removed additional renderers !');
+  if (
+    configRead('enableSponsoredQrCodeBlock') &&
+    stripSponsoredQrCodePopups(r)
+  ) {
+    console.log('Adblock Removed sponsored QR code popups !');
   }
 
   return r;
