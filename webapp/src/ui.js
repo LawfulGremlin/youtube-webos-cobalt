@@ -7,6 +7,7 @@ import './ui.css';
 
 import { configRead, configWrite } from './config.js';
 import { checkboxTools } from './checkboxTools.js';
+import { choiceTools } from './choiceTools.js';
 import { text as languageText } from './languages/index.js';
 import { sponsorBlockCategoryColors } from './sponsorblock-categories.js';
 import {
@@ -189,6 +190,20 @@ export function userScriptStartUI() {
       text('sponsoredQrCodeBlock'),
       configRead('enableSponsoredQrCodeBlock'),
       callbackConfig('enableSponsoredQrCodeBlock')
+    )
+  );
+  uiContainer.appendChild(
+    choiceTools.add(
+      '__startup_page',
+      text('startupPage'),
+      configRead('startupPage'),
+      [
+        { value: 'home', label: text('startupPageHome') },
+        { value: 'subscriptions', label: text('startupPageSubscriptions') },
+        { value: 'shorts', label: text('startupPageShorts') },
+        { value: 'library', label: text('startupPageLibrary') }
+      ],
+      callbackConfig('startupPage')
     )
   );
   uiContainer.appendChild(
@@ -507,7 +522,11 @@ export function userScriptStartUI() {
           if (wrapper) {
             wrapper.dataset.ytafIgnoreClickUntil = String(Date.now() + 1000);
           }
-          checkboxTools.toggleCheck(focusedElement.id);
+          if (focusedElement.dataset.ytafControl === 'choice') {
+            choiceTools.cycle(focusedElement.id);
+          } else {
+            checkboxTools.toggleCheck(focusedElement.id);
+          }
         }
         return false;
       }

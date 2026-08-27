@@ -2,6 +2,7 @@ const CONFIG_KEY = 'ytaf-configuration-cobalt-adfree-v2';
 const defaultConfig = {
   enableAdBlock: true,
   enableSponsoredQrCodeBlock: true,
+  startupPage: 'home',
   enableSponsorBlock: true,
   enableSponsorBlockSponsor: true,
   enableSponsorBlockIntro: true,
