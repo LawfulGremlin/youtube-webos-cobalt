@@ -117,8 +117,12 @@ export function userScriptStartUI() {
       ? item.parentElement
       : item;
     const containerRect = uiContainer.getBoundingClientRect();
+    const titleRect = divTitle.getBoundingClientRect();
     const itemRect = row.getBoundingClientRect();
-    const visibleTop = containerRect.top + visibleMargin;
+    const visibleTop = Math.max(
+      containerRect.top + visibleMargin,
+      titleRect.bottom + 12
+    );
     const visibleBottom = containerRect.bottom - visibleMargin;
 
     if (itemRect.top < visibleTop) {
@@ -127,7 +131,7 @@ export function userScriptStartUI() {
       menuOffset += itemRect.bottom - visibleBottom;
     }
 
-    const viewportHeight = Math.max(0, uiContainer.clientHeight - 48);
+    const viewportHeight = Math.max(0, visibleBottom - visibleTop);
     const maximumOffset = Math.max(0, menuContent.scrollHeight - viewportHeight);
     menuOffset = Math.max(0, Math.min(maximumOffset, menuOffset));
     menuContent.style.top = `${-menuOffset}px`;
@@ -348,8 +352,8 @@ export function userScriptStartUI() {
   menuContent.classList.add('ytaf-ui-content');
   menuContent.style.position = 'relative';
   menuContent.style.top = '0';
-  while (uiContainer.firstChild) {
-    menuContent.appendChild(uiContainer.firstChild);
+  while (uiContainer.children.length > 1) {
+    menuContent.appendChild(uiContainer.children[1]);
   }
   uiContainer.appendChild(menuContent);
 
