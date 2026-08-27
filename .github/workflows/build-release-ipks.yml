@@ -93,20 +93,27 @@ jobs:
           cd .private-images
           sha256sum -c SHA256SUMS
 
-      - name: Fix Docker source mount
+      - name: Fix Makefile build helpers
         run: |
           python3 - <<'PY'
           from pathlib import Path
 
           path = Path('Makefile')
           content = path.read_text()
-          old = '-v "$PWD:/app"'
-          new = '-v "$(CURRENT_DIR):/app"'
 
-          if old in content:
-              content = content.replace(old, new)
-          elif new not in content:
+          old_mount = '-v "$PWD:/app"'
+          new_mount = '-v "$(CURRENT_DIR):/app"'
+          if old_mount in content:
+              content = content.replace(old_mount, new_mount, 1)
+          elif new_mount not in content:
               raise SystemExit('Could not find docker-make source mount in Makefile')
+
+          old_ares = '$aresCmd -v -c $(WORKDIR)/ipk;'
+          new_ares = '$$aresCmd -v -c $(WORKDIR)/ipk;'
+          if old_ares in content:
+              content = content.replace(old_ares, new_ares, 1)
+          elif new_ares not in content:
+              raise SystemExit('Could not find ares-package command in Makefile')
 
           path.write_text(content)
           PY
@@ -250,14 +257,6 @@ jobs:
 
           readme.write_text(readme_text)
 
-          vp9 = Path('.github/workflows/vp9-4k-test.yml')
-          vp9_text = vp9.read_text()
-          old_default = f'default: v{current}'
-          new_default = f'default: v{version}'
-          if old_default not in vp9_text:
-              raise SystemExit(f'Could not find VP9 base tag default {old_default}')
-          vp9.write_text(vp9_text.replace(old_default, new_default, 1))
-
           manifest = {
               'id': 'youtube.leanback.v4',
               'version': version,
@@ -311,10 +310,9 @@ jobs:
           jq -e --arg version "$VERSION" '.packages[0].manifest.version == $version' repo.json
           grep -F "PROJECT_VERSION?=$VERSION" Makefile
           grep -F "## v$VERSION" README.md
-          grep -F "default: v$VERSION" .github/workflows/vp9-4k-test.yml
           sha256sum "$standard" "$pjtr"
           git diff --check
-          git diff -- README.md Makefile repo.json youtube.leanback.v4.manifest.json .github/workflows/vp9-4k-test.yml
+          git diff -- README.md Makefile repo.json youtube.leanback.v4.manifest.json
 
       - name: Commit release metadata
         env:
@@ -328,8 +326,7 @@ jobs:
             README.md \
             Makefile \
             repo.json \
-            youtube.leanback.v4.manifest.json \
-            .github/workflows/vp9-4k-test.yml
+            youtube.leanback.v4.manifest.json
 
           git commit -m "Release v$VERSION"
           git push origin HEAD:main
