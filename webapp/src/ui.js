@@ -32,6 +32,8 @@ export function userScriptStartUI() {
   let lastGreenKeyAt = 0;
   let currentFocusIndex = -1;
   let menuScrollFrame = null;
+  let menuOffset = 0;
+  let menuContent = null;
 
   function getDirectionFromEvent(evt) {
     const key = (evt.key || '').toLowerCase();
@@ -104,7 +106,11 @@ export function userScriptStartUI() {
   }
 
   function scrollMenuItemIntoView(item) {
-    if (!item || !uiContainer.contains(item)) return;
+    if (!item || !menuContent || !uiContainer.contains(item)) return;
+
+    // Cobalt resets an overflow container's scrollTop after programmatic focus.
+    // Keep the viewport fixed and move its inner panel instead.
+    uiContainer.scrollTop = 0;
 
     const visibleMargin = 24;
     const row = item.parentElement && uiContainer.contains(item.parentElement)
@@ -116,10 +122,15 @@ export function userScriptStartUI() {
     const visibleBottom = containerRect.bottom - visibleMargin;
 
     if (itemRect.top < visibleTop) {
-      uiContainer.scrollTop += itemRect.top - visibleTop;
+      menuOffset += itemRect.top - visibleTop;
     } else if (itemRect.bottom > visibleBottom) {
-      uiContainer.scrollTop += itemRect.bottom - visibleBottom;
+      menuOffset += itemRect.bottom - visibleBottom;
     }
+
+    const viewportHeight = Math.max(0, uiContainer.clientHeight - 48);
+    const maximumOffset = Math.max(0, menuContent.scrollHeight - viewportHeight);
+    menuOffset = Math.max(0, Math.min(maximumOffset, menuOffset));
+    menuContent.style.top = `${-menuOffset}px`;
   }
 
   function queueMenuItemScroll(item) {
@@ -333,6 +344,15 @@ export function userScriptStartUI() {
   );
   uiContainer.appendChild(sponsorBlock);
 
+  menuContent = document.createElement('div');
+  menuContent.classList.add('ytaf-ui-content');
+  menuContent.style.position = 'relative';
+  menuContent.style.top = '0';
+  while (uiContainer.firstChild) {
+    menuContent.appendChild(uiContainer.firstChild);
+  }
+  uiContainer.appendChild(menuContent);
+
   (document.body || document.documentElement).appendChild(uiContainer);
 
   let latestFocus = null;
@@ -380,7 +400,7 @@ export function userScriptStartUI() {
       maxWidth: '80vw',
       maxHeight: '80vh',
       boxSizing: 'border-box',
-      overflow: 'auto',
+      overflow: 'hidden',
       zIndex: '2147483647',
       pointerEvents: 'auto',
       background: '#05080c',
@@ -432,6 +452,8 @@ export function userScriptStartUI() {
         : null;
     suspendSpatialNavigation();
     applyVisibleContainerStyles();
+    menuOffset = 0;
+    menuContent.style.top = '0';
     uiContainer.scrollTop = 0;
 
     setTimeout(() => {
