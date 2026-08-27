@@ -31,6 +31,7 @@ export function userScriptStartUI() {
   const PLAYBACK_RATES = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
   let lastGreenKeyAt = 0;
   let currentFocusIndex = -1;
+  let menuScrollFrame = null;
 
   function getDirectionFromEvent(evt) {
     const key = (evt.key || '').toLowerCase();
@@ -106,24 +107,29 @@ export function userScriptStartUI() {
     if (!item || !uiContainer.contains(item)) return;
 
     const visibleMargin = 24;
-    let itemTop = 0;
-    let current = item;
-    while (current && current !== uiContainer) {
-      itemTop += current.offsetTop || 0;
-      current = current.offsetParent;
-    }
+    const row = item.parentElement && uiContainer.contains(item.parentElement)
+      ? item.parentElement
+      : item;
+    const containerRect = uiContainer.getBoundingClientRect();
+    const itemRect = row.getBoundingClientRect();
+    const visibleTop = containerRect.top + visibleMargin;
+    const visibleBottom = containerRect.bottom - visibleMargin;
 
-    const itemBottom = itemTop + (item.offsetHeight || 0);
-    const visibleTop = uiContainer.scrollTop + visibleMargin;
-    const visibleBottom =
-      uiContainer.scrollTop + uiContainer.clientHeight - visibleMargin;
-
-    if (itemTop < visibleTop) {
-      uiContainer.scrollTop = Math.max(0, itemTop - visibleMargin);
-    } else if (itemBottom > visibleBottom) {
-      uiContainer.scrollTop =
-        itemBottom - uiContainer.clientHeight + visibleMargin;
+    if (itemRect.top < visibleTop) {
+      uiContainer.scrollTop += itemRect.top - visibleTop;
+    } else if (itemRect.bottom > visibleBottom) {
+      uiContainer.scrollTop += itemRect.bottom - visibleBottom;
     }
+  }
+
+  function queueMenuItemScroll(item) {
+    if (menuScrollFrame !== null) {
+      window.cancelAnimationFrame(menuScrollFrame);
+    }
+    menuScrollFrame = window.requestAnimationFrame(() => {
+      menuScrollFrame = null;
+      scrollMenuItemIntoView(item);
+    });
   }
 
   function moveFocus(dir) {
@@ -152,7 +158,7 @@ export function userScriptStartUI() {
     const nextItem = focusableItems[currentFocusIndex];
     if (nextItem) {
       nextItem.focus();
-      scrollMenuItemIntoView(nextItem);
+      queueMenuItemScroll(nextItem);
       lastTabIndex = nextItem.tabIndex;
     }
   }
@@ -164,9 +170,9 @@ export function userScriptStartUI() {
   uiContainer.setAttribute('tabindex', 0);
   uiContainer.addEventListener(
     'focus',
-    () => {
+    (event) => {
       console.info('uiContainer focused!');
-      const focusedElement = document.activeElement;
+      const focusedElement = event.target;
       if (
         focusedElement &&
         focusedElement !== uiContainer &&
@@ -174,7 +180,7 @@ export function userScriptStartUI() {
         focusedElement.tabIndex > 0
       ) {
         lastTabIndex = focusedElement.tabIndex;
-        scrollMenuItemIntoView(focusedElement);
+        queueMenuItemScroll(focusedElement);
       }
     },
     true
@@ -406,7 +412,7 @@ export function userScriptStartUI() {
 
     if (target) {
       target.focus();
-      scrollMenuItemIntoView(target);
+      queueMenuItemScroll(target);
       currentFocusIndex = focusableItems.indexOf(target);
       if (target.tabIndex !== null && target.tabIndex > 0) {
         lastTabIndex = target.tabIndex;
@@ -469,6 +475,10 @@ export function userScriptStartUI() {
 
   function closeContainer() {
     console.info('Container: Hiding!');
+    if (menuScrollFrame !== null) {
+      window.cancelAnimationFrame(menuScrollFrame);
+      menuScrollFrame = null;
+    }
     if (focusGuardFrame !== null) {
       window.cancelAnimationFrame(focusGuardFrame);
       focusGuardFrame = null;
