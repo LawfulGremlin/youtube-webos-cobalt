@@ -448,7 +448,7 @@ export function userScriptStartUI() {
       background: '#05080c',
       color: '#ffffff',
       border: '6px solid #37ff77',
-      borderRadius: '0',
+      borderRadius: '12px',
       padding: '24px',
       fontSize: '22px',
       lineHeight: '1.25',
