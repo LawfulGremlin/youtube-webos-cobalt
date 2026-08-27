@@ -12,7 +12,8 @@ const defaultConfig = {
   enableSponsorBlockFiller: false,
   enableSponsorBlockHook: false,
   enableAutoLogin: true,
-  enableReturnYouTubeDislike: true
+  enableReturnYouTubeDislike: true,
+  enableShorts: true
 };
 
 let localConfig;

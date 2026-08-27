@@ -33,6 +33,7 @@ and potentially other PJTR/k7lp devices. It uses the stock PJTR app id,
 * Return YouTube Dislike support
 * Automatic account selection on startup
 * Playback speed support
+* Optional Shorts visibility
 * Optional autostart integration
 * Installable as patched `.ipk` package
 
