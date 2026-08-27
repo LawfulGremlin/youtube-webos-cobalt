@@ -1,20 +1,6 @@
 // const YT_BASE_URL = new URL('https://www.youtube.com/tv#/');
-import { configRead } from './config.js';
-
 const YT_BASE_URL = new URL('https://www.youtube.com/tv#/');
 const CONTENT_INTENT_REGEX = /^.+(?=Content)/g;
-const STARTUP_PAGE_BROWSE_IDS = {
-  subscriptions: 'FEsubscriptions',
-  shorts: 'FEshorts',
-  library: 'FElibrary'
-};
-
-export function getStartupPageUrl(page = configRead('startupPage')) {
-  const browseId = STARTUP_PAGE_BROWSE_IDS[page];
-  return browseId
-    ? `${YT_BASE_URL.origin}/tv#/browse/${browseId}`
-    : YT_BASE_URL.toString();
-}
 
 export function extractLaunchParams() {
   if (window.launchParams) {
@@ -76,27 +62,11 @@ export function handleLaunch(params) {
     }
     default: {
       console.info('Default launch');
-      href = getStartupPageUrl();
+      href = YT_BASE_URL.toString();
     }
   }
 
   window.location.href = href;
-}
-
-export function handleInitialLaunch() {
-  const params = extractLaunchParams();
-  if (params.target !== undefined || params.contentTarget !== undefined) {
-    return;
-  }
-
-  const href = getStartupPageUrl();
-  if (href === YT_BASE_URL.toString()) return;
-
-  const currentHash = window.location.hash;
-  if (currentHash === '' || currentHash === '#' || currentHash === '#/') {
-    console.info('Applying configured startup page');
-    window.location.href = href;
-  }
 }
 
 /**

@@ -6,7 +6,7 @@ import './domrect-polyfill';
 import './json-stringify-hook';
 import './ui.js';
 
-import { handleInitialLaunch, handleLaunch, waitForChildAdd } from './utils';
+import { handleLaunch, waitForChildAdd } from './utils';
 import { configRead } from './config.js';
 import { userScriptStartUI } from './ui.js';
 import { userScriptStartAdBlock } from './adblock.js';
@@ -95,12 +95,6 @@ function startDebugOverlay() {
 
 export async function startUserScript() {
   console.info('[ytaf] startUserScript begin');
-
-  try {
-    handleInitialLaunch();
-  } catch (err) {
-    console.warn('[ytaf] Failed to apply startup page:', err);
-  }
 
   try {
     userScriptStartUI();
