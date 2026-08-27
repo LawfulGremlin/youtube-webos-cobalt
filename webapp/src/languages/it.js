@@ -10,6 +10,7 @@ export default {
     autoLogin: 'Salta automaticamente la selezione account',
     sponsorblock: 'Attiva SponsorBlock',
     ryd: 'Mostra numero di non mi piace',
+    shorts: 'Attiva YouTube Shorts',
     sponsor: 'Salta segmenti sponsor',
     intro: 'Salta intro',
     outro: 'Salta outro',

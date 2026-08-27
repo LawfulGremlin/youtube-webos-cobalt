@@ -13,7 +13,7 @@ PACKAGE_NAME_OFFICIAL?=youtube.leanback.v4
 PACKAGE_NAME?=youtube.leanback.v4
 PACKAGE_NAME_TARGET=$(PACKAGE_NAME)
 PACKAGE_DISPLAY_NAME?=YouTube webOS Cobalt AdFree
-PROJECT_VERSION?=1.2.1
+PROJECT_VERSION?=1.2.2
 PACKAGE_COBALT_VERSION?=23.lts.6
 PACKAGE_VERSION?=$(PROJECT_VERSION)
 PACKAGE_IPK_BUILD=$(PACKAGE_NAME_TARGET)_$(PACKAGE_VERSION)_arm.ipk
@@ -426,7 +426,7 @@ ares-package:
 		aresCmd=node_modules/.bin/ares-package; \
 	fi; \
 	python3 $(PACKAGE_MTIME_NORMALIZER) --mtime $(IPK_MEMBER_MTIME) $(WORKDIR)/ipk; \
-	$aresCmd -v -c $(WORKDIR)/ipk; \
+	$$aresCmd -v -c $(WORKDIR)/ipk; \
 	$$aresCmd -v --outdir $(WORKDIR)/ipk-output $(WORKDIR)/ipk
 
 .PHONY: ares-package-docker
@@ -451,7 +451,7 @@ $(PACKAGE_TARGET): FORCE $(WORKDIR)/image/usr/palm/applications/$(PACKAGE_NAME_O
 
 .PHONY: docker-make.%
 docker-make.%:
-	docker run --rm -i -u $$(id -u):$$(id -g) -e HOME=/app -e npm_config_cache=/app/.npm -e WEBAPP_DEBUG="$(WEBAPP_DEBUG)" -e IPK_MEMBER_MTIME="$(IPK_MEMBER_MTIME)" -v "$PWD:/app" -w /app $(NODE_DOCKER_IMAGE) sh -lc 'mkdir -p /app/.webos /app/.npm && make $*'
+	docker run --rm -i -u $$(id -u):$$(id -g) -e HOME=/app -e npm_config_cache=/app/.npm -e WEBAPP_DEBUG="$(WEBAPP_DEBUG)" -e IPK_MEMBER_MTIME="$(IPK_MEMBER_MTIME)" -v "$(CURRENT_DIR):/app" -w /app $(NODE_DOCKER_IMAGE) sh -lc 'mkdir -p /app/.webos /app/.npm && make $*'
 .PHONY: npm
 npm:
 	( \

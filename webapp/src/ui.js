@@ -216,6 +216,14 @@ export function userScriptStartUI() {
   );
   uiContainer.appendChild(
     checkboxTools.add(
+      '__shorts',
+      text('shorts'),
+      configRead('enableShorts'),
+      callbackConfig('enableShorts')
+    )
+  );
+  uiContainer.appendChild(
+    checkboxTools.add(
       '__sponsorblock',
       text('sponsorblock'),
       configRead('enableSponsorBlock'),

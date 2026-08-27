@@ -9,7 +9,7 @@ import './ui.js';
 import { handleInitialLaunch, handleLaunch, waitForChildAdd } from './utils';
 import { configRead } from './config.js';
 import { userScriptStartUI } from './ui.js';
-import { userScriptStartAdBlock } from './adblock.js';
+import { userScriptStartAdBlock, userScriptStartShorts } from './adblock.js';
 import { userScriptStartSponsorBlock } from './sponsorblock.js';
 import { userScriptStartReturnYouTubeDislike } from './returnyoutubedislike.js';
 import { resetAutoLogin } from './auto-login.js';
@@ -104,6 +104,7 @@ export async function startUserScript() {
 
   try {
     userScriptStartUI();
+    userScriptStartShorts();
     startDebugOverlay();
     console.info('[ytaf] UI started');
   } catch (err) {
