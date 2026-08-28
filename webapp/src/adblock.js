@@ -52,8 +52,11 @@ const SHORTS_LINK_SELECTOR = [
   'a[aria-label="Shorts"]',
   'a[title="Shorts"]',
   '[role="link"][aria-label="Shorts"]',
+  '[role="link"][title="Shorts"]',
   '[role="menuitem"][aria-label="Shorts"]',
-  '[role="treeitem"][aria-label="Shorts"]'
+  '[role="menuitem"][title="Shorts"]',
+  '[role="treeitem"][aria-label="Shorts"]',
+  '[role="treeitem"][title="Shorts"]'
 ].join(',');
 const SHORTS_ITEM_CONTAINER_SELECTOR = [
   'ytlr-guide-entry-renderer',
@@ -154,10 +157,10 @@ function syncAdblockStyles() {
 }
 
 function findShortsContainer(node) {
-  if (node.getAttribute('data-browse-id') === 'FEshorts') return node;
-
   const semanticContainer = node.closest(SHORTS_ITEM_CONTAINER_SELECTOR);
   if (semanticContainer) return semanticContainer;
+
+  if (node.getAttribute('data-browse-id') === 'FEshorts') return node;
 
   let container = node;
   let item = node;
