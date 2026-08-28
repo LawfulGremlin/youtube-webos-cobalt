@@ -58,6 +58,7 @@ const SHORTS_LINK_SELECTOR = [
   '[role="treeitem"][aria-label="Shorts"]',
   '[role="treeitem"][title="Shorts"]'
 ].join(',');
+const SHORTS_LABEL_SELECTOR = '[aria-label], [title]';
 const SHORTS_ITEM_CONTAINER_SELECTOR = [
   'ytlr-guide-entry-renderer',
   'ytd-guide-entry-renderer',
@@ -177,7 +178,7 @@ function syncShortsAncestor(node) {
   if (!node || node.nodeType !== 1) return;
 
   let ancestor = node.parentElement;
-  for (let depth = 0; ancestor && depth < 8; depth += 1) {
+  while (ancestor) {
     if (
       ancestor.classList.contains('ytaf-hidden-shorts') ||
       ancestor.matches(SHORTS_ITEM_CONTAINER_SELECTOR)
@@ -256,7 +257,9 @@ function processShortsNode(node) {
   node.querySelectorAll('.ytaf-hidden-shorts').forEach(syncShortsNode);
   syncShortsNode(node);
   node
-    .querySelectorAll(`${SHORTS_RENDERER_SELECTOR}, ${SHORTS_LINK_SELECTOR}`)
+    .querySelectorAll(
+      `${SHORTS_RENDERER_SELECTOR}, ${SHORTS_LINK_SELECTOR}, ${SHORTS_LABEL_SELECTOR}`
+    )
     .forEach(syncShortsNode);
 }
 
