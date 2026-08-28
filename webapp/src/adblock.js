@@ -63,13 +63,6 @@ const SHORTS_ITEM_CONTAINER_SELECTOR = [
   '[role="treeitem"]',
   '[role="menuitem"]'
 ].join(',');
-const SHORTS_RESPONSE_KEYS = [
-  'reelShelfRenderer',
-  'reelShelfViewModel',
-  'shortsShelfRenderer',
-  'shortsLockupViewModel'
-];
-
 function findAdTile(adRenderer) {
   const semanticTile = adRenderer.closest(AD_TILE_SELECTOR);
   if (semanticTile) return semanticTile;
@@ -217,82 +210,6 @@ function isShortsPath(value) {
   );
 }
 
-function getShortsLinkNode(value) {
-  if (!value || typeof value !== 'object') return null;
-
-  const endpoints = [
-    value.navigationEndpoint,
-    value.onSelectCommand,
-    value.command,
-    value.tileRenderer?.onSelectCommand,
-    value.richItemRenderer?.content?.shortsLockupViewModel?.onTap
-  ];
-  return endpoints.find((endpoint) => {
-    const path = endpoint?.commandMetadata?.webCommandMetadata?.url;
-    const browseId = endpoint?.browseEndpoint?.browseId;
-    return isShortsPath(path) || browseId === 'FEshorts';
-  });
-}
-
-function isShortsResponseEntry(value) {
-  if (!value || typeof value !== 'object') return false;
-
-  const content =
-    value.richItemRenderer?.content ||
-    value.tileRenderer?.content ||
-    value.content;
-  return Boolean(
-    SHORTS_RESPONSE_KEYS.some((key) =>
-      Object.prototype.hasOwnProperty.call(value, key)
-    ) ||
-    content?.shortsLockupViewModel ||
-    content?.reelItemRenderer ||
-    getShortsLinkNode(value)
-  );
-}
-
-function stripShortsFromBrowseResponse(value, depth = 0) {
-  if (!value || typeof value !== 'object' || depth > 32) return false;
-
-  let changed = false;
-  if (Array.isArray(value)) {
-    for (let index = value.length - 1; index >= 0; index -= 1) {
-      if (isShortsResponseEntry(value[index])) {
-        value.splice(index, 1);
-        changed = true;
-      } else {
-        changed =
-          stripShortsFromBrowseResponse(value[index], depth + 1) || changed;
-      }
-    }
-    return changed;
-  }
-
-  Object.keys(value).forEach((key) => {
-    if (SHORTS_RESPONSE_KEYS.includes(key)) {
-      delete value[key];
-      changed = true;
-      return;
-    }
-
-    changed = stripShortsFromBrowseResponse(value[key], depth + 1) || changed;
-  });
-
-  return changed;
-}
-
-function isBrowseResponse(value) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
-
-  return (
-    !value.videoDetails &&
-    !value.streamingData &&
-    (value.contents ||
-      value.onResponseReceivedActions ||
-      value.onResponseReceivedEndpoints)
-  );
-}
-
 function syncShortsNode(node) {
   if (!node || node.nodeType !== 1) return;
 
@@ -316,6 +233,7 @@ function processShortsNode(node) {
   node
     .querySelectorAll(`${SHORTS_RENDERER_SELECTOR}, ${SHORTS_LINK_SELECTOR}`)
     .forEach(syncShortsNode);
+  node.querySelectorAll('.ytaf-hidden-shorts').forEach(syncShortsNode);
 }
 
 function startShortsObserver() {
@@ -510,14 +428,6 @@ JSON.parse = function () {
     if (stripAdditionalYouTubeAds(r)) {
       console.log('Adblock Removed additional renderers !');
     }
-  }
-
-  if (
-    !configRead('enableShorts') &&
-    isBrowseResponse(r) &&
-    stripShortsFromBrowseResponse(r)
-  ) {
-    console.log('Shorts disabled: removed browse renderers !');
   }
 
   return r;
