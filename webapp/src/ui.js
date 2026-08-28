@@ -522,7 +522,11 @@ export function userScriptStartUI() {
           if (wrapper) {
             wrapper.dataset.ytafIgnoreClickUntil = String(Date.now() + 1000);
           }
-          checkboxTools.toggleCheck(focusedElement.id);
+          if (focusedElement.dataset.ytafControl === 'choice') {
+            choiceTools.cycle(focusedElement.id);
+          } else {
+            checkboxTools.toggleCheck(focusedElement.id);
+          }
         }
         return false;
       }
