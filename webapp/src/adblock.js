@@ -286,6 +286,7 @@ function startShortsObserver() {
       'data-id',
       'aria-label',
       'title',
+      'role',
       'href',
       'data-uri',
       'data-href'
