@@ -163,6 +163,15 @@ function findShortsContainer(node) {
   return node;
 }
 
+function syncShortsAncestor(node) {
+  if (!node || node.nodeType !== 1) return;
+
+  const ancestor =
+    node.closest('.ytaf-hidden-shorts') ||
+    node.closest(SHORTS_ITEM_CONTAINER_SELECTOR);
+  if (ancestor) processShortsNode(ancestor);
+}
+
 function isShortsLink(node) {
   if (!node || node.nodeType !== 1) return false;
 
@@ -215,13 +224,7 @@ function syncShortsNode(node) {
 
   const isRenderer = node.matches(SHORTS_RENDERER_SELECTOR);
   const isLink = isShortsLink(node);
-  const isNavigationNode =
-    node.tagName === 'A' ||
-    node.hasAttribute('data-uri') ||
-    node.hasAttribute('data-href') ||
-    node.hasAttribute('data-browse-id');
-  const target =
-    isRenderer || !isNavigationNode ? node : findShortsContainer(node);
+  const target = isLink && !isRenderer ? findShortsContainer(node) : node;
 
   target.classList.toggle('ytaf-hidden-shorts', isRenderer || isLink);
 }
@@ -247,6 +250,7 @@ function startShortsObserver() {
         syncShortsNode(mutation.target);
       } else {
         processShortsNode(mutation.target);
+        syncShortsAncestor(mutation.target);
         mutation.addedNodes.forEach(processShortsNode);
       }
     });
