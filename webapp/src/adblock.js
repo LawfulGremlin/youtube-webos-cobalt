@@ -63,10 +63,6 @@ const SHORTS_LABEL_SELECTOR = '[aria-label], [title]';
 const SHORTS_MARKER_SELECTOR =
   '[data-browse-id], [data-section-id], [data-nav-id], [data-id]';
 const SHORTS_ITEM_CONTAINER_SELECTOR = [
-  'ytlr-shelf-renderer',
-  'ytd-shelf-renderer',
-  'ytlr-section-list-renderer',
-  'ytd-section-list-renderer',
   'ytlr-guide-entry-renderer',
   'ytd-guide-entry-renderer',
   'ytlr-rich-item-renderer',
