@@ -222,7 +222,8 @@ function isShortsLink(node) {
     node.hasAttribute('data-id');
   return (
     isNavigationNode &&
-    ((label.toLowerCase() === 'shorts' && !isWatchPath(href)) ||
+    ((label.toLowerCase() === 'shorts' &&
+      ![href, uri, dataHref].some(isWatchPath)) ||
       browseId === 'FEshorts' ||
       sectionId.toLowerCase() === 'shorts' ||
       navId.toLowerCase() === 'shorts' ||
@@ -313,12 +314,18 @@ function startShortsObserver() {
   processShortsNode(document.body);
   shortsObserver = new MutationObserver((mutations) => {
     mutations.forEach((mutation) => {
+      const target =
+        mutation.type === 'characterData'
+          ? mutation.target.parentElement
+          : mutation.target;
+      if (!target) return;
+
       if (mutation.type === 'attributes') {
-        syncShortsNode(mutation.target);
-        syncShortsAncestor(mutation.target);
+        syncShortsNode(target);
+        syncShortsAncestor(target);
       } else {
-        processShortsNode(mutation.target);
-        syncShortsAncestor(mutation.target);
+        processShortsNode(target);
+        syncShortsAncestor(target);
         mutation.addedNodes.forEach(processShortsNode);
       }
     });
