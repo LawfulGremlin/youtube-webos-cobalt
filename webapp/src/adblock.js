@@ -155,9 +155,11 @@ function findShortsContainer(node) {
   if (semanticContainer) return semanticContainer;
 
   let container = node;
+  let item = node;
   for (let depth = 0; depth < 8 && container.parentElement; depth += 1) {
+    item = container;
     container = container.parentElement;
-    if (container.children.length > 1) return container;
+    if (container.children.length > 1) return item;
   }
 
   return node;
@@ -254,6 +256,7 @@ function startShortsObserver() {
     mutations.forEach((mutation) => {
       if (mutation.type === 'attributes') {
         syncShortsNode(mutation.target);
+        syncShortsAncestor(mutation.target);
       } else {
         processShortsNode(mutation.target);
         syncShortsAncestor(mutation.target);
