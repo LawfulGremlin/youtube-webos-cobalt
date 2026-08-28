@@ -220,9 +220,15 @@ function isShortsLink(node) {
     node.hasAttribute('data-section-id') ||
     node.hasAttribute('data-nav-id') ||
     node.hasAttribute('data-id');
+  const isGuideNavigation = Boolean(
+    node.closest(
+      'ytlr-guide-entry-renderer, ytd-guide-entry-renderer, [role="tree"], [role="menubar"], [role="navigation"]'
+    )
+  );
   return (
     isNavigationNode &&
     ((label.toLowerCase() === 'shorts' &&
+      isGuideNavigation &&
       ![href, uri, dataHref].some(isWatchPath)) ||
       browseId === 'FEshorts' ||
       sectionId.toLowerCase() === 'shorts' ||
@@ -313,6 +319,7 @@ function startShortsObserver() {
 
   processShortsNode(document.body);
   shortsObserver = new MutationObserver((mutations) => {
+    const targets = new Set();
     mutations.forEach((mutation) => {
       const target =
         mutation.type === 'characterData'
@@ -320,13 +327,15 @@ function startShortsObserver() {
           : mutation.target;
       if (!target) return;
 
-      if (mutation.type === 'attributes') {
-        syncShortsNode(target);
-        syncShortsAncestor(target);
-      } else {
+      targets.add(target);
+      mutation.addedNodes.forEach((node) => {
+        if (node.nodeType === 1) targets.add(node);
+      });
+    });
+    targets.forEach((target) => {
+      if (target.parentElement) {
         processShortsNode(target);
         syncShortsAncestor(target);
-        mutation.addedNodes.forEach(processShortsNode);
       }
     });
   });
