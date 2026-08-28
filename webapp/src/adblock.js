@@ -216,8 +216,10 @@ function isShortsLink(node) {
   const sectionId = node.getAttribute('data-section-id') || '';
   const navId = node.getAttribute('data-nav-id') || '';
   const dataId = node.getAttribute('data-id') || '';
-  const label =
-    node.getAttribute('aria-label') || node.getAttribute('title') || '';
+  const labels = [
+    node.getAttribute('aria-label') || '',
+    node.getAttribute('title') || ''
+  ];
   const role = node.getAttribute('role') || '';
   const isNavigationNode =
     node.tagName === 'A' ||
@@ -235,11 +237,15 @@ function isShortsLink(node) {
       'ytlr-guide-entry-renderer, ytd-guide-entry-renderer, [role="tree"], [role="menu"], [role="menubar"], [role="navigation"]'
     )
   );
+  const hasShortsLabel = labels.some(
+    (value) => value.toLowerCase() === 'shorts'
+  );
+  const hasNavigationDestination = [href, uri, dataHref].some(Boolean);
+  const isLabelOnlyShorts =
+    hasShortsLabel && isGuideNavigation && !hasNavigationDestination;
   return (
     isNavigationNode &&
-    ((label.toLowerCase() === 'shorts' &&
-      isGuideNavigation &&
-      ![href, uri, dataHref].some(isWatchPath)) ||
+    (isLabelOnlyShorts ||
       browseId === 'FEshorts' ||
       sectionId.toLowerCase() === 'shorts' ||
       navId.toLowerCase() === 'shorts' ||
@@ -263,18 +269,6 @@ function findShortsShelfContainer(node) {
     'ytlr-shelf-renderer, ytd-shelf-renderer, ytlr-section-list-renderer, ytd-section-list-renderer'
   );
   return shelfContainer || node;
-}
-
-function isWatchPath(value) {
-  if (!value) return false;
-
-  const path = value.split(/[?#]/, 1)[0];
-  return (
-    path === '/watch' ||
-    path.startsWith('/watch/') ||
-    path === 'https://www.youtube.com/watch' ||
-    path.startsWith('https://www.youtube.com/watch/')
-  );
 }
 
 function isShortsPath(value) {
