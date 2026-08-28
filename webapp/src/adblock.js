@@ -36,6 +36,7 @@ const SHORTS_RENDERER_SELECTOR = [
   '[data-renderer-type="shortsShelfRenderer"]',
   '[data-renderer-type="shortsLockupViewModel"]'
 ].join(',');
+const SHORTS_SHELF_HEADER_SELECTOR = 'ytlr-shelf-header, ytd-shelf-header';
 const SHORTS_LINK_SELECTOR = [
   'a[href^="/shorts"]',
   'a[href^="/feed/shorts"]',
@@ -62,6 +63,10 @@ const SHORTS_LABEL_SELECTOR = '[aria-label], [title]';
 const SHORTS_MARKER_SELECTOR =
   '[data-browse-id], [data-section-id], [data-nav-id], [data-id]';
 const SHORTS_ITEM_CONTAINER_SELECTOR = [
+  'ytlr-shelf-renderer',
+  'ytd-shelf-renderer',
+  'ytlr-section-list-renderer',
+  'ytd-section-list-renderer',
   'ytlr-guide-entry-renderer',
   'ytd-guide-entry-renderer',
   'ytlr-rich-item-renderer',
@@ -226,6 +231,23 @@ function isShortsLink(node) {
   );
 }
 
+function isShortsShelfHeader(node) {
+  if (!node || node.nodeType !== 1) return false;
+
+  const tagName = node.tagName.toLowerCase();
+  return (
+    (tagName === 'ytlr-shelf-header' || tagName === 'ytd-shelf-header') &&
+    node.textContent.trim().toLowerCase() === 'shorts'
+  );
+}
+
+function findShortsShelfContainer(node) {
+  const shelfContainer = node.closest(
+    'ytlr-shelf-renderer, ytd-shelf-renderer, ytlr-section-list-renderer, ytd-section-list-renderer'
+  );
+  return shelfContainer || node;
+}
+
 function isWatchPath(value) {
   if (!value) return false;
 
@@ -258,10 +280,18 @@ function syncShortsNode(node) {
   if (!node || node.nodeType !== 1) return;
 
   const isRenderer = node.matches(SHORTS_RENDERER_SELECTOR);
+  const isShelfHeader = isShortsShelfHeader(node);
   const isLink = isShortsLink(node);
-  const target = isLink ? findShortsContainer(node) : node;
+  const target = isShelfHeader
+    ? findShortsShelfContainer(node)
+    : isLink
+      ? findShortsContainer(node)
+      : node;
 
-  target.classList.toggle('ytaf-hidden-shorts', isRenderer || isLink);
+  target.classList.toggle(
+    'ytaf-hidden-shorts',
+    isRenderer || isShelfHeader || isLink
+  );
 }
 
 function processShortsNode(node) {
@@ -272,7 +302,7 @@ function processShortsNode(node) {
   syncShortsNode(node);
   node
     .querySelectorAll(
-      `${SHORTS_RENDERER_SELECTOR}, ${SHORTS_LINK_SELECTOR}, ${SHORTS_LABEL_SELECTOR}, ${SHORTS_MARKER_SELECTOR}`
+      `${SHORTS_RENDERER_SELECTOR}, ${SHORTS_SHELF_HEADER_SELECTOR}, ${SHORTS_LINK_SELECTOR}, ${SHORTS_LABEL_SELECTOR}, ${SHORTS_MARKER_SELECTOR}`
     )
     .forEach(syncShortsNode);
 }
@@ -309,6 +339,7 @@ function startShortsObserver() {
       'data-href'
     ],
     childList: true,
+    characterData: true,
     subtree: true
   });
 }
