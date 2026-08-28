@@ -181,7 +181,7 @@ function findShortsContainer(node) {
   return node;
 }
 
-function syncShortsAncestor(node) {
+function collectShortsAncestors(node, targets) {
   if (!node || node.nodeType !== 1) return;
 
   let ancestor = node.parentElement;
@@ -190,7 +190,7 @@ function syncShortsAncestor(node) {
       ancestor.classList.contains('ytaf-hidden-shorts') ||
       ancestor.matches(SHORTS_ITEM_CONTAINER_SELECTOR)
     ) {
-      processShortsNode(ancestor);
+      targets.add(ancestor);
     }
     ancestor = ancestor.parentElement;
   }
@@ -328,14 +328,17 @@ function startShortsObserver() {
       if (!target) return;
 
       targets.add(target);
+      collectShortsAncestors(target, targets);
       mutation.addedNodes.forEach((node) => {
-        if (node.nodeType === 1) targets.add(node);
+        if (node.nodeType === 1) {
+          targets.add(node);
+          collectShortsAncestors(node, targets);
+        }
       });
     });
     targets.forEach((target) => {
       if (target.parentElement) {
         processShortsNode(target);
-        syncShortsAncestor(target);
       }
     });
   });
