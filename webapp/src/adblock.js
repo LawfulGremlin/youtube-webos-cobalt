@@ -48,7 +48,12 @@ const SHORTS_LINK_SELECTOR = [
   '[data-browse-id="FEshorts"]',
   '[data-section-id="shorts"]',
   '[data-nav-id="shorts"]',
-  '[data-id="shorts"]'
+  '[data-id="shorts"]',
+  'a[aria-label="Shorts"]',
+  'a[title="Shorts"]',
+  '[role="link"][aria-label="Shorts"]',
+  '[role="menuitem"][aria-label="Shorts"]',
+  '[role="treeitem"][aria-label="Shorts"]'
 ].join(',');
 const SHORTS_ITEM_CONTAINER_SELECTOR = [
   'ytlr-guide-entry-renderer',
