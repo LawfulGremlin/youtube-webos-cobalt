@@ -59,6 +59,8 @@ const SHORTS_LINK_SELECTOR = [
   '[role="treeitem"][title="Shorts"]'
 ].join(',');
 const SHORTS_LABEL_SELECTOR = '[aria-label], [title]';
+const SHORTS_MARKER_SELECTOR =
+  '[data-browse-id], [data-section-id], [data-nav-id], [data-id]';
 const SHORTS_ITEM_CONTAINER_SELECTOR = [
   'ytlr-guide-entry-renderer',
   'ytd-guide-entry-renderer',
@@ -215,12 +217,24 @@ function isShortsLink(node) {
     node.hasAttribute('data-id');
   return (
     isNavigationNode &&
-    (label.toLowerCase() === 'shorts' ||
+    ((label.toLowerCase() === 'shorts' && !isWatchPath(href)) ||
       browseId === 'FEshorts' ||
       sectionId.toLowerCase() === 'shorts' ||
       navId.toLowerCase() === 'shorts' ||
       dataId.toLowerCase() === 'shorts' ||
       [href, uri, dataHref].some(isShortsPath))
+  );
+}
+
+function isWatchPath(value) {
+  if (!value) return false;
+
+  const path = value.split(/[?#]/, 1)[0];
+  return (
+    path === '/watch' ||
+    path.startsWith('/watch/') ||
+    path === 'https://www.youtube.com/watch' ||
+    path.startsWith('https://www.youtube.com/watch/')
   );
 }
 
@@ -258,7 +272,7 @@ function processShortsNode(node) {
   syncShortsNode(node);
   node
     .querySelectorAll(
-      `${SHORTS_RENDERER_SELECTOR}, ${SHORTS_LINK_SELECTOR}, ${SHORTS_LABEL_SELECTOR}`
+      `${SHORTS_RENDERER_SELECTOR}, ${SHORTS_LINK_SELECTOR}, ${SHORTS_LABEL_SELECTOR}, ${SHORTS_MARKER_SELECTOR}`
     )
     .forEach(syncShortsNode);
 }
