@@ -166,10 +166,16 @@ function findShortsContainer(node) {
 function syncShortsAncestor(node) {
   if (!node || node.nodeType !== 1) return;
 
-  const ancestor =
-    node.closest('.ytaf-hidden-shorts') ||
-    node.closest(SHORTS_ITEM_CONTAINER_SELECTOR);
-  if (ancestor) processShortsNode(ancestor);
+  let ancestor = node.parentElement;
+  for (let depth = 0; ancestor && depth < 8; depth += 1) {
+    if (
+      ancestor.classList.contains('ytaf-hidden-shorts') ||
+      ancestor.matches(SHORTS_ITEM_CONTAINER_SELECTOR)
+    ) {
+      processShortsNode(ancestor);
+    }
+    ancestor = ancestor.parentElement;
+  }
 }
 
 function isShortsLink(node) {
@@ -224,7 +230,7 @@ function syncShortsNode(node) {
 
   const isRenderer = node.matches(SHORTS_RENDERER_SELECTOR);
   const isLink = isShortsLink(node);
-  const target = isLink && !isRenderer ? findShortsContainer(node) : node;
+  const target = isLink ? findShortsContainer(node) : node;
 
   target.classList.toggle('ytaf-hidden-shorts', isRenderer || isLink);
 }
