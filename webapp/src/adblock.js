@@ -79,6 +79,19 @@ const SHORTS_ITEM_CONTAINER_SELECTOR = [
   '[role="treeitem"]',
   '[role="menuitem"]'
 ].join(',');
+const SHORTS_ITEM_RESCAN_SELECTOR = [
+  'ytlr-guide-entry-renderer',
+  'ytd-guide-entry-renderer',
+  'ytlr-rich-item-renderer',
+  'ytd-rich-item-renderer',
+  'ytlr-grid-item-renderer',
+  'ytd-grid-item-renderer',
+  'ytlr-tile-renderer',
+  'ytd-tile-renderer',
+  '[role="listitem"]',
+  '[role="treeitem"]',
+  '[role="menuitem"]'
+].join(',');
 function findAdTile(adRenderer) {
   const semanticTile = adRenderer.closest(AD_TILE_SELECTOR);
   if (semanticTile) return semanticTile;
@@ -188,9 +201,10 @@ function collectShortsAncestors(node, targets) {
   while (ancestor) {
     if (
       ancestor.classList.contains('ytaf-hidden-shorts') ||
-      ancestor.matches(SHORTS_ITEM_CONTAINER_SELECTOR)
+      ancestor.matches(SHORTS_ITEM_RESCAN_SELECTOR)
     ) {
       targets.add(ancestor);
+      return;
     }
     ancestor = ancestor.parentElement;
   }
