@@ -10,6 +10,12 @@ html.ytaf-adblock-enabled ytd-masthead-ad-v3-renderer {
   pointer-events: none !important;
 }
 
+html.ytaf-shorts-disabled .ytaf-hidden-shorts {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
 html.ytaf-adblock-enabled .ytaf-hidden-ad-tile {
   display: none !important;
   visibility: hidden !important;

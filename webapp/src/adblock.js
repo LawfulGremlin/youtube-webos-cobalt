@@ -1,6 +1,7 @@
 /* eslint no-redeclare: 0 */
 /* global fetch:writable */
 import { configRead } from './config';
+import { stripSponsoredQrCodePopups } from './sponsored-qr-code-block.mjs';
 import './adblock.css';
 
 const AD_RENDERER_SELECTOR = [
@@ -20,6 +21,22 @@ const AD_TILE_SELECTOR = [
 ].join(',');
 
 let adSlotObserver = null;
+let shortsObserver = null;
+
+const SHORTS_RENDERER_SELECTOR = [
+  'ytlr-reel-shelf-renderer',
+  'ytd-reel-shelf-renderer',
+  'ytlr-reel-shelf-view-model',
+  'ytd-reel-shelf-view-model',
+  'ytlr-shorts-lockup-view-model',
+  'ytd-shorts-lockup-view-model',
+  'ytlr-reel-item-renderer',
+  'ytd-reel-item-renderer',
+  '[data-renderer-type="reelShelfRenderer"]',
+  '[data-renderer-type="reelShelfViewModel"]',
+  '[data-renderer-type="shortsShelfRenderer"]',
+  '[data-renderer-type="shortsLockupViewModel"]'
+].join(',');
 
 function findAdTile(adRenderer) {
   const semanticTile = adRenderer.closest(AD_TILE_SELECTOR);
@@ -71,9 +88,7 @@ function processAddedNode(node) {
 function startAdSlotObserver() {
   if (adSlotObserver || !document.body) return;
 
-  document
-    .querySelectorAll(AD_RENDERER_SELECTOR)
-    .forEach(hideAdRenderer);
+  document.querySelectorAll(AD_RENDERER_SELECTOR).forEach(hideAdRenderer);
 
   adSlotObserver = new MutationObserver((mutations) => {
     mutations.forEach((mutation) => {
@@ -99,10 +114,7 @@ function stopAdSlotObserver() {
 
 function syncAdblockStyles() {
   const enabled = Boolean(configRead('enableAdBlock'));
-  document.documentElement.classList.toggle(
-    'ytaf-adblock-enabled',
-    enabled
-  );
+  document.documentElement.classList.toggle('ytaf-adblock-enabled', enabled);
 
   if (enabled) {
     startAdSlotObserver();
@@ -111,8 +123,78 @@ function syncAdblockStyles() {
   }
 }
 
+function hideShortsRenderer(node) {
+  if (!node || node.nodeType !== 1) return;
+  node.classList.add('ytaf-hidden-shorts');
+}
+
+function syncShortsNode(node) {
+  if (!node || node.nodeType !== 1) return;
+
+  if (node.matches(SHORTS_RENDERER_SELECTOR)) {
+    hideShortsRenderer(node);
+  } else {
+    node.classList.remove('ytaf-hidden-shorts');
+  }
+}
+
+function processShortsNode(node) {
+  if (!node || node.nodeType !== 1) return;
+
+  syncShortsNode(node);
+  node.querySelectorAll('.ytaf-hidden-shorts').forEach(syncShortsNode);
+  node.querySelectorAll(SHORTS_RENDERER_SELECTOR).forEach(hideShortsRenderer);
+}
+
+function startShortsObserver() {
+  if (shortsObserver || !document.body) return;
+
+  processShortsNode(document.body);
+  shortsObserver = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      if (mutation.type === 'attributes') {
+        syncShortsNode(mutation.target);
+      } else {
+        mutation.addedNodes.forEach(processShortsNode);
+      }
+    });
+  });
+  shortsObserver.observe(document.body, {
+    attributes: true,
+    attributeFilter: ['data-renderer-type'],
+    childList: true,
+    subtree: true
+  });
+}
+
+function stopShortsObserver() {
+  if (shortsObserver) {
+    shortsObserver.disconnect();
+    shortsObserver = null;
+  }
+
+  document.querySelectorAll('.ytaf-hidden-shorts').forEach((node) => {
+    node.classList.remove('ytaf-hidden-shorts');
+  });
+}
+
+function syncShortsVisibility() {
+  const enabled = Boolean(configRead('enableShorts'));
+  document.documentElement.classList.toggle('ytaf-shorts-disabled', !enabled);
+
+  if (enabled) {
+    stopShortsObserver();
+  } else {
+    startShortsObserver();
+  }
+}
+
 export function userScriptStartAdBlock() {
   syncAdblockStyles();
+}
+
+export function userScriptStartShorts() {
+  syncShortsVisibility();
 }
 
 document.addEventListener(
@@ -120,6 +202,9 @@ document.addEventListener(
   (event) => {
     if (event.detail && event.detail.key === 'enableAdBlock') {
       syncAdblockStyles();
+    }
+    if (event.detail && event.detail.key === 'enableShorts') {
+      syncShortsVisibility();
     }
   },
   true
@@ -221,30 +306,6 @@ function stripAdditionalYouTubeAds(value, depth = 0) {
   return changed;
 }
 
-// YouTube TV sends contextual Shop/sponsored QR popups as timely actions in
-// player and next responses. Removing the collection prevents the overlays
-// from being scheduled while leaving the rest of the player overlay intact.
-function stripSponsoredQrCodePopups(value, depth = 0) {
-  if (!value || typeof value !== 'object' || depth > 16) return false;
-
-  let changed = false;
-  Object.keys(value).forEach((key) => {
-    const child = value[key];
-    if (
-      key === 'playerOverlayRenderer' &&
-      child &&
-      Object.prototype.hasOwnProperty.call(child, 'timelyActionRenderers')
-    ) {
-      delete child.timelyActionRenderers;
-      changed = true;
-    }
-
-    changed = stripSponsoredQrCodePopups(child, depth + 1) || changed;
-  });
-
-  return changed;
-}
-
 /**
  * This is a minimal reimplementation of the following uBlock Origin rule:
  * https://github.com/uBlockOrigin/uAssets/blob/3497eebd440f4871830b9b45af0afc406c6eb593/filters/filters.txt#L116
@@ -262,7 +323,6 @@ JSON.parse = function () {
     if (stripYouTubeAds(r)) {
       console.log('Adblock Removed !');
     }
-
     if (stripAdditionalYouTubeAds(r)) {
       console.log('Adblock Removed additional renderers !');
     }

@@ -6,6 +6,7 @@ export default {
     autoLogin: 'Automatically skip account selection',
     sponsorblock: 'Enable SponsorBlock',
     ryd: 'Show dislike counts',
+    shorts: 'Enable YouTube Shorts',
     sponsor: 'Skip Sponsor Segments',
     intro: 'Skip Intro Segments',
     outro: 'Skip Outro Segments',
