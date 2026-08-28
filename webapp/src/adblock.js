@@ -229,11 +229,12 @@ function syncShortsNode(node) {
 function processShortsNode(node) {
   if (!node || node.nodeType !== 1) return;
 
+  // Clear stale classes first; current Shorts matches must win below.
+  node.querySelectorAll('.ytaf-hidden-shorts').forEach(syncShortsNode);
   syncShortsNode(node);
   node
     .querySelectorAll(`${SHORTS_RENDERER_SELECTOR}, ${SHORTS_LINK_SELECTOR}`)
     .forEach(syncShortsNode);
-  node.querySelectorAll('.ytaf-hidden-shorts').forEach(syncShortsNode);
 }
 
 function startShortsObserver() {
