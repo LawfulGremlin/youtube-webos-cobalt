@@ -232,7 +232,7 @@ function isShortsLink(node) {
     node.hasAttribute('data-id');
   const isGuideNavigation = Boolean(
     node.closest(
-      'ytlr-guide-entry-renderer, ytd-guide-entry-renderer, [role="tree"], [role="menubar"], [role="navigation"]'
+      'ytlr-guide-entry-renderer, ytd-guide-entry-renderer, [role="tree"], [role="menu"], [role="menubar"], [role="navigation"]'
     )
   );
   return (
