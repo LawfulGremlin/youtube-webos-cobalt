@@ -197,8 +197,12 @@ function isShortsLink(node) {
   const dataId = node.getAttribute('data-id') || '';
   const label =
     node.getAttribute('aria-label') || node.getAttribute('title') || '';
+  const role = node.getAttribute('role') || '';
   const isNavigationNode =
     node.tagName === 'A' ||
+    role === 'link' ||
+    role === 'menuitem' ||
+    role === 'treeitem' ||
     node.hasAttribute('data-uri') ||
     node.hasAttribute('data-href') ||
     node.hasAttribute('data-browse-id') ||
