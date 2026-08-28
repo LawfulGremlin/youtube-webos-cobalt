@@ -246,6 +246,7 @@ function startShortsObserver() {
       if (mutation.type === 'attributes') {
         syncShortsNode(mutation.target);
       } else {
+        processShortsNode(mutation.target);
         mutation.addedNodes.forEach(processShortsNode);
       }
     });
