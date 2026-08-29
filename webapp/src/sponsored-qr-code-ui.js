@@ -24,6 +24,8 @@ export function userScriptStartSponsoredQrCodeUI() {
     return;
   }
 
+  const menuContent =
+    uiContainer.querySelector('.ytaf-ui-content') || uiContainer;
   const control = checkboxTools.add(
     '__sponsored_qr_code_block',
     getLabel(),
@@ -37,9 +39,9 @@ export function userScriptStartSponsoredQrCodeUI() {
     (startupControl && startupControl.parentElement) ||
     (adblockControl && adblockControl.parentElement);
 
-  if (anchor && anchor.parentElement === uiContainer) {
-    uiContainer.insertBefore(control, anchor.nextSibling);
+  if (anchor && anchor.parentElement === menuContent) {
+    menuContent.insertBefore(control, anchor.nextSibling);
   } else {
-    uiContainer.appendChild(control);
+    menuContent.appendChild(control);
   }
 }
