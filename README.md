@@ -33,7 +33,7 @@ and potentially other PJTR/k7lp devices. It uses the stock PJTR app id,
 * Return YouTube Dislike support
 * Automatic account selection on startup
 * Playback speed support
-* Optional Shorts visibility
+* Optional Shorts visibility across the sidebar, home page and browse sections
 * Optional autostart integration
 * Installable as patched `.ipk` package
 
@@ -41,6 +41,10 @@ The configuration screen can be opened with the **GREEN** button on the LG remot
 While a video is playing, press **1** to decrease the playback speed or **3** to
 increase it. Press **0** to toggle subtitles on or off. The available playback
 speeds range from 0.25× to 2×.
+
+When **Enable YouTube Shorts** is disabled, Shorts navigation entries and Shorts
+content are hidden from the sidebar, home page, search results and other browse
+sections. Direct Shorts playback remains available when opened explicitly.
 
 ## Requirements
 
