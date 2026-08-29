@@ -1,0 +1,12 @@
+diff --git a/starboard/build/platforms.py b/starboard/build/platforms.py
+index b9861a7a6..d2df93f7b 100644
+--- a/starboard/build/platforms.py
++++ b/starboard/build/platforms.py
+@@ -34,6 +34,7 @@ PLATFORMS = {
+     'evergreen-arm-hardfp': 'starboard/evergreen/arm/hardfp',
+     'evergreen-arm-softfp': 'starboard/evergreen/arm/softfp',
+     'evergreen-arm64': 'starboard/evergreen/arm64',
++    'webos-arm': 'starboard/webos/arm',
+     'win-win32': 'starboard/win/win32',
+ }
+ PLATFORMS.update(INTERNAL_PLATFORMS)

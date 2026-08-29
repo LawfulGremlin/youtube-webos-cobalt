@@ -1,0 +1,16 @@
+diff --git a/starboard/linux/shared/routes.cc b/starboard/linux/shared/routes.cc
+index 5663dc392..660308534 100644
+--- a/starboard/linux/shared/routes.cc
++++ b/starboard/linux/shared/routes.cc
+@@ -18,6 +18,11 @@
+ #include <linux/rtnetlink.h>
+ #include <net/if.h>
+ // This include has to be loaded after net/if.h.
++// Older webOS sysroots do not carry glibc's modern linux/libc compatibility
++// guards and otherwise redefine ifmap, ifreq and ifconf here.
++#if defined(STARBOARD_WEBOS)
++#define _LINUX_IF_H
++#endif
+ #include <linux/wireless.h>  // NOLINT(build/include_order)
+ #include <string.h>
+ #include <sys/ioctl.h>

@@ -1,0 +1,25 @@
+diff --git a/net/BUILD.gn b/net/BUILD.gn
+index 1044e1d30..19d17722b 100644
+--- a/net/BUILD.gn
++++ b/net/BUILD.gn
+@@ -27,6 +27,10 @@ config("net_public_defines") {
+   ]
+ }
+ 
++config("webos_gcc_compat") {
++  cflags_cc = [ "-Wno-invalid-offsetof" ]
++}
++
+ component("net") {
+   check_includes = false
+ 
+@@ -1721,6 +1725,9 @@ component("net") {
+ 
+   public_configs = [ ":net_public_defines" ]
+   configs += [ "//build/config/compiler:chromium_code" ]
++  if (target_platform == "webos-arm") {
++    configs += [ ":webos_gcc_compat" ]
++  }
+   all_dependent_configs = [ ":net_all_dependent_configs" ]
+ 
+   defines = [ "NET_IMPLEMENTATION" ]

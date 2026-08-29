@@ -1,0 +1,92 @@
+diff --git a/cobalt/renderer/backend/egl/display.cc b/cobalt/renderer/backend/egl/display.cc
+index e9398cc73..27083cc70 100644
+--- a/cobalt/renderer/backend/egl/display.cc
++++ b/cobalt/renderer/backend/egl/display.cc
+@@ -75,7 +75,9 @@ DisplayRenderTargetEGL::DisplayRenderTargetEGL(EGLDisplay display,
+ const math::Size& DisplayRenderTargetEGL::GetSize() const { return size_; }
+ 
+ DisplayRenderTargetEGL::~DisplayRenderTargetEGL() {
++#if !defined(STARBOARD_WEBOS)
+   EGL_CALL_SIMPLE(eglDestroySurface(display_, surface_));
++#endif
+ }
+ 
+ EGLSurface DisplayRenderTargetEGL::GetSurface() const { return surface_; }
+diff --git a/cobalt/renderer/backend/egl/graphics_system.cc b/cobalt/renderer/backend/egl/graphics_system.cc
+index e23cf9ce4..d82d31726 100644
+--- a/cobalt/renderer/backend/egl/graphics_system.cc
++++ b/cobalt/renderer/backend/egl/graphics_system.cc
+@@ -41,6 +41,9 @@
+ #endif
+ #include "starboard/common/optional.h"
+ #include "starboard/configuration.h"
++#if defined(STARBOARD_WEBOS)
++#include "starboard/webos/arm/egl_surface.h"
++#endif
+ 
+ namespace cobalt {
+ namespace renderer {
+@@ -77,6 +80,32 @@ struct ChooseConfigResult {
+ base::Optional<ChooseConfigResult> ChooseConfig(
+     EGLDisplay display, EGLint* attribute_list,
+     system_window::SystemWindow* system_window) {
++#if defined(STARBOARD_WEBOS)
++  if (system_window) {
++    EGLSurface sdl_surface =
++        reinterpret_cast<EGLSurface>(SbWebOSGetSdlEglSurface());
++    const EGLint sdl_config_id = SbWebOSGetSdlEglConfigId();
++    EGLint num_configs = 0;
++    EGL_CALL_SIMPLE(eglGetConfigs(display, NULL, 0, &num_configs));
++    std::unique_ptr<EGLConfig[]> configs(new EGLConfig[num_configs]);
++    EGL_CALL_SIMPLE(
++        eglGetConfigs(display, configs.get(), num_configs, &num_configs));
++    for (EGLint i = 0; i < num_configs; ++i) {
++      EGLint config_id = 0;
++      EGL_CALL_SIMPLE(
++          eglGetConfigAttrib(display, configs[i], EGL_CONFIG_ID, &config_id));
++      if (config_id == sdl_config_id && sdl_surface != EGL_NO_SURFACE) {
++        ChooseConfigResult result;
++        result.config = configs[i];
++        result.window_surface = sdl_surface;
++        LOG(INFO) << "Adopting SDL EGL surface with config " << config_id;
++        return result;
++      }
++    }
++    LOG(ERROR) << "Could not find SDL EGL config " << sdl_config_id;
++    return base::nullopt;
++  }
++#endif
+   if (!system_window) {
+     // If there is no system window provided then this task is much easier,
+     // just return the first config that matches the provided attributes.
+@@ -114,7 +143,8 @@ base::Optional<ChooseConfigResult> ChooseConfig(
+   for (EGLint i = 0; i < num_configs; ++i) {
+     EGLSurface surface = EGL_CALL_SIMPLE(
+         eglCreateWindowSurface(display, configs[i], native_window, NULL));
+-    if (EGL_SUCCESS == EGL_CALL_SIMPLE(eglGetError())) {
++    const EGLint error = EGL_CALL_SIMPLE(eglGetError());
++    if (EGL_SUCCESS == error) {
+       // We did it, we found a config that allows us to successfully create
+       // a surface.  Return the config along with the created surface.
+       ChooseConfigResult result;
+@@ -122,6 +152,20 @@ base::Optional<ChooseConfigResult> ChooseConfig(
+       result.window_surface = surface;
+       return result;
+     }
++    EGLint config_id = 0;
++    EGLint native_visual_id = 0;
++    EGLint surface_type = 0;
++    EGL_CALL_SIMPLE(
++        eglGetConfigAttrib(display, configs[i], EGL_CONFIG_ID, &config_id));
++    EGL_CALL_SIMPLE(eglGetConfigAttrib(display, configs[i],
++                                       EGL_NATIVE_VISUAL_ID,
++                                       &native_visual_id));
++    EGL_CALL_SIMPLE(eglGetConfigAttrib(display, configs[i], EGL_SURFACE_TYPE,
++                                       &surface_type));
++    LOG(ERROR) << "eglCreateWindowSurface failed: error=" << error
++               << " config=" << config_id
++               << " native_visual=" << native_visual_id
++               << " surface_type=" << surface_type;
+   }
+ 
+   // We could not find a config with the provided window, return a failure.

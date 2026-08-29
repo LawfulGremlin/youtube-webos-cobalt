@@ -1,0 +1,17 @@
+{
+  "id": "org.rf1705.cobalt-starterless",
+  "version": "0.1.21",
+  "vendor": "RF1705",
+  "type": "native",
+  "main": "cobalt",
+  "title": "Cobalt Starterless",
+  "icon": "icon.png",
+  "largeIcon": "largeIcon.png",
+  "iconColor": "#173f5f",
+  "splashBackground": "splashBackground.png",
+  "spinnerOnLaunch": false,
+  "transparent": true,
+  "handlesRelaunch": true,
+  "nativeLifeCycleInterfaceVersion": 2,
+  "requiredMemory": 512
+}

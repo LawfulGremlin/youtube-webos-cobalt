@@ -1,0 +1,10 @@
+diff --git a/starboard/shared/pulse/pulse_dynamic_load_dispatcher.cc b/starboard/shared/pulse/pulse_dynamic_load_dispatcher.cc
+--- a/starboard/shared/pulse/pulse_dynamic_load_dispatcher.cc
++++ b/starboard/shared/pulse/pulse_dynamic_load_dispatcher.cc
+@@ -24,5 +24,5 @@ namespace pulse {
+ 
+ namespace {
+-const char kPulseLibraryName[] = "libpulse.so";
++const char kPulseLibraryName[] = "libpulse.so.0";
+ void* pulse_lib_handle = NULL;
+ }  // namespace

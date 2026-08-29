@@ -1,0 +1,18 @@
+diff --git a/starboard/linux/shared/BUILD.gn b/starboard/linux/shared/BUILD.gn
+index eb178b194..563ae3f3d 100644
+--- a/starboard/linux/shared/BUILD.gn
++++ b/starboard/linux/shared/BUILD.gn
+@@ -401,6 +401,13 @@ static_library("starboard_platform_sources") {
+     "//starboard/shared/stub/window_update_on_screen_keyboard_suggestions.cc",
+   ]
+ 
++  # SDL supplies webOS remote, keyboard and pointer events. The TV sysroot has
++  # older Linux input headers and this otherwise unused gamepad reader expects
++  # newer BTN_* definitions.
++  if (target_platform == "webos-arm") {
++    sources -= [ "//starboard/shared/linux/dev_input/dev_input.cc" ]
++  }
++
+   sources += common_player_sources
+ 
+   sources -= [ "//starboard/shared/starboard/player/player_set_bounds.cc" ]
