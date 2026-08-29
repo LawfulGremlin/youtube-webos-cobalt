@@ -244,8 +244,13 @@ function isShortsLink(node) {
     (value) =>
       value && value !== '#' && value !== '#/' && !/^javascript:/i.test(value)
   );
+  const hasOrdinaryBrowseDestination =
+    browseId && browseId.toLowerCase() !== 'feshorts';
   const isLabelOnlyShorts =
-    hasShortsLabel && isGuideNavigation && !hasNavigationDestination;
+    hasShortsLabel &&
+    isGuideNavigation &&
+    !hasNavigationDestination &&
+    !hasOrdinaryBrowseDestination;
   return (
     isNavigationNode &&
     (isLabelOnlyShorts ||
