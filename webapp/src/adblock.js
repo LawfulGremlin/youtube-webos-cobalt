@@ -195,13 +195,14 @@ function collectShortsAncestors(node, targets) {
 
   let ancestor = node.parentElement;
   while (ancestor) {
+    const isShelfHeader = ancestor.matches(SHORTS_SHELF_HEADER_SELECTOR);
     if (
       ancestor.classList.contains('ytaf-hidden-shorts') ||
-      ancestor.matches(SHORTS_SHELF_HEADER_SELECTOR) ||
+      isShelfHeader ||
       ancestor.matches(SHORTS_ITEM_RESCAN_SELECTOR)
     ) {
       targets.add(ancestor);
-      return;
+      if (!isShelfHeader) return;
     }
     ancestor = ancestor.parentElement;
   }
