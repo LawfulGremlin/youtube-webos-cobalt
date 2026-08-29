@@ -5,6 +5,9 @@ const SHORTS_RESPONSE_KEYS = [
   'shortsLockupViewModel'
 ];
 
+const TV_SHORTS_SHELF_RENDERER_TYPE = 'TVHTML5_SHELF_RENDERER_TYPE_SHORTS';
+const TV_SHORTS_ICON_TYPE = 'YOUTUBE_SHORTS_FILL_24';
+
 export function isShortsPath(value) {
   if (!value) return false;
 
@@ -39,6 +42,18 @@ function getShortsLinkNode(value) {
   });
 }
 
+function isTvShortsShelf(value) {
+  if (!value || typeof value !== 'object') return false;
+
+  const shelf = value.shelfRenderer;
+  if (!shelf || typeof shelf !== 'object') return false;
+
+  return (
+    shelf.tvhtml5ShelfRendererType === TV_SHORTS_SHELF_RENDERER_TYPE ||
+    shelf.icon?.iconType === TV_SHORTS_ICON_TYPE
+  );
+}
+
 export function isShortsResponseEntry(value) {
   if (!value || typeof value !== 'object') return false;
 
@@ -48,9 +63,10 @@ export function isShortsResponseEntry(value) {
     value.content;
 
   return Boolean(
-    SHORTS_RESPONSE_KEYS.some((key) =>
-      Object.prototype.hasOwnProperty.call(value, key)
-    ) ||
+    isTvShortsShelf(value) ||
+      SHORTS_RESPONSE_KEYS.some((key) =>
+        Object.prototype.hasOwnProperty.call(value, key)
+      ) ||
       content?.shortsLockupViewModel ||
       content?.reelItemRenderer ||
       getShortsLinkNode(value)
