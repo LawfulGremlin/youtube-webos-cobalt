@@ -1,6 +1,7 @@
 /* eslint no-redeclare: 0 */
 /* global fetch:writable */
 import { configRead } from './config';
+import { stripSponsoredQrCodePopups } from './sponsored-qr-code-block.mjs';
 import './adblock.css';
 
 const AD_RENDERER_SELECTOR = [
@@ -322,10 +323,16 @@ JSON.parse = function () {
     if (stripYouTubeAds(r)) {
       console.log('Adblock Removed !');
     }
-
     if (stripAdditionalYouTubeAds(r)) {
       console.log('Adblock Removed additional renderers !');
     }
+  }
+
+  if (
+    configRead('enableSponsoredQrCodeBlock') &&
+    stripSponsoredQrCodePopups(r)
+  ) {
+    console.log('Adblock Removed sponsored QR code popups !');
   }
 
   return r;
