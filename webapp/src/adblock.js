@@ -20,75 +20,14 @@ const AD_TILE_SELECTOR = [
   '[role="gridcell"]'
 ].join(',');
 
+const SHORTS_GUIDE_ENTRY_SELECTOR =
+  'ytlr-guide-entry-renderer, ytd-guide-entry-renderer';
+const SHORTS_SHELF_SELECTOR = 'ytlr-shelf-renderer, ytd-shelf-renderer';
+const SHORTS_SHELF_HEADER_SELECTOR = 'ytlr-shelf-header, ytd-shelf-header';
+
 let adSlotObserver = null;
 let shortsObserver = null;
 
-const SHORTS_RENDERER_SELECTOR = [
-  'ytlr-reel-shelf-renderer',
-  'ytd-reel-shelf-renderer',
-  'ytlr-reel-shelf-view-model',
-  'ytd-reel-shelf-view-model',
-  'ytlr-shorts-lockup-view-model',
-  'ytd-shorts-lockup-view-model',
-  'ytlr-reel-item-renderer',
-  'ytd-reel-item-renderer',
-  '[data-renderer-type="reelShelfRenderer"]',
-  '[data-renderer-type="reelShelfViewModel"]',
-  '[data-renderer-type="shortsShelfRenderer"]',
-  '[data-renderer-type="shortsLockupViewModel"]'
-].join(',');
-const SHORTS_SHELF_HEADER_SELECTOR = 'ytlr-shelf-header, ytd-shelf-header';
-const SHORTS_LINK_SELECTOR = [
-  'a[href^="/shorts"]',
-  'a[href^="/feed/shorts"]',
-  'a[href^="https://www.youtube.com/shorts"]',
-  'a[href^="https://www.youtube.com/feed/shorts"]',
-  '[data-uri^="/shorts"]',
-  '[data-uri^="/feed/shorts"]',
-  '[data-href^="/shorts"]',
-  '[data-href^="/feed/shorts"]',
-  '[data-browse-id="FEshorts"]',
-  '[data-section-id="shorts"]',
-  '[data-nav-id="shorts"]',
-  '[data-id="shorts"]',
-  'a[aria-label="Shorts"]',
-  'a[title="Shorts"]',
-  '[role="link"][aria-label="Shorts"]',
-  '[role="link"][title="Shorts"]',
-  '[role="menuitem"][aria-label="Shorts"]',
-  '[role="menuitem"][title="Shorts"]',
-  '[role="treeitem"][aria-label="Shorts"]',
-  '[role="treeitem"][title="Shorts"]'
-].join(',');
-const SHORTS_LABEL_SELECTOR = '[aria-label], [title]';
-const SHORTS_MARKER_SELECTOR =
-  '[data-browse-id], [data-section-id], [data-nav-id], [data-id]';
-const SHORTS_ITEM_CONTAINER_SELECTOR = [
-  'ytlr-guide-entry-renderer',
-  'ytd-guide-entry-renderer',
-  'ytlr-rich-item-renderer',
-  'ytd-rich-item-renderer',
-  'ytlr-grid-item-renderer',
-  'ytd-grid-item-renderer',
-  'ytlr-tile-renderer',
-  'ytd-tile-renderer',
-  '[role="listitem"]',
-  '[role="treeitem"]',
-  '[role="menuitem"]'
-].join(',');
-const SHORTS_ITEM_RESCAN_SELECTOR = [
-  'ytlr-guide-entry-renderer',
-  'ytd-guide-entry-renderer',
-  'ytlr-rich-item-renderer',
-  'ytd-rich-item-renderer',
-  'ytlr-grid-item-renderer',
-  'ytd-grid-item-renderer',
-  'ytlr-tile-renderer',
-  'ytd-tile-renderer',
-  '[role="listitem"]',
-  '[role="treeitem"]',
-  '[role="menuitem"]'
-].join(',');
 function findAdTile(adRenderer) {
   const semanticTile = adRenderer.closest(AD_TILE_SELECTOR);
   if (semanticTile) return semanticTile;
@@ -174,204 +113,96 @@ function syncAdblockStyles() {
   }
 }
 
-function findShortsContainer(node) {
-  const semanticContainer = node.closest(SHORTS_ITEM_CONTAINER_SELECTOR);
-  if (semanticContainer) return semanticContainer;
-
-  if (node.getAttribute('data-browse-id') === 'FEshorts') return node;
-
-  let container = node;
-  let item = node;
-  for (let depth = 0; depth < 8 && container.parentElement; depth += 1) {
-    item = container;
-    container = container.parentElement;
-    if (container.children.length > 1) return item;
-  }
-
-  return node;
+function isShortsLabel(value) {
+  return (value || '').trim().toLowerCase() === 'shorts';
 }
 
-function collectShortsAncestors(node, targets) {
-  if (!node || node.nodeType !== 1) return;
+function syncShortsGuideEntry(entry) {
+  if (!entry || entry.nodeType !== 1) return;
 
-  let ancestor = node.parentElement;
-  while (ancestor) {
-    const isShelfHeader = ancestor.matches(SHORTS_SHELF_HEADER_SELECTOR);
-    if (
-      ancestor.classList.contains('ytaf-hidden-shorts') ||
-      isShelfHeader ||
-      ancestor.matches(SHORTS_ITEM_RESCAN_SELECTOR)
-    ) {
-      targets.add(ancestor);
-      if (!isShelfHeader) return;
-    }
-    ancestor = ancestor.parentElement;
-  }
-}
-
-function isShortsLink(node) {
-  if (!node || node.nodeType !== 1) return false;
-
-  const href = node.getAttribute('href') || '';
-  const uri = node.getAttribute('data-uri') || '';
-  const dataHref = node.getAttribute('data-href') || '';
-  const browseId = node.getAttribute('data-browse-id') || '';
-  const sectionId = node.getAttribute('data-section-id') || '';
-  const navId = node.getAttribute('data-nav-id') || '';
-  const dataId = node.getAttribute('data-id') || '';
-  const labels = [
-    node.getAttribute('aria-label') || '',
-    node.getAttribute('title') || ''
-  ];
-  const role = node.getAttribute('role') || '';
-  const isNavigationNode =
-    node.tagName === 'A' ||
-    role === 'link' ||
-    role === 'menuitem' ||
-    role === 'treeitem' ||
-    node.hasAttribute('data-uri') ||
-    node.hasAttribute('data-href') ||
-    node.hasAttribute('data-browse-id') ||
-    node.hasAttribute('data-section-id') ||
-    node.hasAttribute('data-nav-id') ||
-    node.hasAttribute('data-id');
-  const isGuideNavigation = Boolean(
-    node.closest(
-      'ytlr-guide-entry-renderer, ytd-guide-entry-renderer, [role="tree"], [role="menu"], [role="menubar"], [role="navigation"]'
-    )
-  );
-  const hasShortsLabel = labels.some(
-    (value) => value.toLowerCase() === 'shorts'
-  );
-  const hasNavigationDestination = [href, uri, dataHref].some(
-    (value) =>
-      value && value !== '#' && value !== '#/' && !/^javascript:/i.test(value)
-  );
-  const hasOrdinaryBrowseDestination =
-    browseId && browseId.toLowerCase() !== 'feshorts';
-  const isLabelOnlyShorts =
-    hasShortsLabel &&
-    isGuideNavigation &&
-    !hasNavigationDestination &&
-    !hasOrdinaryBrowseDestination;
-  return (
-    isNavigationNode &&
-    (isLabelOnlyShorts ||
-      browseId === 'FEshorts' ||
-      sectionId.toLowerCase() === 'shorts' ||
-      navId.toLowerCase() === 'shorts' ||
-      dataId.toLowerCase() === 'shorts' ||
-      [href, uri, dataHref].some(isShortsPath))
-  );
-}
-
-function isShortsShelfHeader(node) {
-  if (!node || node.nodeType !== 1) return false;
-
-  const tagName = node.tagName.toLowerCase();
-  return (
-    (tagName === 'ytlr-shelf-header' || tagName === 'ytd-shelf-header') &&
-    node.textContent.trim().toLowerCase() === 'shorts'
-  );
-}
-
-function findShortsShelfContainer(node) {
-  const shelfContainer = node.closest(
-    'ytlr-shelf-renderer, ytd-shelf-renderer, ytlr-section-list-renderer, ytd-section-list-renderer'
-  );
-  return shelfContainer || node;
-}
-
-function isShortsPath(value) {
-  if (!value) return false;
-
-  const path = value.split(/[?#]/, 1)[0];
-  return (
-    path === '/shorts' ||
-    path.startsWith('/shorts/') ||
-    path === '/feed/shorts' ||
-    path.startsWith('/feed/shorts/') ||
-    path === 'https://www.youtube.com/shorts' ||
-    path.startsWith('https://www.youtube.com/shorts/') ||
-    path === 'https://www.youtube.com/feed/shorts' ||
-    path.startsWith('https://www.youtube.com/feed/shorts/')
-  );
-}
-
-function syncShortsNode(node) {
-  if (!node || node.nodeType !== 1) return;
-
-  const isRenderer = node.matches(SHORTS_RENDERER_SELECTOR);
-  const isShelfHeader = isShortsShelfHeader(node);
-  const isLink = isShortsLink(node);
-  const target = isShelfHeader
-    ? findShortsShelfContainer(node)
-    : isLink
-      ? findShortsContainer(node)
-      : node;
-
+  // On YouTube TV the guide entry itself lives in an absolutely positioned
+  // wrapper. Hide that wrapper so the complete sidebar item disappears.
+  const target = entry.parentElement || entry;
   target.classList.toggle(
     'ytaf-hidden-shorts',
-    isRenderer || isShelfHeader || isLink
+    isShortsLabel(entry.getAttribute('aria-label'))
   );
 }
 
-function processShortsNode(node) {
-  if (!node || node.nodeType !== 1) return;
+function syncShortsShelf(shelf) {
+  if (!shelf || shelf.nodeType !== 1) return;
 
-  // Clear stale classes first; current Shorts matches must win below.
-  node.querySelectorAll('.ytaf-hidden-shorts').forEach(syncShortsNode);
-  syncShortsNode(node);
-  node
-    .querySelectorAll(
-      `${SHORTS_RENDERER_SELECTOR}, ${SHORTS_SHELF_HEADER_SELECTOR}, ${SHORTS_LINK_SELECTOR}, ${SHORTS_LABEL_SELECTOR}, ${SHORTS_MARKER_SELECTOR}`
-    )
-    .forEach(syncShortsNode);
+  const header = shelf.querySelector(SHORTS_SHELF_HEADER_SELECTOR);
+  shelf.classList.toggle(
+    'ytaf-hidden-shorts',
+    Boolean(header && isShortsLabel(header.textContent))
+  );
+}
+
+function scanShortsRoot(root) {
+  if (!root) return;
+
+  if (root.nodeType === 1) {
+    if (root.matches(SHORTS_GUIDE_ENTRY_SELECTOR)) {
+      syncShortsGuideEntry(root);
+    }
+    if (root.matches(SHORTS_SHELF_SELECTOR)) {
+      syncShortsShelf(root);
+    }
+  }
+
+  if (typeof root.querySelectorAll !== 'function') return;
+
+  root
+    .querySelectorAll(SHORTS_GUIDE_ENTRY_SELECTOR)
+    .forEach(syncShortsGuideEntry);
+  root.querySelectorAll(SHORTS_SHELF_SELECTOR).forEach(syncShortsShelf);
+}
+
+function syncClosestShortsShelf(node) {
+  if (!node) return;
+
+  const element = node.nodeType === 1 ? node : node.parentElement;
+  if (!element || typeof element.closest !== 'function') return;
+
+  const shelf = element.matches(SHORTS_SHELF_SELECTOR)
+    ? element
+    : element.closest(SHORTS_SHELF_SELECTOR);
+  if (shelf) syncShortsShelf(shelf);
+}
+
+function processShortsMutation(mutation) {
+  if (mutation.type === 'attributes') {
+    if (mutation.target.matches(SHORTS_GUIDE_ENTRY_SELECTOR)) {
+      syncShortsGuideEntry(mutation.target);
+    }
+    syncClosestShortsShelf(mutation.target);
+    return;
+  }
+
+  syncClosestShortsShelf(mutation.target);
+
+  mutation.addedNodes.forEach((node) => {
+    if (node.nodeType === 1) {
+      scanShortsRoot(node);
+      syncClosestShortsShelf(node);
+    } else {
+      syncClosestShortsShelf(node);
+    }
+  });
 }
 
 function startShortsObserver() {
   if (shortsObserver || !document.body) return;
 
-  processShortsNode(document.body);
-  shortsObserver = new MutationObserver((mutations) => {
-    const targets = new Set();
-    mutations.forEach((mutation) => {
-      const target =
-        mutation.type === 'characterData'
-          ? mutation.target.parentElement
-          : mutation.target;
-      if (!target) return;
+  scanShortsRoot(document.body);
 
-      targets.add(target);
-      collectShortsAncestors(target, targets);
-      mutation.addedNodes.forEach((node) => {
-        if (node.nodeType === 1) {
-          targets.add(node);
-          collectShortsAncestors(node, targets);
-        }
-      });
-    });
-    targets.forEach((target) => {
-      if (target.parentElement) {
-        processShortsNode(target);
-      }
-    });
+  shortsObserver = new MutationObserver((mutations) => {
+    mutations.forEach(processShortsMutation);
   });
   shortsObserver.observe(document.body, {
     attributes: true,
-    attributeFilter: [
-      'data-renderer-type',
-      'data-browse-id',
-      'data-section-id',
-      'data-nav-id',
-      'data-id',
-      'aria-label',
-      'title',
-      'role',
-      'href',
-      'data-uri',
-      'data-href'
-    ],
+    attributeFilter: ['aria-label'],
     childList: true,
     characterData: true,
     subtree: true
