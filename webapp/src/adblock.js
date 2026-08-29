@@ -240,7 +240,10 @@ function isShortsLink(node) {
   const hasShortsLabel = labels.some(
     (value) => value.toLowerCase() === 'shorts'
   );
-  const hasNavigationDestination = [href, uri, dataHref].some(Boolean);
+  const hasNavigationDestination = [href, uri, dataHref].some(
+    (value) =>
+      value && value !== '#' && value !== '#/' && !/^javascript:/i.test(value)
+  );
   const isLabelOnlyShorts =
     hasShortsLabel && isGuideNavigation && !hasNavigationDestination;
   return (
