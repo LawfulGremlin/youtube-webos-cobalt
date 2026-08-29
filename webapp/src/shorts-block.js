@@ -6,20 +6,6 @@ import {
   stripShortsFromBrowseResponse
 } from './shorts-response-filter.mjs';
 
-function reloadForShortsChange() {
-  window.setTimeout(() => {
-    try {
-      if (window.location && typeof window.location.reload === 'function') {
-        window.location.reload();
-      } else if (window.location) {
-        window.location.href = window.location.href;
-      }
-    } catch (err) {
-      console.warn('[ytaf] Failed to reload after Shorts setting change:', err);
-    }
-  }, 100);
-}
-
 function installResponseFilter() {
   if (window.__ytafShortsResponseFilterInstalled) return;
   window.__ytafShortsResponseFilterInstalled = true;
@@ -59,7 +45,6 @@ export function userScriptStartShortsBlockUI() {
 
   checkboxTools.setCallback('__shorts', (newState) => {
     configWrite('enableShorts', !newState);
-    reloadForShortsChange();
   });
 }
 
