@@ -197,6 +197,7 @@ function collectShortsAncestors(node, targets) {
   while (ancestor) {
     if (
       ancestor.classList.contains('ytaf-hidden-shorts') ||
+      ancestor.matches(SHORTS_SHELF_HEADER_SELECTOR) ||
       ancestor.matches(SHORTS_ITEM_RESCAN_SELECTOR)
     ) {
       targets.add(ancestor);
