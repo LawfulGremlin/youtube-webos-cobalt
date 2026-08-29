@@ -10,7 +10,7 @@ import { handleInitialLaunch, handleLaunch, waitForChildAdd } from './utils';
 import { configRead } from './config.js';
 import { userScriptStartUI } from './ui.js';
 import { userScriptStartSponsoredQrCodeUI } from './sponsored-qr-code-ui.js';
-import { userScriptStartAdBlock, userScriptStartShorts } from './adblock.js';
+import { userScriptStartAdBlock } from './adblock.js';
 import { userScriptStartShortsBlockUI } from './shorts-block.js';
 import { userScriptStartSponsorBlock } from './sponsorblock.js';
 import { userScriptStartReturnYouTubeDislike } from './returnyoutubedislike.js';
@@ -108,7 +108,6 @@ export async function startUserScript() {
     userScriptStartUI();
     userScriptStartShortsBlockUI();
     userScriptStartSponsoredQrCodeUI();
-    userScriptStartShorts();
     startDebugOverlay();
     console.info('[ytaf] UI started');
   } catch (err) {
