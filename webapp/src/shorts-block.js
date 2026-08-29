@@ -1,26 +1,10 @@
 import { checkboxTools } from './checkboxTools.js';
 import { configRead, configWrite } from './config.js';
-import { getLanguage } from './languages/index.js';
+import { text as languageText } from './languages/index.js';
 import {
   isBrowseResponse,
   stripShortsFromBrowseResponse
 } from './shorts-response-filter.mjs';
-
-const SHORTS_BLOCK_LABELS = {
-  de: 'YouTube Shorts blockieren',
-  en: 'Block YouTube Shorts',
-  es: 'Bloquear YouTube Shorts',
-  fr: 'Bloquer YouTube Shorts',
-  it: 'Blocca YouTube Shorts',
-  nl: 'YouTube Shorts blokkeren',
-  pl: 'Blokuj YouTube Shorts',
-  pt: 'Bloquear YouTube Shorts'
-};
-
-function getLabel() {
-  const language = getLanguage();
-  return SHORTS_BLOCK_LABELS[language] || SHORTS_BLOCK_LABELS.en;
-}
 
 function reloadForShortsChange() {
   window.setTimeout(() => {
@@ -63,7 +47,7 @@ export function userScriptStartShortsBlockUI() {
   const wrapper = control.parentElement;
   const description = wrapper && wrapper.querySelector('.desc');
   if (description) {
-    description.textContent = getLabel();
+    description.textContent = languageText('ui', 'shorts');
   }
 
   const blocked = !Boolean(configRead('enableShorts'));
