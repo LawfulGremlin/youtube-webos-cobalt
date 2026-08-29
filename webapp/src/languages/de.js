@@ -10,7 +10,7 @@ export default {
     autoLogin: 'Kontoauswahl automatisch überspringen',
     sponsorblock: 'SponsorBlock aktivieren',
     ryd: 'Dislike-Zahlen anzeigen',
-    shorts: 'YouTube Shorts aktivieren',
+    shorts: 'YouTube Shorts blockieren',
     sponsor: 'Sponsor-Segmente überspringen',
     intro: 'Intro überspringen',
     outro: 'Outro überspringen',
