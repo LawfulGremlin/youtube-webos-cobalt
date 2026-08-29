@@ -11,6 +11,7 @@ import { configRead } from './config.js';
 import { userScriptStartUI } from './ui.js';
 import { userScriptStartSponsoredQrCodeUI } from './sponsored-qr-code-ui.js';
 import { userScriptStartAdBlock, userScriptStartShorts } from './adblock.js';
+import { userScriptStartShortsBlockUI } from './shorts-block.js';
 import { userScriptStartSponsorBlock } from './sponsorblock.js';
 import { userScriptStartReturnYouTubeDislike } from './returnyoutubedislike.js';
 import { resetAutoLogin } from './auto-login.js';
@@ -105,6 +106,7 @@ export async function startUserScript() {
 
   try {
     userScriptStartUI();
+    userScriptStartShortsBlockUI();
     userScriptStartSponsoredQrCodeUI();
     userScriptStartShorts();
     startDebugOverlay();
