@@ -33,6 +33,8 @@ class StarfishVideoDecoder
   void SetSeekTime(SbTime seek_to_time) override {
     seek_to_time_.store(seek_to_time);
   }
+  void SetPause(bool pause) override;
+  void SetPlaybackRate(double playback_rate) override;
   void WriteInputBuffers(const InputBuffers& input_buffers) override;
   void WriteEndOfStream() override;
   void Reset() override;
@@ -42,6 +44,9 @@ class StarfishVideoDecoder
   void InitializePipeline(const SbMediaVideoSampleInfo& sample_info);
   void FeedBuffer(const scoped_refptr<InputBuffer>& input_buffer);
   void RetryPendingBuffer();
+  void EnsurePlayingOnDecoderThread(const char* reason, bool force);
+  void ApplyPlaybackStateOnDecoderThread();
+  void OnLoadCompletedOnDecoderThread();
   void WriteEndOfStreamOnDecoderThread();
   void ResetOnDecoderThread();
   void SignalUnloadCompleted();
@@ -65,8 +70,18 @@ class StarfishVideoDecoder
   bool eos_output_ = false;
   int video_width_ = 0;
   int video_height_ = 0;
+  bool play_issued_ = false;
+  bool pause_issued_ = false;
+  bool startup_play_accepted_ = false;
+  double applied_playback_rate_ = -1.0;
   std::atomic<SbTime> seek_to_time_{0};
+  std::atomic<bool> pause_requested_{false};
+  // Keep this 32-bit so the ARMv7 build does not require libatomic merely to
+  // communicate a double between Cobalt's worker and the decoder thread.
+  std::atomic<int> playback_rate_millionths_{1000000};
   std::atomic<bool> preroll_frame_sent_{false};
+  std::atomic<bool> first_frame_presented_{false};
+  std::atomic<bool> load_completed_{false};
   std::atomic<bool> reset_in_progress_{false};
   std::atomic<bool> unload_completed_{false};
   std::atomic<bool> shutting_down_{false};

@@ -2,6 +2,7 @@
 
 #include <inttypes.h>
 
+#include <cmath>
 #include <cstdlib>
 #include <functional>
 
@@ -64,6 +65,26 @@ void StarfishVideoDecoder::Initialize(const DecoderStatusCB& decoder_status_cb,
       "starfish_video_decoder", 0, kSbThreadPriorityHigh));
 }
 
+void StarfishVideoDecoder::SetPause(bool pause) {
+  pause_requested_.store(pause);
+  if (decoder_thread_) {
+    decoder_thread_->Schedule(std::bind(
+        &StarfishVideoDecoder::ApplyPlaybackStateOnDecoderThread, this));
+  }
+}
+
+void StarfishVideoDecoder::SetPlaybackRate(double playback_rate) {
+  if (!std::isfinite(playback_rate)) {
+    return;
+  }
+  playback_rate_millionths_.store(
+      static_cast<int>(playback_rate * 1000000.0));
+  if (decoder_thread_) {
+    decoder_thread_->Schedule(std::bind(
+        &StarfishVideoDecoder::ApplyPlaybackStateOnDecoderThread, this));
+  }
+}
+
 void StarfishVideoDecoder::InitializePipeline(
     const SbMediaVideoSampleInfo& sample_info) {
   SB_DCHECK(decoder_thread_->BelongsToCurrentThread());
@@ -84,7 +105,7 @@ void StarfishVideoDecoder::InitializePipeline(
   const char* codec_name = CodecName(codec_);
   const char* app_id = std::getenv("APPID");
   if (!app_id || !*app_id) {
-    app_id = "org.rf1705.cobalt-starterless";
+    app_id = "youtube.leanback.v4";
   }
   const std::string& window_id = ApplicationSdl::Get()->GetExportedWindowId();
   if (window_id.empty()) {
@@ -96,18 +117,26 @@ void StarfishVideoDecoder::InitializePipeline(
   std::string payload = FormatString(
       "{\"args\":[{\"mediaTransportType\":\"BUFFERSTREAM\","
       "\"option\":{\"windowId\":\"%s\",\"appId\":\"%s\","
-      "\"externalStreamingInfo\":{\"contents\":{\"codec\":{" 
+      "\"queryPosition\":false,"
+      "\"externalStreamingInfo\":{\"contents\":{\"codec\":{"
       "\"video\":\"%s\"},\"esInfo\":{\"pauseAtDecodeTime\":true,"
       "\"seperatedPTS\":true,\"ptsToDecode\":%" PRId64
       ",\"videoWidth\":%d,"
       "\"videoHeight\":%d,\"videoFpsValue\":60,\"videoFpsScale\":1},"
-      "\"format\":\"RAW\"},\"bufferingCtrInfo\":{\"preBufferByte\":0,"
+      "\"format\":\"RAW\",\"provider\":\"Chrome\"},"
+      "\"restartStreaming\":false,\"streamQualityInfo\":true,"
+      "\"streamQualityInfoNonFlushable\":true,\"totalStreamSize\":256,"
+      "\"bufferingCtrInfo\":{\"preBufferByte\":0,"
       "\"bufferMinLevel\":0,\"bufferMaxLevel\":0,"
-      "\"qBufferLevelVideo\":1048576,\"srcBufferLevelVideo\":{"
-      "\"minimum\":1048576,\"maximum\":8388608}}},"
-      "\"transmission\":{\"contentsType\":\"LIVE\"},"
-      "\"needAudio\":false,\"seekMode\":\"late_Iframe\"}}]}",
-      window_id.c_str(), app_id, codec_name, target_pts_ns, width, height);
+      "\"qBufferLevelAudio\":0,\"qBufferLevelVideo\":0,"
+      "\"srcBufferLevelAudio\":{\"minimum\":1024,"
+      "\"maximum\":1048576},\"srcBufferLevelVideo\":{"
+      "\"minimum\":1024,\"maximum\":8388608}}},"
+      "\"adaptiveStreaming\":{\"audioOnly\":false,\"maxWidth\":%d,"
+      "\"maxHeight\":%d,\"maxFrameRate\":60},"
+      "\"forcedPrerollOnPause\":true,\"seekMode\":\"keep-rate\"}}]}",
+      window_id.c_str(), app_id, codec_name, target_pts_ns, width, height,
+      width, height);
 
   SB_LOG(INFO) << "Loading Starfish hardware decoder for " << codec_name
                << " at " << width << "x" << height
@@ -119,6 +148,10 @@ void StarfishVideoDecoder::InitializePipeline(
     return;
   }
   pipeline_loaded_ = true;
+  play_issued_ = false;
+  pause_issued_ = false;
+  startup_play_accepted_ = false;
+  applied_playback_rate_ = -1.0;
 }
 
 void StarfishVideoDecoder::WriteInputBuffers(
@@ -153,6 +186,14 @@ void StarfishVideoDecoder::FeedBuffer(
   std::string result = media_api_->Feed(feed_payload.c_str());
   if (result.find("Ok") != std::string::npos) {
     pending_buffer_ = nullptr;
+    // On some webOS releases LOADCOMPLETED is emitted only after Play(), while
+    // others refuse an early Play(). Retry until one startup Play is accepted,
+    // but do not restart playback for every buffer after an intentional Pause.
+    if (!startup_play_accepted_) {
+      EnsurePlayingOnDecoderThread("first accepted buffer", false);
+      startup_play_accepted_ = play_issued_;
+    }
+    ApplyPlaybackStateOnDecoderThread();
     // Feed acceptance only controls compressed-input backpressure.  Cobalt's
     // video preroll is completed by the first real FRAMEREADY event below, so
     // its audio clock cannot run ahead of the hardware video pipeline.
@@ -160,7 +201,8 @@ void StarfishVideoDecoder::FeedBuffer(
                        scoped_refptr<VideoFrame>()));
     return;
   }
-  if (result.find("BufferFull") != std::string::npos) {
+  if (result.find("BufferFull") != std::string::npos ||
+      result.find("Pending") != std::string::npos) {
     pending_buffer_ = input_buffer;
     Schedule(std::bind(decoder_status_cb_, kBufferFull,
                        scoped_refptr<VideoFrame>()));
@@ -178,6 +220,79 @@ void StarfishVideoDecoder::RetryPendingBuffer() {
     scoped_refptr<InputBuffer> input = pending_buffer_;
     FeedBuffer(input);
   }
+}
+
+void StarfishVideoDecoder::EnsurePlayingOnDecoderThread(const char* reason,
+                                                        bool force) {
+  SB_DCHECK(decoder_thread_->BelongsToCurrentThread());
+  if (!pipeline_loaded_ || (!force && play_issued_)) {
+    return;
+  }
+  const bool accepted = media_api_->Play();
+  SB_LOG(INFO) << "Starfish Play() after " << reason << " -> "
+               << (accepted ? "accepted" : "refused; will retry");
+  if (accepted) {
+    play_issued_ = true;
+    pause_issued_ = false;
+  }
+}
+
+void StarfishVideoDecoder::ApplyPlaybackStateOnDecoderThread() {
+  SB_DCHECK(decoder_thread_->BelongsToCurrentThread());
+  if (!pipeline_loaded_ || shutting_down_.load()) {
+    return;
+  }
+
+  const double playback_rate =
+      playback_rate_millionths_.load() / 1000000.0;
+  if (playback_rate > 0.0 &&
+      std::fabs(playback_rate - applied_playback_rate_) > 0.0001) {
+    // webOS uses audioOutput=false for muted trick play.  Even though Cobalt
+    // renders audio separately, true keeps Starfish in its smooth A/V pacing
+    // mode for the normal 0.1x-2x playback range.
+    const bool smooth_playback = playback_rate >= 0.1 && playback_rate <= 2.0;
+    const std::string payload = FormatString(
+        "{\"playRate\":%.6g,\"audioOutput\":%s}", playback_rate,
+        smooth_playback ? "true" : "false");
+    const bool accepted = media_api_->SetPlayRate(payload.c_str());
+    SB_LOG(INFO) << "Starfish SetPlayRate(" << playback_rate << ") -> "
+                 << (accepted ? "accepted" : "refused");
+    if (accepted) {
+      applied_playback_rate_ = playback_rate;
+    }
+  }
+
+  const bool should_pause = pause_requested_.load() || playback_rate <= 0.0;
+  if (should_pause) {
+    // pauseAtDecodeTime needs one real frame to finish the platform preroll.
+    // Pausing earlier can leave the decoder permanently in LoadingState.
+    if (first_frame_presented_.load() && !pause_issued_) {
+      const bool accepted = media_api_->Pause();
+      SB_LOG(INFO) << "Starfish Pause() -> "
+                   << (accepted ? "accepted" : "refused");
+      if (accepted) {
+        pause_issued_ = true;
+        play_issued_ = false;
+      }
+    }
+    return;
+  }
+
+  if (!play_issued_ || pause_issued_) {
+    EnsurePlayingOnDecoderThread("playback state change", false);
+  }
+}
+
+void StarfishVideoDecoder::OnLoadCompletedOnDecoderThread() {
+  SB_DCHECK(decoder_thread_->BelongsToCurrentThread());
+  if (!pipeline_loaded_ || shutting_down_.load()) {
+    return;
+  }
+  // An early Play() can be accepted but remain queued.  Reissuing it at the
+  // point at which the pipeline declares itself ready is harmless and fixes
+  // that firmware behaviour.
+  EnsurePlayingOnDecoderThread("LOADCOMPLETED", true);
+  ApplyPlaybackStateOnDecoderThread();
 }
 
 void StarfishVideoDecoder::WriteEndOfStream() {
@@ -205,6 +320,8 @@ void StarfishVideoDecoder::Reset() {
   stream_ended_ = false;
   eos_output_ = false;
   preroll_frame_sent_.store(false);
+  first_frame_presented_.store(false);
+  load_completed_.store(false);
   if (decoder_thread_) {
     decoder_thread_->ScheduleAndWait(
         std::bind(&StarfishVideoDecoder::ResetOnDecoderThread, this));
@@ -219,27 +336,44 @@ void StarfishVideoDecoder::ResetOnDecoderThread() {
     return;
   }
 
-  // Starfish BUFFERSTREAM requires a new segment after flush.  That operation
-  // is not exposed by the public webOS SDK, and merely changing its clock
-  // leaves the previous segment active.  Recreate the public pipeline instead;
-  // the next input sample supplies fresh dimensions and ptsToDecode in Load().
+  // Keep the hardware decoder and exported video window alive across seeks.
+  // Reloading this pipeline takes well over a second for 4K VP9 and makes the
+  // YouTube UI show a loading spinner.  flush() discards the old compressed
+  // queue, and setTimeToDecode() starts a fresh BUFFERSTREAM segment at the
+  // requested nanosecond PTS.
   reset_in_progress_.store(true);
-  unload_completed_.store(false);
-  media_api_->Stop();
-  if (media_api_->Unload()) {
-    pipeline_state_mutex_.Acquire();
-    if (!unload_completed_.load() &&
-        !pipeline_state_condition_.WaitTimed(kSbTimeSecond)) {
-      SB_LOG(WARNING) << "Timed out waiting for Starfish unload.";
+  const int64_t target_pts_ns = seek_to_time_.load() * 1000;
+  const bool flushed = media_api_->flush();
+  const std::string time_payload =
+      FormatString("{\"position\":%" PRId64 "}", target_pts_ns);
+  const bool time_set =
+      flushed && media_api_->setTimeToDecode(time_payload.c_str());
+  if (!flushed || !time_set) {
+    SB_LOG(WARNING) << "Starfish seek flush failed (flush=" << flushed
+                    << ", setTimeToDecode=" << time_set
+                    << "); recreating the pipeline.";
+    unload_completed_.store(false);
+    media_api_->Stop();
+    if (media_api_->Unload()) {
+      pipeline_state_mutex_.Acquire();
+      if (!unload_completed_.load() &&
+          !pipeline_state_condition_.WaitTimed(kSbTimeSecond)) {
+        SB_LOG(WARNING) << "Timed out waiting for Starfish unload.";
+      }
+      pipeline_state_mutex_.Release();
     }
-    pipeline_state_mutex_.Release();
+    media_api_.reset(new StarfishMediaAPIs());
+    pipeline_loaded_ = false;
+    video_width_ = 0;
+    video_height_ = 0;
   } else {
-    SB_LOG(WARNING) << "StarfishMediaAPIs::Unload() failed during reset.";
+    SB_LOG(INFO) << "Flushed Starfish pipeline for seek target "
+                 << seek_to_time_.load();
   }
-  media_api_.reset(new StarfishMediaAPIs());
-  pipeline_loaded_ = false;
-  video_width_ = 0;
-  video_height_ = 0;
+  play_issued_ = false;
+  pause_issued_ = false;
+  startup_play_accepted_ = false;
+  applied_playback_rate_ = -1.0;
   reset_in_progress_.store(false);
 }
 
@@ -275,6 +409,10 @@ void StarfishVideoDecoder::HandlePlayerEvent(int type,
   if (type == PF_EVENT_TYPE_FRAMEREADY) {
     const SbTime frame_time = static_cast<SbTime>(num_value / 1000);
     const SbTime target_time = seek_to_time_.load();
+    if (!first_frame_presented_.exchange(true) && decoder_thread_) {
+      decoder_thread_->Schedule(std::bind(
+          &StarfishVideoDecoder::ApplyPlaybackStateOnDecoderThread, this));
+    }
     if (frame_time >= target_time &&
         !preroll_frame_sent_.exchange(true)) {
       SB_LOG(INFO) << "Starfish first visible frame reached target: frame="
@@ -287,7 +425,11 @@ void StarfishVideoDecoder::HandlePlayerEvent(int type,
   SB_LOG(INFO) << "Starfish event type=" << type << " value=" << num_value
                << " text=" << (str_value ? str_value : "");
   if (type == PF_EVENT_TYPE_STR_STATE_UPDATE__LOADCOMPLETED) {
-    media_api_->Play();
+    load_completed_.store(true);
+    if (decoder_thread_) {
+      decoder_thread_->Schedule(std::bind(
+          &StarfishVideoDecoder::OnLoadCompletedOnDecoderThread, this));
+    }
   } else if (type == PF_EVENT_TYPE_INT_NEED_DATA) {
     if (decoder_thread_) {
       decoder_thread_->Schedule(

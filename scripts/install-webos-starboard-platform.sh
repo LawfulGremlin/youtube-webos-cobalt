@@ -20,6 +20,7 @@ starfish_patch="$repo_root/cobalt-platform/cobalt-23.lts.6-webos-starfish.patch"
 pulse_soname_patch="$repo_root/cobalt-platform/cobalt-23.lts.6-webos-pulse-soname.patch"
 pulse_tuning_patch="$repo_root/cobalt-platform/cobalt-23.lts.6-webos-pulse-tuning.patch"
 external_video_seek_patch="$repo_root/cobalt-platform/cobalt-23.lts.6-webos-external-video-seek.patch"
+external_video_controls_patch="$repo_root/cobalt-platform/cobalt-23.lts.6-webos-external-video-controls.patch"
 
 if [[ ! -d "$cobalt_root/.git" || ! -f "$platforms_file" ]]; then
   echo "Not a Cobalt source tree: $cobalt_root" >&2
@@ -116,6 +117,12 @@ if ! grep -q 'virtual void SetSeekTime' \
   "$cobalt_root/starboard/shared/starboard/player/filter/video_decoder_internal.h"; then
   git -C "$cobalt_root" apply --check "$external_video_seek_patch"
   git -C "$cobalt_root" apply "$external_video_seek_patch"
+fi
+
+if ! grep -q 'virtual void SetPlaybackRate' \
+  "$cobalt_root/starboard/shared/starboard/player/filter/video_decoder_internal.h"; then
+  git -C "$cobalt_root" apply --check "$external_video_controls_patch"
+  git -C "$cobalt_root" apply "$external_video_controls_patch"
 fi
 
 echo "Installed webos-arm Starboard platform into: $platform_target"

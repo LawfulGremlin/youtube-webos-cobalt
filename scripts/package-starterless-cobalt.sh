@@ -51,7 +51,6 @@ cp "$runtime_dir/libstdc++.so.6" "$package_root/lib/libstdc++.so.6"
 cp "$runtime_dir/libgcc_s.so.1" "$package_root/lib/libgcc_s.so.1"
 cp "$repo_root/assets/icon.png" "$package_root/icon.png"
 cp "$repo_root/assets/largeIcon.png" "$package_root/largeIcon.png"
-cp "$repo_root/assets/splashBackground.png" "$package_root/splashBackground.png"
 chmod +x "$package_root/cobalt"
 
 mkdir -p "$output_dir"
@@ -62,4 +61,4 @@ if [[ -z "$package_path" ]]; then
   echo "ares-package succeeded but its output IPK was not found." >&2
   exit 5
 fi
-echo "Starterless Cobalt package: $package_path"
+echo "Youtube Cobalt AdFree 2.0 Beta package: $package_path"
