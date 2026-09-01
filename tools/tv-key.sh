@@ -4,9 +4,13 @@
 # WebSocket that the gateway relays onto the TV-local unix socket
 # /tmp/netinput.pointer.sock; as root over ssh we write the same frames to that
 # socket directly (via node, which every webOS TV ships — busybox nc has no -U).
-# This goes through the TV's real input stack, so it is closer to a physical
-# press than a synthetic KeyboardEvent over CDP, but it is still not one: real
-# button-press bugs still need a real remote (see the webos-mods skill).
+#
+# UNVERIFIED: the socket accepts the frames (connect + write both succeed), but
+# a VOLUMEUP frame sent this way left the volume unchanged on lg75 on
+# 2026-09-01, so delivery to the socket is NOT proof the TV acted on it. Check
+# a press by its effect on screen (tv-screenshot.sh before/after) before
+# trusting this for anything. Where tv-ctl.sh has a luna equivalent (volume,
+# mute, media keys, channel), prefer that — luna answers with a returnValue.
 #
 # Usage: tools/tv-key.sh <device-name> <action> [action ...]
 #   BUTTON       UP DOWN LEFT RIGHT ENTER BACK HOME EXIT MENU INFO DASH
