@@ -367,6 +367,18 @@ none is given). `tools/tv-load-video.sh <device> <video-id> [secs] [--paused]`
 is the hash-plant-and-reload recipe below, standalone, for jumping an
 already-running debug app to a specific video without a full reinstall.
 
+The rest of the TV is scriptable the same way. `tools/tv-ctl.sh`,
+`tools/tv-key.sh` and `tools/tv-screenshot.sh` cover what LG's SSAP WebSocket
+API offers (the tool set of [webos-mcp](https://github.com/anurmatov/webos-mcp))
+without the pairing prompt that API needs: the TVs are rooted, and every
+`ssap://` method is a luna-service call the TV's own gateway forwards, so the
+tools call that luna service directly over `ssh -tt` (`tv_luna` in
+`tools/tv-lib.sh`; the ssap→luna map is
+`/usr/palm/services/com.webos.service.secondscreen.gateway/interfaces/*.interface`
+on the TV). Two things cost real time to learn: `luna-send` prints nothing at
+all without a pty, and remote buttons are plain-text frames written to the
+TV-local `/tmp/netinput.pointer.sock` that `getPointerInputSocket` creates.
+
 How it has to work on this Cobalt build (each alternative tested live and
 ignored): launch params / `contentTarget` deep links do nothing (cold or warm),
 plain hash mutation doesn't route, and `resume_time` in the watch hash isn't

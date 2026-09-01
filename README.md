@@ -158,15 +158,22 @@ tools/tv-status.sh [device...]                              # reachable? CDP up?
 tools/tv-load-video.sh <device> <video-id> [secs] [--paused] # jump to a specific video, no remote needed
 tools/tv-deploy.sh debug|release <device> [version]          # build + install + launch in one step
 tools/tv-app-restart.sh <device> [ipk]                       # close/(install)/relaunch, restoring playback
+tools/tv-screenshot.sh <device> [out.jpg] [WxH]              # what's on screen right now
+tools/tv-ctl.sh <device> <command> [args]                    # info/apps/launch/volume/mute/inputs/toast/... over luna
+tools/tv-key.sh <device> <BUTTON...>                         # remote-control buttons via the TV's input socket
 ```
 
 `tv-app-restart.sh` closes the app, optionally installs a new IPK, relaunches
 it, and restores whatever video was playing (same position, same paused
 state) so a reinstall doesn't cost you your place. `tv-deploy.sh` auto-bumps
 the patch version from the highest existing `output/*.ipk` for that variant
-if you don't pass one. All four take an `ares-*` device **name** (`lg48`),
-not an IP — resolved via `tools/tv-lib.sh` against the same
-`~/.webos/tv/novacom-devices.json` `ares-setup-device` maintains.
+if you don't pass one. `tv-ctl.sh`, `tv-key.sh` and `tv-screenshot.sh` are
+the [webos-mcp](https://github.com/anurmatov/webos-mcp) tool set (LG's SSAP
+API) done over root ssh + `luna-send` instead, so nothing has to be paired;
+`tv-ctl.sh` with no arguments lists its commands. All of them take an
+`ares-*` device **name** (`lg48`), not an IP — resolved via `tools/tv-lib.sh`
+against the same `~/.webos/tv/novacom-devices.json` `ares-setup-device`
+maintains.
 
 ### Building a compatibility-test package
 
@@ -220,8 +227,9 @@ own `ci.yml` so the two never collide.
   swatches). Kept as close to upstream as possible; see FORK.md for why each
   edit exists and what it replaced.
 * `tools/cdp-eval.py`, `tools/tv-status.sh`, `tools/tv-load-video.sh`,
-  `tools/tv-deploy.sh`, `tools/tv-app-restart.sh`, `tools/tv-lib.sh` —
-  development tooling described above.
+  `tools/tv-deploy.sh`, `tools/tv-app-restart.sh`, `tools/tv-screenshot.sh`,
+  `tools/tv-ctl.sh`, `tools/tv-key.sh`, `tools/tv-lib.sh` — development
+  tooling described above.
 * `FORK.md` — the full technical narrative: root causes, dead ends, and the
   Cobalt/webOS engine quirks discovered along the way (missing
   `Element.prototype.closest`, no `NodeList.forEach`, synchronous XHR
