@@ -4,13 +4,10 @@
 # WebSocket that the gateway relays onto the TV-local unix socket
 # /tmp/netinput.pointer.sock; as root over ssh we write the same frames to that
 # socket directly (via node, which every webOS TV ships — busybox nc has no -U).
-#
-# UNVERIFIED: the socket accepts the frames (connect + write both succeed), but
-# a VOLUMEUP frame sent this way left the volume unchanged on lg75 on
-# 2026-09-01, so delivery to the socket is NOT proof the TV acted on it. Check
-# a press by its effect on screen (tv-screenshot.sh before/after) before
-# trusting this for anything. Where tv-ctl.sh has a luna equivalent (volume,
-# mute, media keys, channel), prefer that — luna answers with a returnValue.
+# The socket is LENGTH_PREFIX_32: each message is preceded by its byte length
+# as a 4-byte big-endian int (the gateway's helpers/servers/web-socket-proxy.js
+# does exactly that to every WebSocket message). Unprefixed frames are accepted
+# and silently ignored — that cost a day on 2026-09-01.
 #
 # Usage: tools/tv-key.sh <device-name> <action> [action ...]
 #   BUTTON       UP DOWN LEFT RIGHT ENTER BACK HOME EXIT MENU INFO DASH
@@ -28,8 +25,9 @@ DEVICE="${1:-}"; shift || true
 [ -z "$DEVICE" ] || [ $# -eq 0 ] && { sed -n '/^# Usage/,/^$/p' "$0" | sed 's/^# \{0,1\}//'; exit 1; }
 
 # getPointerInputSocket (re)creates the socket and tells us where it is; the
-# node script then streams the frames. Wire format is the SSAP pointer socket's:
-# "type:button\nname:X\n\n", "type:move\ndx:X\ndy:Y\ndown:0\n\n", "type:click\n\n".
+# node script then streams the frames, each length-prefixed. Message text is
+# the SSAP pointer socket's: "type:button\nname:X\n\n",
+# "type:move\ndx:X\ndy:Y\ndown:0\n\n", "type:click\n\n".
 JS=$(base64 -w0 <<'JSEOF'
 const [sock, ...acts] = process.argv.slice(2);
 const s = require('net').connect(sock);
@@ -39,9 +37,11 @@ s.on('connect', () => {
   (function next() {
     if (i >= acts.length) { s.end(); return; }
     const a = acts[i++], m = a.match(/^move:(-?\d+),(-?\d+)$/);
-    s.write(m ? 'type:move\ndx:' + m[1] + '\ndy:' + m[2] + '\ndown:0\n\n'
+    const msg = Buffer.from(m ? 'type:move\ndx:' + m[1] + '\ndy:' + m[2] + '\ndown:0\n\n'
           : a === 'click' ? 'type:click\n\n'
           : 'type:button\nname:' + a.toUpperCase() + '\n\n');
+    const len = Buffer.alloc(4); len.writeUInt32BE(msg.length, 0);
+    s.write(Buffer.concat([len, msg]));
     setTimeout(next, 150);
   })();
 });
