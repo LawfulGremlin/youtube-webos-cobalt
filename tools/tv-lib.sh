@@ -69,7 +69,7 @@ tv_ssh() {
   local name="$1" cmd="$2" ip key out rc
   ip=$(tv_resolve_ip "$name") || { echo "no device named '$name' in the ares registry" >&2; return 1; }
   key=$(tv_resolve_key "$name")
-  out=$(ssh -tt -q -i "$key" -o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=8 \
+  out=$(ssh -tt -o LogLevel=ERROR -i "$key" -o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=8 \
         "root@$ip" "$cmd; exit")
   rc=$?
   printf '%s\n' "${out//$'\r'/}"
