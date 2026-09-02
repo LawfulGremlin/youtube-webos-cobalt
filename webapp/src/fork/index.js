@@ -21,6 +21,7 @@ import {
 import {
   decideLayout,
   layoutKey,
+  inheritOriginal,
   layoutLabel,
   cycleLayout
 } from './keyboard-layout.mjs';
@@ -129,6 +130,7 @@ decideLayoutOnce();
 // AltGr arrives as altKey and is looked up as level 3; YouTube types those
 // keydowns as-is (verified live: Danish AltGr+2 typed @).
 function onLayoutKey(evt) {
+  inheritOriginal(evt); // YouTube's re-dispatched copies carry no modifiers
   const layout = configRead(LAYOUT_KEY);
   if (!layout) return;
   const ch = layoutKey(layout, evt.keyCode || evt.which || 0, evt.shiftKey, evt.altKey);

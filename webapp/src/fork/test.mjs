@@ -14,6 +14,7 @@ import {
   layoutForCountry,
   decideLayout,
   layoutKey,
+  inheritOriginal,
   layoutLabel,
   cycleLayout
 } from './keyboard-layout.mjs';
@@ -334,6 +335,18 @@ assert.equal(layoutKey('de', 89, false, false), 'z');
 assert.equal(layoutKey('de', 90, true, false), 'Y');
 assert.equal(layoutKey('pl', 65, false, false), 'a');
 assert.equal(layoutKey('pl', 65, false, true), 'ą');
+// YouTube's re-dispatched copies get the original's modifiers and key once;
+// real events (which have shiftKey) and copies without an original are left.
+{
+  const copy = { keyCode: 67, he: { shiftKey: true, altKey: false, ctrlKey: false, metaKey: false, key: 'C' } };
+  assert.equal(inheritOriginal(copy), true);
+  assert.equal(copy.shiftKey, true);
+  assert.equal(copy.key, 'C');
+  assert.equal(Object.keys(copy).includes('shiftKey'), true, 'own enumerable, for Closure\'s for-in wrapper');
+  assert.equal(inheritOriginal(copy), false);
+  assert.equal(inheritOriginal({ keyCode: 67 }), false);
+  assert.equal(inheritOriginal({ keyCode: 67, shiftKey: false, he: { shiftKey: true } }).valueOf(), false);
+}
 // No dead keys survive generation: every stored character is printable text.
 Object.keys(LAYOUTS).forEach((id) => {
   Object.keys(LAYOUTS[id]).forEach((code) => {

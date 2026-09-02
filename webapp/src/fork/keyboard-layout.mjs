@@ -86,6 +86,25 @@ export function layoutKey(layoutId, keyCode, shift, altgr) {
   return levels[altgr ? 2 : shift ? 1 : 0] || null;
 }
 
+// YouTube's key normaliser (`vXb` in the kabuki bundle) re-dispatches a key
+// as a plain Event carrying only keyCode/which/charCode plus `he`, the
+// original KeyboardEvent, whenever its focus manager is locked — which on the
+// search page is most of the time while suggestions render. The search box
+// types the copy from keyCode + shiftKey/altKey (it ignores `key` for letters
+// and digits), and the copy has neither, so Shift and AltGr were lost on 1–3
+// keys of every burst (measured on lg75 2026-09-02 from a virtual keyboard;
+// a physical one goes through the same code). Give the copy the original's
+// modifiers and key as own enumerable properties — what Closure's for-in
+// event wrapper reads — before the layout lookup and before YouTube sees it.
+export function inheritOriginal(copy) {
+  const orig = copy.he;
+  if (!orig || copy.shiftKey !== undefined) return false;
+  ['shiftKey', 'altKey', 'ctrlKey', 'metaKey', 'key'].forEach((name) => {
+    copy[name] = orig[name];
+  });
+  return true;
+}
+
 export function layoutLabel(layoutId) {
   return LAYOUT_NAMES[layoutId] || layoutId || 'undecided';
 }
