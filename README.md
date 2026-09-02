@@ -34,11 +34,15 @@ Features:
 * **Shortcut-key registry** with frame-stepping actions (ported from
   [LawfulGremlin/youtube-webos](https://github.com/LawfulGremlin/youtube-webos)'s
   `fork-extensions`), plus upstream's own playback-speed shortcuts.
+* **Keyboard support.** A USB or Bluetooth keyboard types into the search
+  box (LG's starter drops letters unless the IPK enables it), with the layout
+  picked once from your country — Danish keys give æ, ø and å — and
+  changeable in the settings menu.
 
 Fixes:
 * **Menu focus that moves one row at a time.** The settings menu used to skip
-  a row on every Down/Up press on real hardware (not reproducible via a
-  synthetic key event — only a real remote press triggers it).
+  a row on every Down/Up press: YouTube's own key handling re-dispatches a
+  copy of each press, and the menu moved for both. The copy is now dropped.
 * **SponsorBlock markers that render on local hardware** Upstream's original marker
   code silently never worked on any video — four separate, stacked DOM/engine
   issues, all fixed here. Markers are translucent and cover the whole

@@ -330,6 +330,7 @@ $(STANDALONE_WORKDIR):
 	  '--fallback_splash_screen_url=file:///youtube/splash.html' \
 	  '--min_log_level=info' \
 	  '--enable_pseudo_touch' \
+	  '--enable_keyboard' \
 	  '--loader_use_mmap_file' > $@/switches
 	if [ -f "$(STANDALONE_COBALT_DIR)/lib/libcobalt.lz4" ]; then \
 		printf '%s\n' '--loader_use_compression' >> $@/switches; \
@@ -416,6 +417,9 @@ $(WORKDIR)/ipk/content/app/cobalt/content/web/adblock: $(WEBAPP_OUTPUT_STAMP)
 # (user preference, 2026-08-15).
 
 	echo " --evergreen_lite" >> $(WORKDIR)/ipk/switches
+	# fork: LG's starter maps only remote keys unless this switch is set; with it
+	# physical/virtual keyboards reach the web app (letters, Space, Backspace…).
+	echo " --enable_keyboard" >> $(WORKDIR)/ipk/switches
 	if [ -n "$(COBALT_DEBUG_ENABLED)" ] || [ -n "$(REMOTE_DEBUG_ENABLED)" ]; then \
 		echo " --remote_debugging_port=9222" >> $(WORKDIR)/ipk/switches; \
 		echo " --dev_servers_listen_ip=0.0.0.0" >> $(WORKDIR)/ipk/switches; \

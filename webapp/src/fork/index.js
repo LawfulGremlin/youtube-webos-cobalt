@@ -18,6 +18,12 @@ import {
   slotForKeyCode,
   cycleActionKey
 } from './shortcut-registry.mjs';
+import {
+  decideLayout,
+  layoutKey,
+  layoutLabel,
+  cycleLayout
+} from './keyboard-layout.mjs';
 
 function bindingConfigKey(slotId) {
   return 'forkShortcut_' + slotId;
@@ -58,8 +64,11 @@ const SLOT_DEFAULTS = {
 // was written at — not against the values alone.
 const SHORTCUT_DEFAULTS_VERSION = 6;
 
+const LAYOUT_KEY = 'forkKeyboardLayout'; // '' = not decided yet, see below
+
 const FORK_DEFAULTS = {
-  forkRemoveShorts: false
+  forkRemoveShorts: false,
+  [LAYOUT_KEY]: ''
 };
 SLOTS.forEach((slot) => {
   FORK_DEFAULTS[bindingConfigKey(slot.id)] = SLOT_DEFAULTS[slot.id] || 'none';
@@ -80,6 +89,65 @@ if ((configRead('forkShortcutDefaultsVersion') || 0) < SHORTCUT_DEFAULTS_VERSION
   });
   configWrite('forkShortcutDefaultsVersion', SHORTCUT_DEFAULTS_VERSION);
 }
+
+// --- Keyboard layout ---------------------------------------------------------
+
+// Decided once, from the country YouTube resolved for this session (ytcfg
+// GL, IP-based). Never revisited automatically: a user who moves, or sits
+// behind a VPN, changes it in the settings menu. ytcfg exists once the page
+// has its config, which can be after this module runs — poll briefly, and
+// if there is still no country (offline start), leave it undecided for the
+// next launch rather than guessing.
+function readCountry() {
+  try {
+    return window.ytcfg && ytcfg.get ? ytcfg.get('GL') : undefined;
+  } catch (err) {
+    return undefined;
+  }
+}
+
+let layoutTries = 0;
+function decideLayoutOnce() {
+  const current = configRead(LAYOUT_KEY);
+  const decided = decideLayout(current, readCountry());
+  if (decided) {
+    if (decided !== current) {
+      configWrite(LAYOUT_KEY, decided);
+      console.info('[ytaf-fork] keyboard layout decided from country: ' + decided);
+    }
+    return;
+  }
+  layoutTries += 1;
+  if (layoutTries < 20) setTimeout(decideLayoutOnce, 500);
+}
+decideLayoutOnce();
+
+// Rewrite event.key per layout before YouTube sees the event. Capture on
+// window runs ahead of every listener YouTube installs. Cobalt's KeyboardEvent
+// objects are extensible, so an own `key` property shadows the prototype
+// getter (verified live 2026-09-02: 186 -> æ, 222 -> ø, 219 -> å, Shift -> Æ).
+// AltGr arrives as altKey and is looked up as level 3; YouTube types those
+// keydowns as-is (verified live: Danish AltGr+2 typed @).
+function onLayoutKey(evt) {
+  const layout = configRead(LAYOUT_KEY);
+  if (!layout) return;
+  const ch = layoutKey(layout, evt.keyCode || evt.which || 0, evt.shiftKey, evt.altKey);
+  if (ch === null) return;
+  try {
+    Object.defineProperty(evt, 'key', { value: ch, configurable: true });
+  } catch (err) {
+    // Non-extensible event: the key stays US for this press.
+  }
+}
+window.addEventListener('keydown', onLayoutKey, true);
+window.addEventListener('keyup', onLayoutKey, true);
+
+// Read (no argument) or set the layout over the debug build's CDP.
+window.ytafKeyboardLayout = function (id) {
+  if (typeof id === 'undefined') return configRead(LAYOUT_KEY);
+  configWrite(LAYOUT_KEY, id);
+  return id;
+};
 
 // Chain onto JSON.parse after upstream adblock.js — same interception point
 // upstream uses, without editing upstream code. Shorts filtering is behind
@@ -248,15 +316,15 @@ function swallowEvent(evt) {
   evt.stopPropagation();
 }
 
-// Binding rows in the settings menu: Enter/left/right cycle the focused
-// slot's action. Registered at import time, which is before ui.js installs
-// its document handlers, so this capture listener runs first for these keys
-// while a binding row is focused; up/down fall through to ui.js focus
-// movement.
+// Cycler rows in the settings menu (shortcut bindings, keyboard layout):
+// Enter/left/right cycle the focused row's value. Registered at import time,
+// which is before ui.js installs its document handlers, so this capture
+// listener runs first for these keys while a cycler row is focused; up/down
+// fall through to ui.js focus movement.
 function onMenuKey(evt) {
   if (!isMenuOpen()) return;
   const el = document.activeElement;
-  if (!el || !el.dataset || !el.dataset.forkSlot) return;
+  if (!el || !el.__forkCycle) return;
 
   const key = evt.keyCode || evt.which || 0;
   let delta = 0;
@@ -266,11 +334,26 @@ function onMenuKey(evt) {
 
   swallowEvent(evt);
 
-  const cfgKey = bindingConfigKey(el.dataset.forkSlot);
-  configWrite(cfgKey, cycleActionKey(configRead(cfgKey), delta));
-  if (el.__forkUpdateLabel) el.__forkUpdateLabel();
+  el.__forkCycle(delta);
+  el.__forkUpdateLabel();
 }
 document.addEventListener('keydown', onMenuKey, true);
+
+// fork: YouTube's own key normaliser (kabuki, `vXb`) re-dispatches a copy of
+// every keydown onto ITS focused element while our menu holds the focus, so
+// ui.js moved two rows per press and the cycler rows above stepped twice
+// (measured on lg48 2026-09-02 with a focus() stack trace; Cobalt has no
+// isTrusted to tell the copy apart). The copy is structurally distinct: with
+// the menu focused, a real press targets the focused row, the copy targets a
+// node outside the menu. Swallow it before any document listener sees it.
+function dropRedispatchedMenuKey(evt) {
+  if (!isMenuOpen()) return;
+  const menu = document.querySelector('.ytaf-ui-container');
+  const active = document.activeElement;
+  if (!menu || !active || !menu.contains(active)) return;
+  if (evt.target && !menu.contains(evt.target)) swallowEvent(evt);
+}
+window.addEventListener('keydown', dropRedispatchedMenuKey, true);
 
 // Slot keys dispatch their bound action. Slots bound to 'none' fall through
 // untouched so the TV app's own key handling is preserved.
@@ -292,24 +375,24 @@ document.addEventListener('keydown', onShortcutKey, true);
 
 // --- Settings UI -------------------------------------------------------------
 
-// Binding rows reuse the checkbox row styling (.toggler-wrapper +
+// Cycler rows reuse the checkbox row styling (.toggler-wrapper +
 // .ytaf-focused) but carry no id, so upstream's Enter-toggles-checkbox
 // path ignores them; onMenuKey above handles their input instead.
+// `text()` renders the current value, `cycle(delta)` stores the next one.
 let cyclerTabIndex = 900; // clear of checkboxTools' own tabindex counter
-function bindingRow(slot) {
+function cyclerRow(text, cycle) {
   const wrapper = document.createElement('div');
   wrapper.classList.add('toggler-wrapper');
 
   const focusable = document.createElement('div');
   focusable.setAttribute('tabindex', cyclerTabIndex);
   cyclerTabIndex += 1;
-  focusable.dataset.forkSlot = slot.id;
 
   const label = document.createElement('div');
   label.classList.add('desc');
+  focusable.__forkCycle = cycle;
   focusable.__forkUpdateLabel = function () {
-    const action = getAction(configRead(bindingConfigKey(slot.id))) || getAction('none');
-    label.textContent = slot.label + ': ' + action.label;
+    label.textContent = text();
   };
   focusable.__forkUpdateLabel();
 
@@ -319,6 +402,21 @@ function bindingRow(slot) {
   wrapper.appendChild(focusable);
   wrapper.appendChild(label);
   return wrapper;
+}
+
+function bindingRow(slot) {
+  const cfgKey = bindingConfigKey(slot.id);
+  return cyclerRow(
+    () => slot.label + ': ' + (getAction(configRead(cfgKey)) || getAction('none')).label,
+    (delta) => configWrite(cfgKey, cycleActionKey(configRead(cfgKey), delta))
+  );
+}
+
+function layoutRow() {
+  return cyclerRow(
+    () => 'Keyboard layout: ' + layoutLabel(configRead(LAYOUT_KEY)),
+    (delta) => configWrite(LAYOUT_KEY, cycleLayout(configRead(LAYOUT_KEY), delta))
+  );
 }
 
 // Append our rows once upstream's settings UI exists. The container is
@@ -342,6 +440,7 @@ function appendForkUI() {
 
   const shortcuts = document.createElement('div');
   shortcuts.classList.add('blockquote');
+  shortcuts.appendChild(layoutRow());
   SLOTS.forEach((slot) => shortcuts.appendChild(bindingRow(slot)));
   container.appendChild(shortcuts);
 }

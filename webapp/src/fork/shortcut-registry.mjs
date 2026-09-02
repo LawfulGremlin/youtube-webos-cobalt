@@ -13,9 +13,12 @@
 
 export const SLOTS = (function () {
   const slots = [
-    { id: 'red', label: 'Red Button', keyCodes: [403] },
+    // Second code per colour: what LG's magic-remote colour keys arrive as
+    // once the IPK enables keyboard input (measured on lg48, 2026-09-02) —
+    // the starter maps them to the browser-navigation virtual keys.
+    { id: 'red', label: 'Red Button', keyCodes: [403, 166] },
     { id: 'yellow', label: 'Yellow Button', keyCodes: [405, 170] },
-    { id: 'blue', label: 'Blue Button', keyCodes: [406, 191] }
+    { id: 'blue', label: 'Blue Button', keyCodes: [406, 191, 167] }
   ];
   for (let n = 0; n <= 9; n++) {
     slots.push({

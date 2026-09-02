@@ -10,6 +10,15 @@ import {
 import { stepTarget, FRAME_DURATION_SEC } from './frame-step.mjs';
 import { nextPlaybackRate, PLAYBACK_RATES } from './playback-speed.mjs';
 import {
+  LAYOUT_IDS,
+  layoutForCountry,
+  decideLayout,
+  layoutKey,
+  layoutLabel,
+  cycleLayout
+} from './keyboard-layout.mjs';
+import { LAYOUTS } from './keyboard-layouts.mjs';
+import {
   SLOTS,
   registerShortcutAction,
   getAction,
@@ -258,6 +267,91 @@ assert.equal(nextPlaybackRate(undefined, 1), 1.25);
 assert.equal(nextPlaybackRate(0, 1), 1.25);
 assert.equal(nextPlaybackRate(NaN, -1), 0.75);
 
+// Colour keys as LG's magic remote delivers them with keyboard input enabled.
+assert.equal(slotForKeyCode(166).id, 'red');
+assert.equal(slotForKeyCode(170).id, 'yellow');
+assert.equal(slotForKeyCode(167).id, 'blue');
+assert.equal(slotForKeyCode(172), null, 'green stays upstream\'s settings-menu key');
+
+// --- Keyboard layout ---------------------------------------------------------
+
+// Country -> layout: the two named cases, the source's other groupings, and
+// everything unknown or non-Latin falls back to us.
+assert.equal(layoutForCountry('DK'), 'dk');
+assert.equal(layoutForCountry('dk'), 'dk');
+assert.equal(layoutForCountry('US'), 'us');
+assert.equal(layoutForCountry('CA'), 'us');
+assert.equal(layoutForCountry('NL'), 'us');
+assert.equal(layoutForCountry('AT'), 'de');
+assert.equal(layoutForCountry('LU'), 'ch_fr');
+assert.equal(layoutForCountry('MX'), 'latam');
+assert.equal(layoutForCountry('RU'), 'us');
+assert.equal(layoutForCountry('GR'), 'us');
+assert.equal(layoutForCountry(''), 'us');
+assert.equal(layoutForCountry(undefined), 'us');
+assert.equal(layoutForCountry('ZZ'), 'us');
+
+// Every layout the country table points at exists in the generated data.
+['us', 'gb', 'dk', 'no', 'se', 'fi', 'is', 'de', 'ch', 'ch_fr', 'fr', 'be', 'it', 'es',
+  'latam', 'pt', 'br', 'pl', 'cz', 'sk', 'hu', 'ro', 'hr', 'si', 'ba', 'rs', 'ee', 'lv',
+  'lt', 'tr', 'al', 'jp'].forEach((id) => assert.ok(LAYOUTS[id], 'missing layout ' + id));
+assert.equal(LAYOUT_IDS[0], 'us');
+assert.deepEqual(LAYOUTS.us, {}, 'us is the reference: nothing to override');
+
+// Decided once: a stored layout is never revisited, no country means no
+// decision yet, and a stale id is treated as undecided.
+assert.equal(decideLayout('', 'DK'), 'dk');
+assert.equal(decideLayout('us', 'DK'), 'us');
+assert.equal(decideLayout('dk', 'US'), 'dk');
+assert.equal(decideLayout('', undefined), '');
+assert.equal(decideLayout('', ''), '');
+assert.equal(decideLayout(undefined, ''), '');
+assert.equal(decideLayout('nolongerexists', 'DK'), 'dk');
+assert.equal(decideLayout('', 'ZZ'), 'us');
+
+// Danish: the three letters at the US ; ' [ positions, Shift for capitals,
+// AltGr level from the same table, letters untouched (null = leave US key).
+assert.equal(layoutKey('dk', 186, false, false), 'æ');
+assert.equal(layoutKey('dk', 186, true, false), 'Æ');
+assert.equal(layoutKey('dk', 222, false, false), 'ø');
+assert.equal(layoutKey('dk', 219, false, false), 'å');
+assert.equal(layoutKey('dk', 219, true, false), 'Å');
+assert.equal(layoutKey('dk', 50, false, false), '2', 'a key that differs on any level carries all three');
+assert.equal(layoutKey('dk', 50, true, false), '"');
+assert.equal(layoutKey('dk', 50, false, true), '@');
+// Letters carry their AltGr level too, so they are in the table; base and
+// shift still spell what Cobalt would have spelled.
+assert.equal(layoutKey('dk', 65, false, false), 'a');
+assert.equal(layoutKey('dk', 65, true, false), 'A');
+assert.equal(layoutKey('dk', 0xBD, false, false), '+');
+// US and undecided leave everything alone; unknown keys and layouts too.
+assert.equal(layoutKey('us', 186, false, false), null);
+assert.equal(layoutKey('', 186, false, false), null);
+assert.equal(layoutKey('nolongerexists', 186, false, false), null);
+assert.equal(layoutKey('dk', 999, false, false), null);
+// German QWERTZ swaps Y and Z; Polish differs from US only on AltGr.
+assert.equal(layoutKey('de', 89, false, false), 'z');
+assert.equal(layoutKey('de', 90, true, false), 'Y');
+assert.equal(layoutKey('pl', 65, false, false), 'a');
+assert.equal(layoutKey('pl', 65, false, true), 'ą');
+// No dead keys survive generation: every stored character is printable text.
+Object.keys(LAYOUTS).forEach((id) => {
+  Object.keys(LAYOUTS[id]).forEach((code) => {
+    const levels = LAYOUTS[id][code];
+    assert.equal(levels.length, 3, id + '/' + code);
+    levels.forEach((ch) => assert.ok(!/^<[a-z]|dead/.test(ch), id + '/' + code + ': ' + ch));
+  });
+});
+
+// Settings row: labels and cycling that always recovers.
+assert.equal(layoutLabel('dk'), 'Danish');
+assert.equal(layoutLabel(''), 'undecided');
+assert.equal(cycleLayout('us', 1), LAYOUT_IDS[1]);
+assert.equal(cycleLayout(LAYOUT_IDS[LAYOUT_IDS.length - 1], 1), 'us');
+assert.equal(cycleLayout('us', -1), LAYOUT_IDS[LAYOUT_IDS.length - 1]);
+assert.equal(cycleLayout('', 1), LAYOUT_IDS[1]);
+assert.equal(cycleLayout('bogus', 1), LAYOUT_IDS[1]);
+
 console.log(
-  'fork filters + frame step + shortcut registry + playback speed: all tests passed'
+  'fork filters + frame step + shortcut registry + playback speed + keyboard layout: all tests passed'
 );
