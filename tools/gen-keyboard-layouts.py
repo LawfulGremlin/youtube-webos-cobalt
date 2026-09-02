@@ -91,17 +91,17 @@ def keysym_char(sym):
     buf = ctypes.create_string_buffer(8)
     lib.xkb_keysym_to_utf8(sym, buf, 8)
     text = buf.value.decode()
-    if text:
-        return text
-    name = ctypes.create_string_buffer(64)
-    lib.xkb_keysym_get_name(sym, name, 64)
-    name = name.value.decode()
-    if name.startswith('dead_'):  # dead_acute -> acute -> '´'
-        plain = lib.xkb_keysym_from_name(name[5:].encode(), 0)
-        if plain:
-            lib.xkb_keysym_to_utf8(plain, buf, 8)
-            return buf.value.decode()
-    return ''
+    if not text:
+        name = ctypes.create_string_buffer(64)
+        lib.xkb_keysym_get_name(sym, name, 64)
+        name = name.value.decode()
+        if name.startswith('dead_'):  # dead_acute -> acute -> '´'
+            plain = {'circumflex': 'asciicircum', 'tilde': 'asciitilde'}.get(name[5:], name[5:])
+            plain = lib.xkb_keysym_from_name(plain.encode(), 0)
+            if plain:
+                lib.xkb_keysym_to_utf8(plain, buf, 8)
+                text = buf.value.decode()
+    return text if text.isprintable() else ''  # drops AltGr+Space's no-break space
 
 
 def table(layout, variant):
