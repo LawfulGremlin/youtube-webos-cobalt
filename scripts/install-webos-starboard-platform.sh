@@ -15,6 +15,7 @@ gcc_compat_patch="$repo_root/cobalt-platform/cobalt-23.lts.6-webos-gcc.patch"
 video_fallback_patch="$repo_root/cobalt-platform/cobalt-23.lts.6-webos-video-fallback.patch"
 vp9_patch="$repo_root/cobalt-platform/cobalt-23.lts.6-webos-vp9.patch"
 av1_patch="$repo_root/cobalt-platform/cobalt-23.lts.6-webos-av1.patch"
+uhd_patch="$repo_root/cobalt-platform/cobalt-23.lts.6-webos-uhd.patch"
 dav1d_api_patch="$repo_root/cobalt-platform/cobalt-23.lts.6-webos-dav1d-api.patch"
 starfish_patch="$repo_root/cobalt-platform/cobalt-23.lts.6-webos-starfish.patch"
 pulse_soname_patch="$repo_root/cobalt-platform/cobalt-23.lts.6-webos-pulse-soname.patch"
@@ -87,6 +88,12 @@ if ! grep -q 'dav1d handles AV1' \
   "$cobalt_root/starboard/linux/shared/media_is_video_supported.cc"; then
   git -C "$cobalt_root" apply --check "$av1_patch"
   git -C "$cobalt_root" apply "$av1_patch"
+fi
+
+if ! grep -q 'Starfish.*hardware decoder' \
+  "$cobalt_root/starboard/linux/shared/media_is_video_supported.cc"; then
+  git -C "$cobalt_root" apply --check "$uhd_patch"
+  git -C "$cobalt_root" apply "$uhd_patch"
 fi
 
 if ! grep -q 'dav1d-webos-official/public' \

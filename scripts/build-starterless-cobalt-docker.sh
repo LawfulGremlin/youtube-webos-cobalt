@@ -19,7 +19,9 @@ if ! docker volume inspect "$sdk_volume" >/dev/null 2>&1; then
   exit 3
 fi
 
+make -C "$repo_root" npm-docker
 "$repo_root/scripts/install-webos-starboard-platform.sh" "$cobalt_root"
+"$repo_root/scripts/install-ytaf-cobalt-assets.sh" "$cobalt_root"
 mkdir -p "$(dirname "$build_log")"
 
 echo "Starting the long Cobalt webos-arm build with $parallel jobs."
@@ -33,7 +35,7 @@ docker run --rm --platform linux/amd64 \
   -e WEBOS_SDK_ROOT=/sdk/arm-webos-linux-gnueabi_sdk-buildroot \
   -e SDL2_BUNDLE_DIR=/sdl \
   cobalt-build-evergreen:latest \
-  sh -c "gn --script-executable=python3 gen '$out_dir' --args='target_platform=\"webos-arm\" build_type=\"$build_type\" target_cpu=\"arm\" sb_api_version=13 is_clang=false' && ninja -v -j '$parallel' -C '$out_dir' cobalt" \
+  sh -c "git config --global --add safe.directory /code && gn --script-executable=python3 gen '$out_dir' --args='target_platform=\"webos-arm\" build_type=\"$build_type\" target_cpu=\"arm\" sb_api_version=13 is_clang=false' && ninja -v -j '$parallel' -C '$out_dir' cobalt" \
   2>&1 | tee "$build_log"
 
 echo "Cobalt binary: $cobalt_root/$out_dir/cobalt"
