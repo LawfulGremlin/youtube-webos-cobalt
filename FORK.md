@@ -2,27 +2,31 @@
 
 This repository is a shadow fork of
 [RF1705/youtube-webos-cobalt-adfree](https://github.com/RF1705/youtube-webos-cobalt-adfree):
-it is not registered as a GitHub fork, but `main` carries upstream's full history and is kept
-up to date automatically.
+it is not registered as a GitHub fork, but `main` carries upstream's full history. Upstream
+releases are merged by hand; [UPSTREAM.md](UPSTREAM.md) records where we stand and every
+take/leave decision.
 
 ## Rules
 
-- **Pull only.** We fetch and merge from upstream on a schedule. We never push to upstream and
-  never open issues, pull requests, or discussions there.
+- **Pull only.** We fetch and merge from upstream. We never push to upstream and never open
+  issues, pull requests, or discussions there.
 - **Work as patches.** Fork changes live in fork-owned files (listed in `.gitattributes` with
   `merge=ours`) or as additive patches, so upstream syncs merge cleanly. Avoid editing
   upstream-owned files.
 
 ## Automation
 
-- `.github/workflows/sync-upstream.yml` — merges upstream `main` on the 1st and 15th of each
-  month (or manually via *Run workflow*). Clean merges land on `main` directly; conflicts open
-  a pull request in **this** repository for manual resolution.
+- `.github/workflows/sync-upstream.yml` — polls upstream daily for release tags not yet in
+  `main` and opens an issue in **this** repository (one per tag). It never merges or pushes;
+  the merge is manual, per the routine in AGENTS.md, and is recorded in UPSTREAM.md.
 - `.github/workflows/release.yml` — manual (*Run workflow*, takes a version). Builds the IPK
   from the current source, publishes a GitHub release `v<version>` with the IPK + webosbrew
   manifest, and regenerates `repo.json` on `main`.
 
 ## Feature policy
+
+Per-change verdicts on upstream's work (taken, kept ours, rejected, and why) are in
+[UPSTREAM.md](UPSTREAM.md); this section is the policy and the technical narrative.
 
 Features are ported **on demand** (what users actually ask for in the wild, e.g.
 NicholasBly/youtube-webos#143), not for blanket parity with the WebView-based

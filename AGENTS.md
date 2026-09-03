@@ -42,6 +42,14 @@ touching fork features. The rules below are the working routine.
    check the player's quality menu against the same video in a desktop browser. v1.1.0
    launched and played fine yet capped at 720p, because an unreleased upstream VP9
    experiment in the patch broke format selection — a launch check alone said nothing.
+6. **Record it in [UPSTREAM.md](UPSTREAM.md)** in the same commit: move each assessed change
+   from "Waiting for a decision" into the Decisions table with a verdict and a revisit trigger,
+   add the sync-history entry, and refresh "Where we stand". The merge commit carries the
+   details; the ledger carries the decisions.
+
+New upstream release tags are noticed by `.github/workflows/sync-upstream.yml`, which opens an
+issue here (one per tag, never reopened). It never merges or pushes; close the issue when the
+tag is merged or deliberately skipped.
 
 ## Releases
 
@@ -53,4 +61,5 @@ touching fork features. The rules below are the working routine.
   rollback path when a new one regresses (upstream's own v1.2.x wave left users asking for
   exactly this). Rolling back = installing an older release's IPK by hand, optionally pointing
   `repo.json` back at it.
-- Never publish a release that has not been installed and launched on real hardware.
+- Never publish a release that has not been installed and launched on real hardware. Add the
+  verification row to the Hardware verification table in `UPSTREAM.md` with the release.

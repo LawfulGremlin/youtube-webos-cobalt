@@ -1,102 +1,94 @@
-name: Sync with Upstream
+name: Watch upstream
 
-# Pull-only shadow-fork sync: fetches upstream and merges it into main.
-# This workflow never pushes to, or opens anything against, upstream.
+# Pull-only shadow fork: polls upstream for release tags not yet merged into
+# main and opens an issue here when one appears. Never pushes anywhere and
+# never touches upstream. The merge itself is manual — see AGENTS.md and
+# UPSTREAM.md.
 
 on:
   schedule:
-    - cron: '0 6 1,15 * *'   # biweekly: 1st and 15th of each month at 06:00 UTC
+    - cron: '0 6 * * *'   # daily; GitHub cannot trigger on another repo's tags
   workflow_dispatch:
 
 jobs:
-  sync:
+  watch:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
-      pull-requests: write
+      contents: read
+      issues: write
     steps:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
-          ref: main
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Configure git
-        run: |
-          git config user.name  'GitHub Actions'
-          git config user.email 'actions@github.com'
-          # Required for `merge=ours` attributes in .gitattributes to take effect.
-          git config merge.ours.driver true
 
       - name: Fetch upstream
         run: |
           git remote add upstream https://github.com/RF1705/youtube-webos-cobalt-adfree.git
-          git fetch upstream main
+          # Upstream's tags collide with ours by name (both use vX.Y.Z), so
+          # keep them under refs/tags/upstream/ — same as UPSTREAM.md prescribes locally.
+          git fetch --no-tags upstream \
+            '+refs/heads/main:refs/remotes/upstream/main' \
+            '+refs/tags/v*:refs/tags/upstream/v*'
 
-      - name: Check whether upstream has new commits
-        id: check
+      - name: Find unmerged upstream release tags
+        id: find
         run: |
-          BEHIND=$(git rev-list --count HEAD..upstream/main)
-          echo "behind=$BEHIND" >> "$GITHUB_OUTPUT"
-          echo "main is $BEHIND commit(s) behind upstream/main."
+          NEW=""
+          for t in $(git tag -l 'upstream/v*' --sort=-creatordate); do
+            git merge-base --is-ancestor "$t" HEAD || NEW="$NEW ${t#upstream/}"
+          done
+          NEW=${NEW# }
+          echo "new=$NEW" >> "$GITHUB_OUTPUT"
+          echo "Unmerged upstream release tags: ${NEW:-none}"
 
-      - name: Attempt merge
-        if: steps.check.outputs.behind != '0'
-        id: merge
-        run: |
-          git checkout -B sync/upstream
-          if git merge upstream/main --no-edit; then
-            echo "result=clean" >> "$GITHUB_OUTPUT"
-          else
-            echo "result=conflict" >> "$GITHUB_OUTPUT"
-            # Never commit conflict markers. Publish the upstream tip as-is
-            # on the sync branch; a human resolves the merge locally.
-            git merge --abort
-            git reset --hard upstream/main
-          fi
-
-      - name: Fast-forward main on clean merge
-        if: steps.merge.outputs.result == 'clean'
+      - name: Open issue for a new tag
+        if: steps.find.outputs.new != ''
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NEW: ${{ steps.find.outputs.new }}
         run: |
-          git checkout main
-          git merge --ff-only sync/upstream
-          git push origin main
-          # If a prior conflict left a sync PR open, it no longer reflects reality — close it.
-          gh pr close sync/upstream --delete-branch --comment "Superseded by a later clean sync." 2>/dev/null || true
-
-      - name: Push conflicts to sync branch and open PR
-        if: steps.merge.outputs.result == 'conflict'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -e
-          git push -f origin sync/upstream
-          # Filter on state=open explicitly: `gh pr view <branch>` also matches
-          # long-closed PRs, which would make this skip creating a needed PR.
-          OPEN_COUNT=$(gh pr list --head sync/upstream --state open --json number --jq 'length')
-          if [ "$OPEN_COUNT" -gt 0 ]; then
-            echo "Existing sync PR refreshed with latest upstream conflicts."
-          else
-            if ! gh pr create \
-              --base main \
-              --head sync/upstream \
-              --title "Sync upstream/main — manual conflict resolution required" \
-              --body "Automatic upstream sync produced conflicts, so nothing was merged. This branch is a clean snapshot of upstream \`main\` (no conflict markers committed).
-
-              Resolve locally on \`main\`:
-
-              \`\`\`
-              git checkout main && git pull
-              git config merge.ours.driver true
-              git remote add upstream https://github.com/RF1705/youtube-webos-cobalt-adfree.git 2>/dev/null || true
-              git fetch upstream main
-              git merge upstream/main   # resolve conflicts, commit, push
-              \`\`\`
-
-              Fork-owned files (\`merge=ours\` in \`.gitattributes\`) are kept as-is automatically — any remaining conflicts are real content overlaps. Close this PR once main is synced (the next clean sync run also closes it)."; then
-              echo "::error::Failed to open sync PR — conflict commit is stranded on sync/upstream. Open the PR manually or rerun this workflow."
-              exit 1
-            fi
+          latest=${NEW%% *}
+          title="Upstream $latest released: sync needed"
+          # One issue per tag, ever. A closed issue means the tag was merged or
+          # deliberately skipped; do not reopen it.
+          if gh issue list --state all --limit 200 --json title --jq '.[].title' | grep -qxF "$title"; then
+            echo "Issue for $latest already exists; nothing to do."
+            exit 0
           fi
+
+          git config user.name 'GitHub Actions'
+          git config user.email 'actions@github.com'
+          git config merge.ours.driver true
+          if git merge --no-commit --no-ff upstream/main >/dev/null 2>&1; then
+            trial="clean (fork-owned files kept by merge=ours). Still review hunk-by-hunk."
+          else
+            trial="conflicts. Resolve hunk-by-hunk per AGENTS.md."
+          fi
+          git merge --abort 2>/dev/null || true
+
+          {
+            echo "Unmerged upstream release tags: **$NEW**"
+            echo
+            echo "Trial merge of \`upstream/main\` into \`main\`: $trial"
+            echo
+            echo "Commits on \`upstream/main\` not in \`main\` ($(git rev-list --count HEAD..upstream/main)):"
+            echo
+            echo '```'
+            git log --oneline HEAD..upstream/main | head -150
+            echo '```'
+            echo
+            echo 'Sync routine (AGENTS.md):'
+            echo
+            echo '- [ ] Review upstream issues open and recently closed against this release'
+            echo '- [ ] Merge locally, hunk-by-hunk; never take a whole shared file as ours'
+            echo '- [ ] Grep merged upstream files for Cobalt-missing APIs (`.closest(`, `NodeList.forEach`, injected `<style>`)'
+            echo '- [ ] Hardcoded remote keys become shortcut-registry actions'
+            echo '- [ ] Build the bundle and run `node webapp/src/fork/test.mjs`'
+            echo '- [ ] Record the decisions in `UPSTREAM.md`'
+            echo '- [ ] Hardware-verify before any release (quality ladder too if the runtime or patch changed)'
+            echo
+            echo 'Close this issue once the tag is merged, or once the decision is not to take it.'
+          } > body.md
+          gh issue create --title "$title" --body-file body.md
+          echo "::error::$title (issue opened). Manual sync required."
+          exit 1
