@@ -3,12 +3,14 @@
 // lives under webapp/src/fork/ so upstream syncs merge cleanly.
 
 import { configRead, configWrite } from '../config.js';
-import './fork.css';
-import { checkboxTools } from '../checkboxTools.js';
 import { showNotification } from '../ui.js';
 import { text as languageText } from '../languages/index.js';
 import { toggleSubtitles } from '../subtitle-shortcut.js';
-import { filterTvResponse, getUnmatchedShoppingKeys } from './filters.mjs';
+import { filterTvResponse } from './filters.mjs';
+import {
+  isBrowseResponse,
+  stripShortsFromBrowseResponse
+} from '../shorts-response-filter.mjs';
 import { stepTarget } from './frame-step.mjs';
 import { nextPlaybackRate } from './playback-speed.mjs';
 import {
@@ -68,7 +70,6 @@ const SHORTCUT_DEFAULTS_VERSION = 6;
 const LAYOUT_KEY = 'forkKeyboardLayout'; // '' = not decided yet, see below
 
 const FORK_DEFAULTS = {
-  forkRemoveShorts: false,
   [LAYOUT_KEY]: ''
 };
 SLOTS.forEach((slot) => {
@@ -89,6 +90,17 @@ if ((configRead('forkShortcutDefaultsVersion') || 0) < SHORTCUT_DEFAULTS_VERSION
     configWrite(key, FORK_DEFAULTS[key]);
   });
   configWrite('forkShortcutDefaultsVersion', SHORTCUT_DEFAULTS_VERSION);
+}
+
+// fork: one-time migration of this fork's old "Remove Shorts" toggle
+// (forkRemoveShorts, true = hide) to upstream's enableShorts (false = hide),
+// which replaced it in the v1.2.2 sync. Delete this block after 2026-11-01.
+{
+  const legacyRemoveShorts = configRead('forkRemoveShorts');
+  if (typeof legacyRemoveShorts !== 'undefined') {
+    if (legacyRemoveShorts) configWrite('enableShorts', false);
+    configWrite('forkRemoveShorts', undefined);
+  }
 }
 
 // --- Keyboard layout ---------------------------------------------------------
@@ -152,18 +164,30 @@ window.ytafKeyboardLayout = function (id) {
 };
 
 // Chain onto JSON.parse after upstream adblock.js — same interception point
-// upstream uses, without editing upstream code. Shorts filtering is behind
-// our own toggle; feed-ad item removal rides the existing adblock toggle.
+// upstream uses, without editing upstream code. Feed-ad item removal rides
+// the existing adblock toggle.
 const prevParse = JSON.parse;
 JSON.parse = function () {
   const result = prevParse.apply(this, arguments);
   try {
     const removed = filterTvResponse(result, {
-      removeAds: configRead('enableAdBlock'),
-      removeShorts: configRead('forkRemoveShorts')
+      removeAds: configRead('enableAdBlock')
     });
     if (removed) {
       console.info('[ytaf-fork] filtered ' + removed + ' feed item(s)');
+    }
+    // fork: upstream runs its Shorts filter only from adblockPreload.js, which
+    // the Cobalt runtime executes before the document loads. On a runtime
+    // without that hook (older binary, or the preload failed) nothing would
+    // filter Shorts at all, so run the same filter from here in that case.
+    // Same guard flag as the preload, so it never runs twice.
+    if (
+      !window.__ytafShortsResponseFilterInstalled &&
+      !configRead('enableShorts') &&
+      isBrowseResponse(result) &&
+      stripShortsFromBrowseResponse(result)
+    ) {
+      console.info('[ytaf-fork] Shorts filtered without preload');
     }
   } catch (err) {
     console.warn('[ytaf-fork] filter failed:', err);
@@ -175,42 +199,10 @@ JSON.parse = function () {
 // 2026-08-15 as measured dead code: instrumenting XMLHttpRequest.open on
 // hardware showed 0 of 73 requests hitting the /youtubei/v1/(browse|search|
 // next|reel) endpoints it scoped — this client fetches its feed through some
-// other transport, so the shadow never filtered anything. Feed-ad and Shorts
-// removal ride upstream's DOM hider plus the JSON.parse chain above for
-// whatever payloads do pass through it.
+// other transport, so the shadow never filtered anything. Feed-ad removal
+// rides upstream's DOM hider plus the JSON.parse chain above for whatever
+// payloads do pass through it.
 
-// fork: belt-and-braces for the in-video shopping QR card. The JSON filter above
-// keys off shoppingTimelyActionRenderer, which is *inferred* from the DOM tag
-// (ytlr-shopping-timely-action-renderer) via this client's tag↔renderer naming
-// convention — the element names are confirmed live, the InnerTube key isn't.
-// fork.css keys off the confirmed element name instead; this gates it on the
-// AdBlock toggle. If the JSON key is right, the rule never has anything to hide.
-function syncShoppingCardHiding() {
-  const root = document.documentElement;
-  if (!root) return;
-  if (configRead('enableAdBlock')) {
-    root.classList.add('ytaf-hide-shopping');
-  } else {
-    root.classList.remove('ytaf-hide-shopping');
-  }
-}
-syncShoppingCardHiding();
-
-// The JSON filter above re-reads the toggle on every parse, so it follows the
-// setting for free — this class doesn't, and syncing it only at import would
-// leave the card hidden (or showing) until the next launch. configWrite emits
-// this event for exactly that.
-document.addEventListener('ytaf-config-changed', (evt) => {
-  const key = evt && evt.detail && evt.detail.key;
-  if (!key || key === 'enableAdBlock') syncShoppingCardHiding();
-});
-
-// fork: SHOPPING_RENDERER_KEYS above is inferred, not confirmed. This exposes
-// any shopping-shaped key it did NOT match, so `window.ytafShoppingKeys()` over
-// the debug build's CDP names the real one from real data if the inference is
-// wrong — rather than another round of guessing.
-window.ytafShoppingKeys = getUnmatchedShoppingKeys;
-window.ytafSyncShoppingCardHiding = syncShoppingCardHiding;
 
 // --- Shortcut actions -------------------------------------------------------
 
@@ -414,6 +406,24 @@ function bindingRow(slot) {
   );
 }
 
+// Upstream's configurable startup page (utils.js handleInitialLaunch, config
+// key startupPage) rendered as one of this fork's cycler rows instead of
+// upstream's choiceTools control, so it behaves like the rows around it.
+const STARTUP_PAGES = ['home', 'subscriptions', 'shorts', 'library'];
+function startupPageLabel(page) {
+  return languageText('ui', 'startupPage' + page.charAt(0).toUpperCase() + page.slice(1));
+}
+function startupPageRow() {
+  return cyclerRow(
+    () => languageText('ui', 'startupPage') + ': ' + startupPageLabel(configRead('startupPage')),
+    (delta) => {
+      const n = STARTUP_PAGES.length;
+      const i = Math.max(0, STARTUP_PAGES.indexOf(configRead('startupPage')));
+      configWrite('startupPage', STARTUP_PAGES[(i + delta + n) % n]);
+    }
+  );
+}
+
 function layoutRow() {
   return cyclerRow(
     () => 'Keyboard layout: ' + layoutLabel(configRead(LAYOUT_KEY)),
@@ -431,17 +441,9 @@ function appendForkUI() {
     if (uiTries < 120) setTimeout(appendForkUI, 500);
     return;
   }
-  container.appendChild(
-    checkboxTools.add(
-      '__fork_remove_shorts',
-      'Remove Shorts',
-      configRead('forkRemoveShorts'),
-      (state) => configWrite('forkRemoveShorts', state)
-    )
-  );
-
   const shortcuts = document.createElement('div');
   shortcuts.classList.add('blockquote');
+  shortcuts.appendChild(startupPageRow());
   shortcuts.appendChild(layoutRow());
   SLOTS.forEach((slot) => shortcuts.appendChild(bindingRow(slot)));
   container.appendChild(shortcuts);

@@ -13,7 +13,7 @@ PACKAGE_NAME_OFFICIAL?=youtube.leanback.v4
 PACKAGE_NAME?=youtube.leanback.v4
 PACKAGE_NAME_TARGET=$(PACKAGE_NAME)
 PACKAGE_DISPLAY_NAME?=YouTube webOS Cobalt AdFree
-PROJECT_VERSION?=1.2.1
+PROJECT_VERSION?=1.2.2
 PACKAGE_COBALT_VERSION?=23.lts.6
 PACKAGE_VERSION?=$(PROJECT_VERSION)
 PACKAGE_IPK_BUILD=$(PACKAGE_NAME_TARGET)_$(PACKAGE_VERSION)_arm.ipk
@@ -470,8 +470,6 @@ endif
 	fi
 
 .PHONY: ares-package
-# fork: upstream's -c check line reads `$aresCmd` (single $), which expands
-# to literal "resCmd" and silently skips the check; kept $$aresCmd.
 ares-package:
 	@aresCmd=$$(command -v ares-package); \
 	if [ "$$aresCmd" == "" ]; then \
@@ -514,9 +512,7 @@ docker-make.%:
 # `make package ... COBALT_DEBUG=1` silently built as if COBALT_DEBUG were
 # unset, since the DevTools-stub step above (gated on COBALT_DEBUG_ENABLED)
 # runs via this target too.
-# fork: upstream's version says $PWD (expands to "WD" in make — mounts an
-# empty named volume instead of the repo); kept $$PWD.
-	docker run --rm -i -u $$(id -u):$$(id -g) -e HOME=/app -e npm_config_cache=/app/.npm -e WEBAPP_DEBUG="$(WEBAPP_DEBUG)" -e COBALT_DEBUG="$(COBALT_DEBUG)" -e IPK_MEMBER_MTIME="$(IPK_MEMBER_MTIME)" -v "$$PWD:/app" -w /app $(NODE_DOCKER_IMAGE) sh -lc 'mkdir -p /app/.webos /app/.npm && make $*'
+	docker run --rm -i -u $$(id -u):$$(id -g) -e HOME=/app -e npm_config_cache=/app/.npm -e WEBAPP_DEBUG="$(WEBAPP_DEBUG)" -e COBALT_DEBUG="$(COBALT_DEBUG)" -e IPK_MEMBER_MTIME="$(IPK_MEMBER_MTIME)" -v "$(CURRENT_DIR):/app" -w /app $(NODE_DOCKER_IMAGE) sh -lc 'mkdir -p /app/.webos /app/.npm && make $*'
 .PHONY: npm
 npm:
 	( \

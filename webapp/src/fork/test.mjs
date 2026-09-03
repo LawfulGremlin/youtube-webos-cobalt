@@ -2,11 +2,7 @@
 // Plain node + assert — no framework, mirrors upstream's zero-test-infra style.
 
 import assert from 'node:assert/strict';
-import {
-  filterTvResponse,
-  getUnmatchedShoppingKeys,
-  resetUnmatchedShoppingKeys
-} from './filters.mjs';
+import { filterTvResponse } from './filters.mjs';
 import { stepTarget, FRAME_DURATION_SEC } from './frame-step.mjs';
 import { nextPlaybackRate, PLAYBACK_RATES } from './playback-speed.mjs';
 import {
@@ -27,7 +23,7 @@ import {
   cycleActionKey
 } from './shortcut-registry.mjs';
 
-const BOTH = { removeShorts: true, removeAds: true };
+const ADS = { removeAds: true };
 
 function feed(...items) {
   return {
@@ -47,42 +43,12 @@ const normalTile = () => ({
   tileRenderer: { style: 'TILE_STYLE_YTLR_DEFAULT', contentType: 'TILE_CONTENT_TYPE_VIDEO' }
 });
 
-// Shorts shelf by explicit type
-{
-  const data = feed({ shelfRenderer: { tvhtml5ShelfRendererType: 'TVHTML5_SHELF_RENDERER_TYPE_SHORTS' } }, normalTile());
-  assert.equal(filterTvResponse(data, BOTH), 1);
-  assert.equal(data.contents.tvBrowseRenderer.content.tvSurfaceContentRenderer.content.sectionListRenderer.contents.length, 1);
+function feedItems(data) {
+  return data.contents.tvBrowseRenderer.content.tvSurfaceContentRenderer.content
+    .sectionListRenderer.contents;
 }
 
-// Shorts shelf by title
-{
-  const data = feed({ shelfRenderer: { title: { runs: [{ text: 'Shorts' }] } } });
-  assert.equal(filterTvResponse(data, BOTH), 1);
-}
-
-// Non-shorts shelf survives, but shorts tiles inside it are removed
-{
-  const shelf = {
-    shelfRenderer: {
-      title: { runs: [{ text: 'Recommended' }] },
-      content: {
-        horizontalListRenderer: {
-          items: [
-            normalTile(),
-            { tileRenderer: { style: 'TILE_STYLE_YTLR_SHORTS' } },
-            { tileRenderer: { onSelectCommand: { reelWatchEndpoint: {} } } },
-            { reelItemRenderer: {} }
-          ]
-        }
-      }
-    }
-  };
-  const data = feed(shelf);
-  assert.equal(filterTvResponse(data, BOTH), 3);
-  assert.equal(shelf.shelfRenderer.content.horizontalListRenderer.items.length, 1);
-}
-
-// Feed ads: adSlotRenderer and reel ads
+// Feed ads: adSlotRenderer and reel ads go, the normal tile stays
 {
   const data = feed(
     { adSlotRenderer: {} },
@@ -90,31 +56,43 @@ const normalTile = () => ({
     { command: { reelWatchEndpoint: { videoType: 'REEL_VIDEO_TYPE_AD' } } },
     normalTile()
   );
-  assert.equal(filterTvResponse(data, BOTH), 3);
+  assert.equal(filterTvResponse(data, ADS), 3);
+  assert.equal(feedItems(data).length, 1);
 }
 
-// removeAds alone must not remove shorts; removeShorts alone must not remove ads
+// Nested: an ad inside a shelf's item list is removed, the shelf survives
 {
-  const data = feed({ reelItemRenderer: {} }, { adSlotRenderer: {} });
-  assert.equal(filterTvResponse(data, { removeAds: true }), 1);
-}
-{
-  const data = feed({ reelItemRenderer: {} }, { adSlotRenderer: {} });
-  assert.equal(filterTvResponse(data, { removeShorts: true }), 1);
+  const shelf = {
+    shelfRenderer: {
+      content: { horizontalListRenderer: { items: [{ adSlotRenderer: {} }, normalTile()] } }
+    }
+  };
+  const data = feed(shelf, normalTile());
+  assert.equal(filterTvResponse(data, ADS), 1);
+  assert.equal(feedItems(data).length, 2);
+  assert.equal(shelf.shelfRenderer.content.horizontalListRenderer.items.length, 1);
 }
 
-// Both flags off: untouched, returns 0
+// Shorts are upstream's job now (shorts-response-filter.mjs): untouched here
 {
-  const data = feed({ reelItemRenderer: {} });
+  const data = feed({ reelItemRenderer: {} }, { adSlotRenderer: {} });
+  assert.equal(filterTvResponse(data, ADS), 1);
+  assert.equal(feedItems(data).length, 1);
+  assert.ok(feedItems(data)[0].reelItemRenderer);
+}
+
+// Flag off: untouched, returns 0
+{
+  const data = feed({ adSlotRenderer: {} });
   assert.equal(filterTvResponse(data, {}), 0);
-  assert.equal(data.contents.tvBrowseRenderer.content.tvSurfaceContentRenderer.content.sectionListRenderer.contents.length, 1);
+  assert.equal(feedItems(data).length, 1);
 }
 
 // Garbage tolerance
-assert.equal(filterTvResponse(null, BOTH), 0);
-assert.equal(filterTvResponse('"a string"', BOTH), 0);
-assert.equal(filterTvResponse([null, 42, 'x'], BOTH), 0);
-assert.equal(filterTvResponse({ a: { b: [null, { c: [] }] } }, BOTH), 0);
+assert.equal(filterTvResponse(null, ADS), 0);
+assert.equal(filterTvResponse('"a string"', ADS), 0);
+assert.equal(filterTvResponse([null, 42, 'x'], ADS), 0);
+assert.equal(filterTvResponse({ a: { b: [null, { c: [] }] } }, ADS), 0);
 
 // Shortcut registry: slot mapping (green 404/172 must NOT be a slot — it
 // opens the settings menu)
@@ -160,98 +138,6 @@ assert.equal(stepTarget(100, 100, 1), 100 - FRAME_DURATION_SEC);
 // Frame step: unknown duration (NaN while loading) must not block stepping
 assert.ok(Math.abs(stepTarget(10, NaN, 1) - (10 + FRAME_DURATION_SEC)) < 1e-9);
 assert.equal(stepTarget(0, undefined, -1), 0);
-
-// Shopping/merch overlay: removed as an object property (playerOverlays), which
-// is where the in-video QR card lives — the array path alone never reaches it.
-{
-  const data = {
-    playerOverlays: {
-      playerOverlayRenderer: {
-        shoppingTimelyActionRenderer: { title: 'Rippling Muscles T-shirt' },
-        decoratedPlayerBarRenderer: { keep: true }
-      }
-    }
-  };
-  assert.equal(filterTvResponse(data, { removeAds: true }), 1);
-  assert.equal(
-    data.playerOverlays.playerOverlayRenderer.shoppingTimelyActionRenderer,
-    undefined
-  );
-  assert.ok(data.playerOverlays.playerOverlayRenderer.decoratedPlayerBarRenderer);
-}
-
-// The whole timely action goes, not just its shopping payload — otherwise the
-// card's dismiss X and chrome are left behind as an empty shell.
-{
-  const data = {
-    timelyActions: [
-      { timelyActionRenderer: { content: { shoppingTimelyActionRenderer: { qr: true } } } },
-      { timelyActionRenderer: { content: { someOtherActionRenderer: { keep: true } } } }
-    ]
-  };
-  assert.equal(filterTvResponse(data, { removeAds: true }), 1);
-  assert.equal(data.timelyActions.length, 1, 'non-shopping timely actions survive');
-  assert.ok(data.timelyActions[0].timelyActionRenderer.content.someOtherActionRenderer);
-}
-
-// A timely action hung off an OBJECT property is dropped whole too — not just
-// its inner shopping payload, which would leave the wrapper's dismiss X behind.
-{
-  const data = {
-    playerOverlays: {
-      timelyActionRenderer: { content: { shoppingTimelyActionRenderer: { qr: true } } },
-      keepMe: { a: 1 }
-    }
-  };
-  assert.equal(filterTvResponse(data, { removeAds: true }), 1);
-  assert.equal(data.playerOverlays.timelyActionRenderer, undefined);
-  assert.ok(data.playerOverlays.keepMe);
-}
-
-// An object-hung timely action WITHOUT shopping content survives whole.
-{
-  const data = {
-    playerOverlays: {
-      timelyActionRenderer: { content: { someOtherActionRenderer: { keep: 1 } } }
-    }
-  };
-  assert.equal(filterTvResponse(data, { removeAds: true }), 0);
-  assert.ok(data.playerOverlays.timelyActionRenderer.content.someOtherActionRenderer);
-}
-
-// Shopping overlay carried as a plain array item is dropped too.
-{
-  const data = { contents: [{ tileRenderer: { videoId: 'keep' } }, { shoppingTimelyActionRenderer: {} }] };
-  assert.equal(filterTvResponse(data, { removeAds: true }), 1);
-  assert.equal(data.contents.length, 1);
-  assert.ok(data.contents[0].tileRenderer);
-}
-
-// Sign-in QR codes must survive: hiding qrCodeRenderer would lock the user out.
-{
-  const data = { signInPage: { qrCodeRenderer: { url: 'https://youtube.com/activate' } } };
-  assert.equal(filterTvResponse(data, { removeAds: true }), 0);
-  assert.ok(data.signInPage.qrCodeRenderer, 'sign-in QR must never be removed');
-}
-
-// Shopping removal rides the adblock toggle: off means untouched.
-{
-  const data = { playerOverlays: { shoppingTimelyActionRenderer: { a: 1 } } };
-  assert.equal(filterTvResponse(data, { removeAds: false, removeShorts: true }), 0);
-  assert.ok(data.playerOverlays.shoppingTimelyActionRenderer);
-}
-
-// Diagnostic: shopping-shaped keys we do NOT know are reported, never removed —
-// this is what names the real renderer if the guessed list misses it.
-{
-  resetUnmatchedShoppingKeys();
-  const data = { playerOverlays: { someUnknownShoppingThingRenderer: { a: 1 }, shoppingTimelyActionRenderer: {} } };
-  filterTvResponse(data, { removeAds: true });
-  assert.deepEqual(getUnmatchedShoppingKeys(), ['someUnknownShoppingThingRenderer']);
-  assert.ok(data.playerOverlays.someUnknownShoppingThingRenderer, 'unknown keys must survive');
-  assert.equal(data.playerOverlays.shoppingTimelyActionRenderer, undefined, 'known keys are removed');
-  resetUnmatchedShoppingKeys();
-}
 
 // Playback speed: steps one position, clamps at both ends, never wraps
 assert.equal(nextPlaybackRate(1, 1), 1.25);

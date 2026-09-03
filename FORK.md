@@ -30,10 +30,13 @@ adding features itself.
   `import './fork/index.js'` line in `adblock-main.js` is the only wiring inside
   upstream files. Pure logic goes in `filters.mjs` with node-runnable tests in
   `test.mjs` (run by `fork-ci.yml`).
-- Current fork features: **Remove Shorts** toggle (shelves + tiles), **feed ad item
-  removal** (adSlotRenderer/reel ads + sponsored tiles, rides the existing
-  AdBlock toggle — via the JSON.parse chain in fork/index.js plus upstream's
-  DOM hider. An XHR responseText-shadow layer scoped to
+- Current fork features: **feed ad item removal** (adSlotRenderer/reel ads,
+  rides the existing AdBlock toggle — via the JSON.parse chain in
+  fork/index.js plus upstream's DOM hider. Shorts removal and the in-video
+  shopping QR card used to be fork features here too; both were replaced by
+  upstream's own versions in the 2026-09-03 sync — see UPSTREAM.md — and the
+  JSON.parse chain also runs upstream's Shorts filter as a fallback on a
+  runtime without the preload hook. An XHR responseText-shadow layer scoped to
   /youtubei/v1/(browse|search|next|reel) was built on an early live
   measurement that saw /browse carry an ad node over XHR, but a later
   instrumented pass showed the app never calls those endpoints at all
@@ -328,9 +331,11 @@ web API exists:
 - **Dynamically injected `<style>` elements are silently ignored**: `.sheet`
   stays null and the rules never apply — via `textContent`, `innerHTML`, or
   `appendChild(createTextNode())`, and even for a plain class selector on a
-  `<div>`. Fork CSS must be a bundled stylesheet (`fork/fork.css`, folded into
-  `adblockMain.css` by webpack and loaded via `<link>`). Custom-tag type
-  selectors (`ytlr-shopping-timely-action-renderer`) *do* match from bundled CSS.
+  `<div>`. Any fork CSS must be a bundled stylesheet (import a `.css` file from
+  `fork/index.js`; webpack folds it into `adblockMain.css`, loaded via
+  `<link>`). Custom-tag type selectors (`ytlr-shopping-timely-action-renderer`)
+  *do* match from bundled CSS — verified with the fork's former shopping-card
+  rule, removed 2026-09-03 when upstream's QR blocker replaced that feature.
 - **`:has()` is unsupported** — a rule cannot select a parent by its contents.
 - **Incremental DOM prunes foreign nodes** inside the player subtree: next to
   `ytlr-progress-bar` within seconds, inside the progress `slider` in under

@@ -28,32 +28,19 @@ _Updated 2026-09-03._
 | | |
 |---|---|
 | Upstream line we merge | `upstream/main` (their 1.x line) |
-| Last upstream commit merged | `6217ffa` (2026-08-09), between their v1.2.1 and v1.2.2 |
-| Merged in | `c5393ab` (2026-08-15) |
-| Upstream since then | v1.2.2 (2026-08-27) plus about 90 commits on main; v2.0.0-beta (2026-08-30) on a side branch |
-| Our latest release | v1.2.1 (2026-09-02) |
-| Shipping base | official YouTube 1.1.7 IPK (Starboard 12 starter) + Cobalt 23.lts.6-12 built from source; `cobalt-23.lts.6.patch` held at upstream `37a27f1` |
-| Fork edits inside upstream files | 47 hunks in 8 files, each marked `fork:` (`git grep -c 'fork:' -- ':!webapp/src/fork' ':!tools'`) |
+| Last upstream commit merged | `479203b` (2026-08-29), the tip of their main after v1.2.2 and PR #64 |
+| Merged in | MERGE_COMMIT_TBD (2026-09-03) |
+| Upstream since then | nothing on main; v2.0.0-beta (2026-08-30) stays on a side branch |
+| Our latest release | v1.2.1 (2026-09-02); the merged tree is not released yet |
+| Shipping base | official YouTube 1.1.7 IPK (Starboard 12 starter) + Cobalt 23.lts.6-12 built from source with upstream's early-preload hook; `cobalt-23.lts.6.patch` is upstream's current one minus the VP9 hunk |
+| Fork edits inside upstream files | 46 hunks in 9 files, each marked `fork:` (`git grep -c 'fork:' -- ':!webapp/src/fork' ':!tools'`) |
 
 Version numbers are ours, not upstream's. Our v1.2.1 and their v1.2.1 are unrelated releases
 that share a number. See [Tag hygiene](#tag-hygiene).
 
 ## Waiting for a decision
 
-Upstream changes since `6217ffa` that have not been assessed. Each needs a verdict in the next
-sync; move the row into the Decisions table once it has one.
-
-| Upstream change | Landed | Notes for the decision |
-|---|---|---|
-| Shorts toggle (their PR #48) | v1.2.2 | Overlaps our **Remove Shorts** toggle. Standing rule: when upstream ships its own version of a fork feature, delete ours in the same sync. |
-| Shorts blocker rewrite: filters TV browse responses instead of the DOM, drops the old observer (PRs #52, #62, #63) | after v1.2.2 | Same overlap. Their new approach is closer to our JSON.parse chain than their old DOM hider was. |
-| Sponsored QR-code popup blocker (PR #49) | v1.2.2 | New feature, no overlap. Cobalt-gap grep needed. |
-| Configurable startup page (PR #50) | v1.2.2 | New feature, no overlap. |
-| Configuration menu scrolling and navigation fixes (PR #51) | after v1.2.2 | Touches `ui.js`, which carries 7 of our `fork:` hunks. Hunk-by-hunk. |
-| Early preload bundle: runs the YTAF preload before the initial document load (PR #64) | after v1.2.2 | New bundle in the build. Highest Cobalt risk in the batch; check how it is injected. |
-| Automated release IPK builds (`build-release-ipks.yml`, the `ci:` commits) | v1.2.2 | Our `release.yml` already builds releases. This new workflow file is what broke the old sync workflow's push. |
-| v1.2.2 as VP9 test base (`51d897f`) | v1.2.2 | We deleted `vp9-4k-test.yml` on 2026-08-15. Likely stays out. |
-| Shorts recycled-node resync (`4e79719`) | v1.2.2 | Part of the DOM blocker upstream has since removed itself. |
+Nothing at the moment. The 2026-09-03 sync assessed everything up to `479203b`.
 
 ## Decisions
 
@@ -61,6 +48,16 @@ Newest first.
 
 | Upstream change | Verdict | Why | Revisit when |
 |---|---|---|---|
+| Settings menu scrolling and remote navigation, PR #51 (inner-panel scrolling, held-key debounce, native spatial-navigation detection, rounded corners, `ui.css` title band) | **Deferred** | Both sides fix the same two bugs (double step, more rows than fit). Ours is hardware-verified on both TVs; theirs was written against Cobalt but is untested here. `ui.js` and `ui.css` stayed ours in the 2026-09-03 merge; the only upstream hunk taken in `ui.js` is the Shorts toggle row. | Early September 2026, A/B on lg48 with the throwaway-IPK procedure. |
+| Configurable startup page, PR #50 (v1.2.2) | **Taken, rendered by our menu row** | `utils.js` launch hook, the `startupPage` config key and its strings taken as-is. Upstream's `choiceTools` control is not taken (deleted): the option is one of the fork's cycler rows in `fork/index.js`, so it behaves like the rows around it. | Never. |
+| Early preload bundle, PR #64 (`adblock-preload.js`, webpack entry, `web_module.cc` hook in the patch) | **Taken** | Runs the Shorts response filter before YouTube's first parse. Needs the runtime hook, so Cobalt 23.lts.6-12 gold and qa were rebuilt 2026-09-03. The fork's JSON.parse chain also runs the same filter, under the same guard flag, on a runtime without the hook. | Never. |
+| Shorts toggle and browse-response filter, PRs #48, #52, #62, #63 | **Taken, replaced ours** | Broader than the fork's predicates (sidebar entry, several renderer keys) and has node tests. The fork's Remove Shorts predicates, row and `forkRemoveShorts` key were deleted; a dated migration in `fork/index.js` carries the old setting into `enableShorts`. | Delete the migration block after 2026-11-01. |
+| Sponsored QR popup blocker, PR #49 (v1.2.2) | **Taken, replaced ours** | Own toggle, tests and translated labels. The fork's shopping predicates, its CSS fallback and the diagnostic hook were deleted. Their predicate keys on the timely-action type; ours keyed on the nested renderer name. Not yet seen against a live shopping card. | A shopping card shows up on hardware: add the nested-renderer predicate to upstream's module with a `fork:` marker. |
+| Node tests and the CI test step (`npm test`, `webapp/test/`) | **Taken** | Step added to the fork-owned `ci.yml`. | Never. |
+| Makefile: `$(CURRENT_DIR)` docker mount, `$$aresCmd` fix (v1.2.2) | **Taken** | Their mount fix is make-native and replaces our `$$PWD` marker; the `$$aresCmd` fix converged with ours. Our `&&` chaining in `ares-package` and the `COBALT_DEBUG` forwarding stay. | Never. |
+| Language strings, `checkboxTools.setCallback`, config defaults (v1.2.2) | **Taken** | Additive. | Never. |
+| Release IPK build workflow, `build-release-ipks.yml` (v1.2.2) | **Rejected** | Our `release.yml` builds against our checked-in binaries. Deleted in the merge; delete again on every sync. | Never. |
+| VP9 test-base bump (`51d897f`) and Shorts recycled-node resync (`4e79719`) (v1.2.2) | **Rejected** | `vp9-4k-test.yml` stays deleted; the DOM blocker the resync patched is gone upstream too. | Never. |
 | Starterless 2.0 line (`starterless-cobalt-playback`, v2.0.0-beta, 2026-08-30) | **Watching** | Self-built Cobalt starter with SDL2 and Starfish decoding. Replaces the stock `youtube.leanback.v4` app instead of installing beside it. Tested by upstream on one webOS 6.5 TV; their #68 reports it as the only build that starts on a k7lp/webOS 6.5 set. | Our TVs (webOS 2021) stop launching the 1.x line, or YouTube drops Cobalt 23.lts. |
 | Makefile `$$` to `$` regressions (v1.2.1) | **Fixed with `fork:` markers** | Broke the docker build (`$PWD`) and skipped the package check (`$aresCmd`). | Upstream fixes them differently: take theirs, drop ours. |
 | `vp9-4k-test.yml` (v1.2.1) | **Rejected** | Deleted 2026-08-15. 4K works without the experiment. | Never. |
@@ -75,7 +72,7 @@ Newest first.
 | `normalize-ipk-mtime.py` (v1.1.6) | **Taken, then replaced** | Broke `make package` on this machine (cross-filesystem replace, deterministic `ar`). Fixed in `d8a9c05`, superseded by upstream's v1.2.1 pipeline. | Never. |
 | Green-key debounce (`34623b1`) | **Taken** | Restored 2026-07-28 after the 07-20 merge reverted it by accident. Confirmed on the lg75 remote. | Never. |
 | Playback-speed shortcuts on digits 1 and 3 (July 2026) | **Kept ours** | Digits are bindable slots in our shortcut registry. Ours lives in `fork/playback-speed.mjs`, default binding 1/3. | Never (hardcoded-key principle). |
-| Menu focus fix in `ui.js` (July 2026) | **Kept ours, then converged** | Theirs double-stepped on a real remote (lg48). In v1.1.6 upstream adopted the same `currentFocusIndex` approach. No longer a divergence. | Closed. |
+| Menu focus and focus-guard rewrite in `ui.js` (July 2026) | **Kept ours** | Theirs double-stepped on a real remote (lg48). Upstream later adopted our `currentFocusIndex` idea, but its spatial-navigation suspend/restore, focus guard and focus-restore code stayed out, so `ui.js` remains a real divergence (see the PR #51 row). | With the PR #51 A/B. |
 | SponsorBlock marker rewrite and `sponsorblock-categories.js` (July 2026) | **Kept ours** | A/B on lg48: their `findProgressBarParts()` requires an `idomkey="segment"` element the TV client never renders, so markers never appear. The categories module is dead without their `sponsorblock.js`. | Upstream drops the segment-element requirement. |
 | json-stringify-hook, text-data-guard, visual-debug, language files, compatibility-test build (July 2026) | **Taken** | Additive, no overlap with fork features. | Never. |
 
@@ -85,6 +82,14 @@ feature policy in FORK.md.
 ## Sync history
 
 Newest first. One entry per merge; the merge commit has the details.
+
+**2026-09-03, upstream v1.2.2 and tip `479203b`** (merge MERGE_COMMIT_TBD). Took the
+startup page (as a fork menu row), the early preload bundle with a rebuilt runtime, upstream's
+Shorts and sponsored-QR blockers in place of the fork's own, the node tests, the Makefile
+fixes and the strings. Deferred PR #51's menu scrolling and navigation as a unit. Rejected the
+release-build workflow and the VP9 test files. Issues reviewed: #70, #46, #66, #24, #2, #42,
+#68, #45 and the launch-failure cluster; none reproduced on our TVs, no action until upstream
+merges fixes.
 
 **2026-08-15, upstream v1.2.0 to v1.2.1 and tip `6217ffa`** (merge `c5393ab`, prepared by
 `09b428a` on 08-09). Took the subtitle toggle as a registry action, the pre-package mtime
@@ -111,6 +116,8 @@ released 2026-07-18.
 ## Upstream issues we watch
 
 Read upstream's open issues at every sync. These are the ones with a bearing on this fork.
+Stance as of 2026-09-03: none of them has been seen on our TVs, so no action; revisit any of
+them when upstream merges a fix.
 
 | Issue | Why it matters here |
 |---|---|
