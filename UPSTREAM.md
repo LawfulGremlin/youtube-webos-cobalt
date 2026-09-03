@@ -128,6 +128,7 @@ One row per release we published. The IPK is ARM-only; nothing ships without thi
 
 | Release | Date | TV | Result |
 |---|---|---|---|
+| v1.2.1-debug (prerelease, not in the feed) | 2026-09-03 | lg75 | Debug variant of the same code, kept as the pre-sync fallback. Installed beside the release app, launched, stable past 60 s, CDP up, UA `Cobalt/23.lts.6 qa Starboard/12`, fork menu row present. |
 | v1.2.1 | 2026-09-02 | lg75 | Shift/AltGr and dead-key layouts typed through a virtual keyboard into the release build. Feed verified. |
 | v1.2.0 | 2026-09-02 | lg75 | Physical and virtual keyboard input. |
 | v1.1.1 | 2026-08-15 | lg75, lg48 | VP9 2160p60 offered, SponsorBlock skip and end clamp, key-0 subtitles. |
