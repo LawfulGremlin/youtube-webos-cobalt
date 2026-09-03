@@ -34,9 +34,11 @@ adding features itself.
   rides the existing AdBlock toggle — via the JSON.parse chain in
   fork/index.js plus upstream's DOM hider. Shorts removal and the in-video
   shopping QR card used to be fork features here too; both were replaced by
-  upstream's own versions in the 2026-09-03 sync — see UPSTREAM.md — and the
-  JSON.parse chain also runs upstream's Shorts filter as a fallback on a
-  runtime without the preload hook. An XHR responseText-shadow layer scoped to
+  upstream's own versions in the 2026-09-03 sync — see UPSTREAM.md. Two
+  safety nets stay in fork code: the JSON.parse chain runs upstream's Shorts
+  filter on a runtime without the preload hook, and `fork.css` hides the
+  shopping card by its hardware-confirmed element name under upstream's QR
+  toggle. An XHR responseText-shadow layer scoped to
   /youtubei/v1/(browse|search|next|reel) was built on an early live
   measurement that saw /browse carry an ad node over XHR, but a later
   instrumented pass showed the app never calls those endpoints at all
@@ -334,8 +336,8 @@ web API exists:
   `<div>`. Any fork CSS must be a bundled stylesheet (import a `.css` file from
   `fork/index.js`; webpack folds it into `adblockMain.css`, loaded via
   `<link>`). Custom-tag type selectors (`ytlr-shopping-timely-action-renderer`)
-  *do* match from bundled CSS — verified with the fork's former shopping-card
-  rule, removed 2026-09-03 when upstream's QR blocker replaced that feature.
+  *do* match from bundled CSS — verified with the fork's shopping-card rule in
+  `fork/fork.css`, kept as a safety net behind upstream's QR-blocker toggle.
 - **`:has()` is unsupported** — a rule cannot select a parent by its contents.
 - **Incremental DOM prunes foreign nodes** inside the player subtree: next to
   `ytlr-progress-bar` within seconds, inside the progress `slider` in under

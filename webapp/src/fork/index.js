@@ -3,6 +3,7 @@
 // lives under webapp/src/fork/ so upstream syncs merge cleanly.
 
 import { configRead, configWrite } from '../config.js';
+import './fork.css';
 import { showNotification } from '../ui.js';
 import { text as languageText } from '../languages/index.js';
 import { toggleSubtitles } from '../subtitle-shortcut.js';
@@ -203,6 +204,24 @@ JSON.parse = function () {
 // rides upstream's DOM hider plus the JSON.parse chain above for whatever
 // payloads do pass through it.
 
+
+// fork: DOM-level safety net for the sponsored shopping QR card (fork.css),
+// gated on upstream's enableSponsoredQrCodeBlock so it follows the same
+// toggle as upstream's JSON filter — live, via the config-changed event.
+function syncShoppingCardHiding() {
+  const root = document.documentElement;
+  if (!root) return;
+  if (configRead('enableSponsoredQrCodeBlock')) {
+    root.classList.add('ytaf-hide-shopping');
+  } else {
+    root.classList.remove('ytaf-hide-shopping');
+  }
+}
+syncShoppingCardHiding();
+document.addEventListener('ytaf-config-changed', (evt) => {
+  const key = evt && evt.detail && evt.detail.key;
+  if (!key || key === 'enableSponsoredQrCodeBlock') syncShoppingCardHiding();
+});
 
 // --- Shortcut actions -------------------------------------------------------
 

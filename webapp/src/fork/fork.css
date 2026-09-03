@@ -1,0 +1,22 @@
+/* Fork-owned styles (see FORK.md).
+ *
+ * fork: this MUST be a bundled stylesheet, not an injected <style>. Confirmed
+ * live on hardware: a dynamically created <style> element is silently ignored
+ * by this engine — its .sheet stays null and its rules never apply, whether the
+ * CSS is set via textContent, innerHTML, or appendChild(createTextNode()), and
+ * even for a plain class selector on a <div>. Webpack folds this import into
+ * adblockMain.css, which the app loads via <link> and which demonstrably works.
+ */
+
+/* fork: DOM-level safety net for the in-video sponsored shopping QR card,
+ * behind upstream's "Block sponsored QR code popups" toggle. Upstream's
+ * sponsored-qr-code-block.mjs removes the card from the player response by
+ * its timely-action type, which has not yet been seen against a live card on
+ * this fork's TVs; this element name has (ytlr-shopping-timely-action-renderer,
+ * inspected over CDP). If the JSON filter works, this rule never matches.
+ *
+ * ytlr-qr-code-renderer is deliberately NOT hidden: sign-in uses a QR code too.
+ */
+.ytaf-hide-shopping ytlr-shopping-timely-action-renderer {
+  display: none !important;
+}
