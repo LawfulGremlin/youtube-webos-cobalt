@@ -89,6 +89,6 @@ jobs:
             echo
             echo 'Close this issue once the tag is merged, or once the decision is not to take it.'
           } > body.md
-          gh issue create --title "$title" --body-file body.md
+          gh api "repos/$GITHUB_REPOSITORY/issues" -f title="$title" -F body=@body.md --jq .html_url
           echo "::error::$title (issue opened). Manual sync required."
           exit 1
