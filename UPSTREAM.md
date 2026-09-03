@@ -29,7 +29,7 @@ _Updated 2026-09-03._
 |---|---|
 | Upstream line we merge | `upstream/main` (their 1.x line) |
 | Last upstream commit merged | `479203b` (2026-08-29), the tip of their main after v1.2.2 and PR #64 |
-| Merged in | MERGE_COMMIT_TBD (2026-09-03) |
+| Merged in | `5bdac4d` (2026-09-03) |
 | Upstream since then | nothing on main; v2.0.0-beta (2026-08-30) stays on a side branch |
 | Our latest release | v1.2.1 (2026-09-02); the merged tree is not released yet |
 | Shipping base | official YouTube 1.1.7 IPK (Starboard 12 starter) + Cobalt 23.lts.6-12 built from source with upstream's early-preload hook; `cobalt-23.lts.6.patch` is upstream's current one minus the VP9 hunk |
@@ -83,7 +83,7 @@ feature policy in FORK.md.
 
 Newest first. One entry per merge; the merge commit has the details.
 
-**2026-09-03, upstream v1.2.2 and tip `479203b`** (merge MERGE_COMMIT_TBD). Took the
+**2026-09-03, upstream v1.2.2 and tip `479203b`** (merge `5bdac4d`). Took the
 startup page (as a fork menu row), the early preload bundle with a rebuilt runtime, upstream's
 Shorts and sponsored-QR blockers in place of the fork's own, the node tests, the Makefile
 fixes and the strings. Deferred PR #51's menu scrolling and navigation as a unit. Rejected the
