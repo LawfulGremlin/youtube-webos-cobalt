@@ -51,7 +51,9 @@ jobs:
           title="Upstream $latest released: sync needed"
           # One issue per tag, ever. A closed issue means the tag was merged or
           # deliberately skipped; do not reopen it.
-          if gh issue list --state all --limit 200 --json title --jq '.[].title' | grep -qxF "$title"; then
+          # REST, not `gh issue list`: gh's GraphQL calls are refused for GITHUB_TOKEN
+          # under this permissions block and would fail silently into a duplicate.
+          if gh api "repos/$GITHUB_REPOSITORY/issues?state=all&per_page=100" --paginate --jq '.[].title' | grep -qxF "$title"; then
             echo "Issue for $latest already exists; nothing to do."
             exit 0
           fi
