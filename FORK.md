@@ -328,6 +328,9 @@ web API exists:
   anything visual cannot be checked from here** — prefer approaches that don't
   depend on stacking, and expect to need the user's eyes otherwise.
 - **Synchronous XHR throws** — use async + `awaitPromise`.
+- **`HTMLElement.prototype.click` does not exist** (measured 2026-09-03): to drive a
+  click handler from CDP, `dispatchEvent(new MouseEvent('click', {bubbles: true}))`
+  works and reaches capture listeners on ancestors.
 - **`max-height` is reported by `getComputedStyle` but not enforced as a layout
   constraint** (`clientHeight` exceeded it), so it can't be used to clip a list.
 - **Dynamically injected `<style>` elements are silently ignored**: `.sheet`
