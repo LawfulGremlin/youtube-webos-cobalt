@@ -36,6 +36,8 @@ touching fork features. The rules below are the working routine.
 4. **Hardcoded-key principle**: when upstream ships a feature on a hardcoded remote key, adopt
    it as a shortcut-registry action (`webapp/src/fork/index.js`) with upstream's key as the
    default binding — rebindable and clearable — never as upstream's hard listener.
+   When upstream ships its own version of a fork feature, delete ours in the same sync
+   (A/B both on hardware first if both work).
 5. Build the bundle and run `node webapp/src/fork/test.mjs` before committing; hardware-verify
    on a real TV before any release (IPKs are ARM-only — the emulator cannot run them).
    **When the Cobalt runtime or its patch changed, "verifies" includes the quality ladder**:

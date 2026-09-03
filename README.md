@@ -33,7 +33,8 @@ Features:
   shows a swatch in the same color as its timeline marker.
 * **Shortcut-key registry** with frame-stepping actions (ported from
   [LawfulGremlin/youtube-webos](https://github.com/LawfulGremlin/youtube-webos)'s
-  `fork-extensions`), plus upstream's own playback-speed shortcuts.
+  `fork-extensions`). Playback speed and subtitles are actions on the same
+  registry: upstream ships them on hardcoded keys, here they are rebindable.
 * **Keyboard support.** A USB or Bluetooth keyboard types into the search
   box (LG's starter drops letters unless the IPK enables it), with the layout
   picked once from your country — Danish keys give æ, ø and å — and
@@ -48,10 +49,10 @@ Fixes:
   issues, all fixed here. Markers are translucent and cover the whole
   segment, so the played portion shows through as a lighter tint instead of
   hiding your progress through it.
-* **Ad-blocking fixed for the feed**, not just what the page's own
-  `JSON.parse` sees. The home/search/Shorts feed and in-video "shopping"
-  overlays are filtered at the XHR response layer, which is the only point
-  every consumer of that data actually passes through on this platform.
+* **Feed ad removal.** Ad slots and sponsored tiles in the home and search
+  feed are stripped from the JSON the page parses, alongside upstream's
+  DOM-level hider. (An XHR-layer filter shipped briefly and was removed once
+  hardware measurement showed the feed never passes through XHR.)
 
 ## Requirements
 * LG TV with webOS
@@ -234,6 +235,11 @@ own `ci.yml` so the two never collide.
   `tools/tv-deploy.sh`, `tools/tv-app-restart.sh`, `tools/tv-screenshot.sh`,
   `tools/tv-ctl.sh`, `tools/tv-key.sh`, `tools/tv-lib.sh` — development
   tooling described above.
+* `docs/` — upstream's own documentation: their release notes (their version
+  numbers, not ours) and the private-images/starter model this fork does not
+  use. Kept unmodified so syncs stay clean.
+* `UPSTREAM.md` — where the fork stands against upstream and every
+  take/keep/reject decision with its reason.
 * `FORK.md` — the full technical narrative: root causes, dead ends, and the
   Cobalt/webOS engine quirks discovered along the way (missing
   `Element.prototype.closest`, no `NodeList.forEach`, synchronous XHR

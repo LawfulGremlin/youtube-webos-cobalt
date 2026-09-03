@@ -3,16 +3,9 @@
 This repository is a shadow fork of
 [RF1705/youtube-webos-cobalt-adfree](https://github.com/RF1705/youtube-webos-cobalt-adfree):
 it is not registered as a GitHub fork, but `main` carries upstream's full history. Upstream
-releases are merged by hand; [UPSTREAM.md](UPSTREAM.md) records where we stand and every
-take/leave decision.
-
-## Rules
-
-- **Pull only.** We fetch and merge from upstream. We never push to upstream and never open
-  issues, pull requests, or discussions there.
-- **Work as patches.** Fork changes live in fork-owned files (listed in `.gitattributes` with
-  `merge=ours`) or as additive patches, so upstream syncs merge cleanly. Avoid editing
-  upstream-owned files.
+releases are merged by hand. The working rules are in [AGENTS.md](AGENTS.md); every
+take/leave decision about upstream's work is in [UPSTREAM.md](UPSTREAM.md). This file is the
+technical narrative: why the code is the way it is.
 
 ## Automation
 
@@ -215,12 +208,12 @@ adding features itself.
   v1.2.1 release asset, archived because it contains everything their private
   images repo gates: the official-1.1.5 app tree with the **Starboard 13**
   starter (verified `sb_api_version:13` in the binary) and their prebuilt
-  23.lts.6-13 `libcobalt.so`. Our shipping base stays the SB12 official 1.1.7
-  IPK — upstream's v1.2.x launch-crash wave (their issues #36/#37/#41) is tied
-  to this SB13 base, so it's insurance and a future Cobalt 24.lts experiment
-  base (24.lts needs SB≥13), not a migration.
-- Deliberately not ported: 4K/quality forcing (capped by the Cobalt binary + DRM,
-  not fixable in JS), auto-login (Cobalt's native account flow already works), UI
+  23.lts.6-13 `libcobalt.so`. It is a future Cobalt 24.lts experiment base
+  (24.lts needs SB≥13), not our shipping base — see UPSTREAM.md for why.
+- Deliberately not ported from the WebView sibling fork (youtube-webos):
+  4K/quality forcing (capped by the Cobalt binary + DRM, not fixable in JS),
+  its auto-login (Cobalt's native account flow already works; upstream
+  cobalt-adfree's own auto-login module is a different thing and was taken), UI
   themes/OLED/cosmetic CSS (WebView-specific, poor fit for Cobalt's CSS subset).
 - `cobalt-patches/cobalt-23.lts.6.patch` is deliberately held at upstream's
   `37a27f1` state — **without** their later VP9-4K-force addition (`0f9e01a`),
@@ -229,16 +222,7 @@ adding features itself.
   every platform "NotSupported" for clear VP9 into "Probably" on 4K-output
   devices (99999×99999 included), YouTube then attempts formats the hardware
   can't decode, and playback caps at 720p h264 (measured on lg75; rolled back
-  same day, fixed in v1.1.1). If upstream graduates the experiment, re-evaluate
-  against a real quality-menu check on hardware — never re-adopt on a green
-  build alone.
-- If upstream ships its own version of a fork feature, delete ours in the same
-  sync PR.
-
-**Releases are hardware-verified**: the app is ARM-only — the x86 webOS emulator
-cannot run it. Do not run `release.yml` (it updates the public `repo.json`) until
-the build has been sideloaded and checked on a real TV
-(`ares-setup-device` + `ares-install`).
+  same day, fixed in v1.1.1). Revisit trigger in UPSTREAM.md.
 
 ## Debug builds (remote devtools)
 
@@ -304,7 +288,7 @@ patch". Fixed by recomputing every header's counts from its actual body; verify 
 `patch -p1 --dry-run < cobalt-patches/cobalt-23.lts.4.patch` against a clean clone
 before trusting a patch-file edit.
 
-## Engine quirks (Cobalt 23.lts.4)
+## Engine quirks (Cobalt 23.lts, measured on hardware)
 
 Found the hard way, each confirmed live over CDP. Check here before assuming a
 web API exists:
