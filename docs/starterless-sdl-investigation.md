@@ -46,6 +46,13 @@ The older SDK SDL shared binary requires no newer glibc symbol than
 `GLIBC_2.9`. The newer webOSbrew SDL is statically linked into the probe to
 keep the test package independent of a particular TV's installed SDL version.
 
+Starterless application resume additionally requires
+`cobalt-platform/SDL-webOS-2.30.12-relaunch-sigcont.patch` to be applied when
+building that SDL archive. The patch keeps SDL's Luna lifecycle callback in
+control of conceal/relaunch transitions and sends a process-directed
+`SIGCONT`, allowing Cobalt's main thread to resume even though the callback
+runs on a worker thread that blocks lifecycle signals.
+
 The SDK also contains the public Starfish media header and a link-time
 `libplayerAPIs.so.1` stub. The real implementation is provided by the TV. This
 is important because it gives a starterless port access to LG's hardware video

@@ -44,8 +44,8 @@ class ApplicationSdl : public starboard::QueueApplication {
                    int y,
                    int width,
                    int height) override;
-  bool IsStartImmediate() override { return true; }
-  bool IsPreloadImmediate() override { return false; }
+  bool IsStartImmediate() override { return !HasPreloadSwitch(); }
+  bool IsPreloadImmediate() override { return HasPreloadSwitch(); }
   void Initialize() override;
   void Teardown() override;
   bool MayHaveSystemEvents() override;

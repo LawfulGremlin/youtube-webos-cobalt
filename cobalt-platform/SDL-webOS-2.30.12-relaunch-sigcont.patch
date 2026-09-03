@@ -1,0 +1,53 @@
+diff --git a/src/core/webos/SDL_webos_init.c b/src/core/webos/SDL_webos_init.c
+index 314751a..8a66e5a 100644
+--- a/src/core/webos/SDL_webos_init.c
++++ b/src/core/webos/SDL_webos_init.c
+@@ -1,6 +1,8 @@
+ #include "../../SDL_internal.h"
+ 
+ #ifdef __WEBOS__
++#include <signal.h>
++#include <unistd.h>
+ #include "../../events/SDL_events_c.h"
+ #include "../../video/SDL_sysvideo.h"
+ #include "SDL_error.h"
+@@ -208,6 +210,7 @@ static int lifecycleCallbackVersion1(LSHandle *sh, LSMessage *reply, HContext *c
+                 if (device->windows) {
+                     SDL_RaiseWindow(device->windows);
+                 }
++                kill(getpid(), SIGCONT);
+             }
+         }
+     }
+@@ -232,6 +235,7 @@ static int lifecycleCallbackVersion2(LSHandle *sh, LSMessage *reply, HContext *c
+                 if (device->windows) {
+                     SDL_RaiseWindow(device->windows);
+                 }
++                kill(getpid(), SIGCONT);
+             } else if (SDL_strncmp(message_buf.m_str, "close", message_buf.m_len) == 0) {
+                 SDL_SendQuit();
+             }
+diff --git a/src/video/wayland/SDL_waylandwebos.c b/src/video/wayland/SDL_waylandwebos.c
+index 20b9038..af40d4c 100644
+--- a/src/video/wayland/SDL_waylandwebos.c
++++ b/src/video/wayland/SDL_waylandwebos.c
+@@ -184,9 +184,6 @@ static void webos_shell_handle_state(void *data, struct wl_webos_shell_surface *
+ {
+     SDL_WindowData *d = data;
+     if (state == WL_WEBOS_SHELL_SURFACE_STATE_MINIMIZED) {
+-#ifdef SDL_WEBOS_HAVE_LIBHELPER
+-        HELPERS_HProcessAppState(3, NULL);
+-#endif
+         SDL_SendWindowEvent(d->sdlwindow, SDL_WINDOWEVENT_MINIMIZED, 0, 0);
+         SDL_SendAppEvent(SDL_APP_WILLENTERBACKGROUND);
+         SDL_SendAppEvent(SDL_APP_DIDENTERBACKGROUND);
+@@ -226,9 +223,6 @@ static void webos_shell_handle_state_about_to_change(void *data, struct wl_webos
+         return;
+     }
+     SDL_SendAppEvent(SDL_APP_WILLENTERBACKGROUND);
+-#ifdef SDL_WEBOS_HAVE_LIBHELPER
+-    HELPERS_HProcessAppState(1, NULL);
+-#endif
+ }
+ 
+ static void WindowHintsCallback(void *userdata, const char *name, const char *oldValue, const char *newValue)

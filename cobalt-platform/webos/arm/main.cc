@@ -41,12 +41,22 @@ extern "C" SB_EXPORT_PLATFORM int main(int argc, char** argv) {
   starboard::shared::webos::ApplicationSdl application;
   std::vector<char*> cobalt_argv;
   cobalt_argv.push_back(argv[0]);
+  bool preload = false;
   for (int i = 1; i < argc; ++i) {
     if (argv[i] && argv[i][0] == '{' &&
         std::strstr(argv[i], "\"@system_native_app\"") != nullptr) {
+      if (std::strstr(argv[i], "\"preload\":\"semi-full\"") != nullptr ||
+          std::strstr(argv[i], "\"event\":\"preload\"") != nullptr) {
+        preload = true;
+      }
       continue;
     }
     cobalt_argv.push_back(argv[i]);
+  }
+  char preload_switch[] = "--preload";
+  if (preload) {
+    cobalt_argv.push_back(preload_switch);
+    std::fprintf(stderr, "Translating webOS hidden preload launch.\n");
   }
   int result = 0;
   {
