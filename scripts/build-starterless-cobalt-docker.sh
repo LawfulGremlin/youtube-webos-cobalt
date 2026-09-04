@@ -19,7 +19,6 @@ fi
 # lifecycle SIGCONT patch. An explicitly supplied SDL2_BUNDLE_DIR remains an
 # escape hatch for development or compatibility testing.
 if [[ -z "${SDL2_BUNDLE_DIR:-}" ]]; then
-  WEBOS_SDK_ROOT= \
   SDL2_BUNDLE_DIR="$sdl_root" \
   WEBOS_LINUX_SDK_VOLUME="$sdk_volume" \
     "$repo_root/scripts/build-sdl-webos-docker.sh"

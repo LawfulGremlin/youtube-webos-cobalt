@@ -47,6 +47,7 @@ bundle_is_current() {
   [[ -f "$bundle_dir/include/SDL2/SDL_config.h" ]] || return 1
   [[ -f "$stamp_file" ]] || return 1
   grep -Fqx "version=$sdl_version" "$stamp_file" || return 1
+  grep -Fqx "source_repository=$sdl_repo" "$stamp_file" || return 1
   grep -Fqx "source_ref=$sdl_ref" "$stamp_file" || return 1
   grep -Fqx "patch_sha256=$patch_sha256" "$stamp_file" || return 1
   grep -Eq '^#define SDL_WEBOS_BROKEN_ABI[[:space:]]+1$' \
@@ -60,25 +61,12 @@ if [[ "$force_rebuild" != "1" ]] && bundle_is_current; then
   exit 0
 fi
 
-sdk_mount=()
-toolchain_file=
-if [[ -n "${WEBOS_SDK_ROOT:-}" ]]; then
-  sdk_root="$(cd "$WEBOS_SDK_ROOT" && pwd)"
-  if [[ ! -f "$sdk_root/share/buildroot/toolchainfile.cmake" ]]; then
-    echo "WEBOS_SDK_ROOT does not contain share/buildroot/toolchainfile.cmake: $sdk_root" >&2
-    exit 3
-  fi
-  sdk_mount=(-v "$sdk_root:/webos-sdk:ro")
-  toolchain_file="/webos-sdk/share/buildroot/toolchainfile.cmake"
-else
-  sdk_volume="${WEBOS_LINUX_SDK_VOLUME:-ytaf-webos-linux-sdk}"
-  if ! docker volume inspect "$sdk_volume" >/dev/null 2>&1; then
-    echo "Missing Docker SDK volume: $sdk_volume" >&2
-    exit 3
-  fi
-  sdk_mount=(-v "$sdk_volume:/sdk:ro")
-  toolchain_file="/sdk/arm-webos-linux-gnueabi_sdk-buildroot/share/buildroot/toolchainfile.cmake"
+sdk_volume="${WEBOS_LINUX_SDK_VOLUME:-ytaf-webos-linux-sdk}"
+if ! docker volume inspect "$sdk_volume" >/dev/null 2>&1; then
+  echo "Missing Docker SDK volume: $sdk_volume" >&2
+  exit 3
 fi
+toolchain_file="/sdk/arm-webos-linux-gnueabi_sdk-buildroot/share/buildroot/toolchainfile.cmake"
 
 mkdir -p "$(dirname "$source_dir")"
 
@@ -126,7 +114,7 @@ echo "Building patched SDL-webOS $sdl_version from $sdl_ref"
 docker run --rm --platform linux/amd64 \
   --user "$(id -u):$(id -g)" \
   -e HOME=/tmp \
-  "${sdk_mount[@]}" \
+  -v "$sdk_volume:/sdk:ro" \
   -v "$source_dir:/src:ro" \
   -v "$build_dir:/build" \
   -v "$bundle_dir:/out" \

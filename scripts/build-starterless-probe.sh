@@ -18,14 +18,12 @@ sysroot="$sdk_root/arm-webos-linux-gnueabi/sysroot"
 compiler="$sdk_root/bin/arm-webos-linux-gnueabi-gcc"
 strip="$sdk_root/bin/arm-webos-linux-gnueabi-strip"
 readelf="$sdk_root/bin/arm-webos-linux-gnueabi-readelf"
-sdl_bundle_root="${SDL2_BUNDLE_DIR:-$repo_root/workdir/deps/SDL2-2.30.12-webos-abi}"
-
-if [[ -z "${SDL2_BUNDLE_DIR:-}" ]]; then
-  WEBOS_SDK_ROOT="$sdk_root" \
-  SDL2_BUNDLE_DIR="$sdl_bundle_root" \
-    "$repo_root/scripts/build-sdl-webos-docker.sh"
+sdl_bundle_root="${SDL2_BUNDLE_DIR:-}"
+if [[ -z "$sdl_bundle_root" ]]; then
+  echo "SDL2_BUNDLE_DIR must point to the extracted webOSbrew SDL ABI archive." >&2
+  echo "The SDK's SDL static archive has no Wayland video backend." >&2
+  exit 3
 fi
-
 sdl_bundle_root="$(cd "$sdl_bundle_root" && pwd)"
 sdl_archive="$sdl_bundle_root/lib/libSDL2.a"
 sdl_include_root="$sdl_bundle_root/include"
