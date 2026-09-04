@@ -10,13 +10,24 @@ parallel="${NINJA_PARALLEL:-4}"
 out_dir="out/webos-arm-sbversion-13_${build_type}"
 build_log="${COBALT_BUILD_LOG:-$repo_root/output/starterless-cobalt-${build_type}.log}"
 
-if [[ ! -d "$sdl_root/include/SDL2" || ! -f "$sdl_root/lib/libSDL2.a" ]]; then
-  echo "SDL2_BUNDLE_DIR does not contain the extracted webOSbrew SDL ABI archive." >&2
-  exit 2
-fi
 if ! docker volume inspect "$sdk_volume" >/dev/null 2>&1; then
   echo "Missing Docker SDK volume: $sdk_volume" >&2
   exit 3
+fi
+
+# The default SDL bundle is built from the pinned webOSbrew SDL source with the
+# lifecycle SIGCONT patch. An explicitly supplied SDL2_BUNDLE_DIR remains an
+# escape hatch for development or compatibility testing.
+if [[ -z "${SDL2_BUNDLE_DIR:-}" ]]; then
+  WEBOS_SDK_ROOT= \
+  SDL2_BUNDLE_DIR="$sdl_root" \
+  WEBOS_LINUX_SDK_VOLUME="$sdk_volume" \
+    "$repo_root/scripts/build-sdl-webos-docker.sh"
+fi
+
+if [[ ! -d "$sdl_root/include/SDL2" || ! -f "$sdl_root/lib/libSDL2.a" ]]; then
+  echo "SDL2_BUNDLE_DIR does not contain a usable webOS SDL static bundle: $sdl_root" >&2
+  exit 2
 fi
 
 "$repo_root/scripts/install-webos-starboard-platform.sh" "$cobalt_root"
