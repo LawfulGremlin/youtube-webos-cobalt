@@ -19,9 +19,7 @@ if ! docker volume inspect "$sdk_volume" >/dev/null 2>&1; then
   exit 3
 fi
 
-make -C "$repo_root" npm-docker
 "$repo_root/scripts/install-webos-starboard-platform.sh" "$cobalt_root"
-"$repo_root/scripts/install-ytaf-cobalt-assets.sh" "$cobalt_root"
 mkdir -p "$(dirname "$build_log")"
 
 echo "Starting the long Cobalt webos-arm build with $parallel jobs."
