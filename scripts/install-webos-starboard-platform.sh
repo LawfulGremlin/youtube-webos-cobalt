@@ -15,6 +15,7 @@ gcc_compat_patch="$repo_root/cobalt-platform/cobalt-23.lts.6-webos-gcc.patch"
 video_fallback_patch="$repo_root/cobalt-platform/cobalt-23.lts.6-webos-video-fallback.patch"
 vp9_patch="$repo_root/cobalt-platform/cobalt-23.lts.6-webos-vp9.patch"
 av1_patch="$repo_root/cobalt-platform/cobalt-23.lts.6-webos-av1.patch"
+uhd_patch="$repo_root/cobalt-platform/cobalt-23.lts.6-webos-uhd.patch"
 dav1d_api_patch="$repo_root/cobalt-platform/cobalt-23.lts.6-webos-dav1d-api.patch"
 starfish_patch="$repo_root/cobalt-platform/cobalt-23.lts.6-webos-starfish.patch"
 hardware_video_capabilities_patch="$repo_root/cobalt-platform/cobalt-23.lts.6-webos-hardware-video-capabilities.patch"
@@ -22,6 +23,8 @@ pulse_soname_patch="$repo_root/cobalt-platform/cobalt-23.lts.6-webos-pulse-sonam
 pulse_tuning_patch="$repo_root/cobalt-platform/cobalt-23.lts.6-webos-pulse-tuning.patch"
 external_video_seek_patch="$repo_root/cobalt-platform/cobalt-23.lts.6-webos-external-video-seek.patch"
 external_video_controls_patch="$repo_root/cobalt-platform/cobalt-23.lts.6-webos-external-video-controls.patch"
+lifecycle_patch="$repo_root/cobalt-platform/cobalt-23.lts.6-webos-lifecycle.patch"
+demuxer_stop_race_patch="$repo_root/cobalt-platform/cobalt-23.lts.6-demuxer-stop-race.patch"
 
 if [[ ! -d "$cobalt_root/.git" || ! -f "$platforms_file" ]]; then
   echo "Not a Cobalt source tree: $cobalt_root" >&2
@@ -90,6 +93,12 @@ if ! grep -Eq "dav1d handles AV1|TV's Starfish hardware pipeline" \
   git -C "$cobalt_root" apply "$av1_patch"
 fi
 
+if ! grep -q 'Starfish.*hardware decoder' \
+  "$cobalt_root/starboard/linux/shared/media_is_video_supported.cc"; then
+  git -C "$cobalt_root" apply --check "$uhd_patch"
+  git -C "$cobalt_root" apply "$uhd_patch"
+fi
+
 if ! grep -q 'dav1d-webos-official/public' \
   "$cobalt_root/starboard/shared/libdav1d/dav1d_video_decoder.h"; then
   git -C "$cobalt_root" apply --check "$dav1d_api_patch"
@@ -130,6 +139,18 @@ if ! grep -q 'virtual void SetPlaybackRate' \
   "$cobalt_root/starboard/shared/starboard/player/filter/video_decoder_internal.h"; then
   git -C "$cobalt_root" apply --check "$external_video_controls_patch"
   git -C "$cobalt_root" apply "$external_video_controls_patch"
+fi
+
+if ! grep -q 'Stay Concealed so the main event loop' \
+  "$cobalt_root/starboard/shared/signal/system_request_freeze.cc"; then
+  git -C "$cobalt_root" apply --check "$lifecycle_patch"
+  git -C "$cobalt_root" apply "$lifecycle_patch"
+fi
+
+if ! grep -q 'Ignore that stale callback before dereferencing its stream' \
+  "$cobalt_root/cobalt/media/base/sbplayer_pipeline.cc"; then
+  git -C "$cobalt_root" apply --check "$demuxer_stop_race_patch"
+  git -C "$cobalt_root" apply "$demuxer_stop_race_patch"
 fi
 
 echo "Installed webos-arm Starboard platform into: $platform_target"

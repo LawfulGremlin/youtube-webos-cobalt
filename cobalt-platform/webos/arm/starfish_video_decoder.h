@@ -67,6 +67,7 @@ class StarfishVideoDecoder
   Mutex pipeline_state_mutex_;
   ConditionVariable pipeline_state_condition_;
   bool pipeline_loaded_ = false;
+  bool exported_window_acquired_ = false;
   bool stream_ended_ = false;
   bool eos_output_ = false;
   int video_width_ = 0;

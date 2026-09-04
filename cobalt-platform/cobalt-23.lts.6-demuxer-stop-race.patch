@@ -1,0 +1,26 @@
+diff --git a/cobalt/media/base/sbplayer_pipeline.cc b/cobalt/media/base/sbplayer_pipeline.cc
+index e14d0d07e..912895f3a 100644
+--- a/cobalt/media/base/sbplayer_pipeline.cc
++++ b/cobalt/media/base/sbplayer_pipeline.cc
+@@ -1284,15 +1284,16 @@ void SbPlayerPipeline::OnDemuxerStreamRead(
+     return;
+   }
+ 
++  // Stop() clears the streams while an asynchronous read callback may still
++  // be queued. Ignore that stale callback before dereferencing its stream.
++  if (!player_bridge_) {
++    return;
++  }
++
+   DemuxerStream* stream =
+       type == DemuxerStream::AUDIO ? audio_stream_ : video_stream_;
+   DCHECK(stream);
+ 
+-  // In case if Stop() has been called.
+-  if (!player_bridge_) {
+-    return;
+-  }
+-
+   if (status == DemuxerStream::kAborted) {
+     DCHECK(GetReadInProgress(type));
+     SetReadInProgress(type, false);

@@ -26,6 +26,9 @@ class ApplicationSdl : public starboard::QueueApplication {
   void* GetEglSurface() const { return egl_surface_; }
   int GetEglConfigId() const { return egl_config_id_; }
   const std::string& GetExportedWindowId() const { return exported_window_id_; }
+  bool AcquireExportedVideoWindow();
+  void ReleaseExportedVideoWindow();
+  void SetVideoPaused(bool paused);
   void SetVideoResolution(int width, int height) {
     video_width_.store(width);
     video_height_.store(height);
@@ -44,8 +47,8 @@ class ApplicationSdl : public starboard::QueueApplication {
                    int y,
                    int width,
                    int height) override;
-  bool IsStartImmediate() override { return true; }
-  bool IsPreloadImmediate() override { return false; }
+  bool IsStartImmediate() override { return !HasPreloadSwitch(); }
+  bool IsPreloadImmediate() override { return HasPreloadSwitch(); }
   void Initialize() override;
   void Teardown() override;
   bool MayHaveSystemEvents() override;
@@ -68,6 +71,8 @@ class ApplicationSdl : public starboard::QueueApplication {
   SDL_Rect last_video_destination_{0, 0, 0, 0};
   Mutex exported_geometry_mutex_;
   bool exported_geometry_valid_ = false;
+  int exported_video_clients_ = 0;
+  bool video_screen_saver_inhibited_ = false;
   Uint32 wake_event_type_;
 };
 

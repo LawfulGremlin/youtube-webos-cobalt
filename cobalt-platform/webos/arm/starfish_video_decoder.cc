@@ -210,6 +210,10 @@ StarfishVideoDecoder::~StarfishVideoDecoder() {
     decoder_thread_.reset();
   }
   CancelPendingJobs();
+  if (exported_window_acquired_) {
+    ApplicationSdl::Get()->ReleaseExportedVideoWindow();
+    exported_window_acquired_ = false;
+  }
 }
 
 void StarfishVideoDecoder::Initialize(const DecoderStatusCB& decoder_status_cb,
@@ -219,12 +223,19 @@ void StarfishVideoDecoder::Initialize(const DecoderStatusCB& decoder_status_cb,
   SB_DCHECK(error_cb);
   decoder_status_cb_ = decoder_status_cb;
   error_cb_ = error_cb;
+  exported_window_acquired_ =
+      ApplicationSdl::Get()->AcquireExportedVideoWindow();
+  if (!exported_window_acquired_) {
+    ReportError("SDL did not create a webOS exported video window.");
+    return;
+  }
   decoder_thread_.reset(new starboard::player::JobThread(
       "starfish_video_decoder", 0, kSbThreadPriorityHigh));
 }
 
 void StarfishVideoDecoder::SetPause(bool pause) {
   pause_requested_.store(pause);
+  ApplicationSdl::Get()->SetVideoPaused(pause);
   if (decoder_thread_) {
     decoder_thread_->Schedule(std::bind(
         &StarfishVideoDecoder::ApplyPlaybackStateOnDecoderThread, this));
@@ -237,6 +248,7 @@ void StarfishVideoDecoder::SetPlaybackRate(double playback_rate) {
   }
   playback_rate_millionths_.store(
       static_cast<int>(playback_rate * 1000000.0));
+  ApplicationSdl::Get()->SetVideoPaused(playback_rate <= 0.0);
   if (decoder_thread_) {
     decoder_thread_->Schedule(std::bind(
         &StarfishVideoDecoder::ApplyPlaybackStateOnDecoderThread, this));

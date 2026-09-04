@@ -135,6 +135,11 @@ void ApplicationSdl::Initialize() {
   SDL_SetHint(SDL_HINT_WEBOS_REGISTER_APP, "1");
   SDL_SetHint(SDL_HINT_WEBOS_ACCESS_POLICY_KEYS_BACK, "1");
   SDL_SetHint(SDL_HINT_WEBOS_ACCESS_POLICY_KEYS_EXIT, "1");
+  // SDL disables the screen saver by default.  On webOS that registers a
+  // process-wide wake lock whose response vetoes every screen-saver request,
+  // including while this app is only semi-full preloaded.  Start uninhibited;
+  // the Starfish decoder below controls inhibition during active playback.
+  SDL_SetHint(SDL_HINT_VIDEO_ALLOW_SCREENSAVER, "1");
   if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS) != 0) {
     SB_LOG(ERROR) << "SDL_Init failed: " << SDL_GetError();
     Stop(10);
@@ -251,15 +256,6 @@ SbWindow ApplicationSdl::CreateWindow(const SbWindowOptions* options) {
   window_ = new SbWindowPrivate(sdl_window, info.info.wl.display,
                                 info.info.wl.egl_window, width, height,
                                 video_pixel_ratio);
-  const char* exported_window = SDL_webOSCreateExportedWindow(
-      SDL_WEBOS_EXPORED_WINDOW_TYPE_VIDEO);
-  if (exported_window) {
-    exported_window_id_ = exported_window;
-    SB_LOG(INFO) << "Created exported video window " << exported_window_id_;
-  } else {
-    SB_LOG(ERROR) << "SDL_webOSCreateExportedWindow failed: "
-                  << SDL_GetError();
-  }
   return window_;
 }
 
@@ -275,6 +271,9 @@ bool ApplicationSdl::DestroyWindow(SbWindow window) {
     SDL_webOSDestroyExportedWindow(exported_window_id_.c_str());
     exported_window_id_.clear();
   }
+  SDL_EnableScreenSaver();
+  exported_video_clients_ = 0;
+  video_screen_saver_inhibited_ = false;
   exported_geometry_valid_ = false;
   egl_surface_ = nullptr;
   egl_config_id_ = 0;
@@ -282,6 +281,64 @@ bool ApplicationSdl::DestroyWindow(SbWindow window) {
   delete window;
   window_ = kSbWindowInvalid;
   return true;
+}
+
+bool ApplicationSdl::AcquireExportedVideoWindow() {
+  ScopedLock lock(exported_geometry_mutex_);
+  if (!SbWindowIsValid(window_)) {
+    return false;
+  }
+  if (!exported_window_id_.empty()) {
+    ++exported_video_clients_;
+    return true;
+  }
+
+  const char* exported_window = SDL_webOSCreateExportedWindow(
+      SDL_WEBOS_EXPORED_WINDOW_TYPE_VIDEO);
+  if (!exported_window) {
+    SB_LOG(ERROR) << "SDL_webOSCreateExportedWindow failed: "
+                  << SDL_GetError();
+    return false;
+  }
+  exported_window_id_ = exported_window;
+  exported_video_clients_ = 1;
+  exported_geometry_valid_ = false;
+  SDL_DisableScreenSaver();
+  video_screen_saver_inhibited_ = true;
+  SB_LOG(INFO) << "Created exported video window " << exported_window_id_;
+  return true;
+}
+
+void ApplicationSdl::ReleaseExportedVideoWindow() {
+  ScopedLock lock(exported_geometry_mutex_);
+  if (exported_video_clients_ <= 0) {
+    return;
+  }
+  --exported_video_clients_;
+  if (exported_video_clients_ != 0 || exported_window_id_.empty()) {
+    return;
+  }
+  SDL_webOSDestroyExportedWindow(exported_window_id_.c_str());
+  SB_LOG(INFO) << "Destroyed exported video window " << exported_window_id_;
+  exported_window_id_.clear();
+  exported_geometry_valid_ = false;
+  SDL_EnableScreenSaver();
+  video_screen_saver_inhibited_ = false;
+}
+
+void ApplicationSdl::SetVideoPaused(bool paused) {
+  ScopedLock lock(exported_geometry_mutex_);
+  if (!sdl_initialized_ || exported_window_id_.empty()) {
+    return;
+  }
+  const bool inhibit_screen_saver = !paused;
+  if (video_screen_saver_inhibited_ == inhibit_screen_saver) {
+    return;
+  }
+  video_screen_saver_inhibited_ = inhibit_screen_saver;
+  inhibit_screen_saver ? SDL_DisableScreenSaver() : SDL_EnableScreenSaver();
+  SB_LOG(INFO) << "Screen saver " << (paused ? "allowed" : "inhibited")
+               << " for video pause state.";
 }
 
 void* ApplicationSdl::GetNativeDisplay() const {
