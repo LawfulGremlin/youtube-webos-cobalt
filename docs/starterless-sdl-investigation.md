@@ -53,6 +53,13 @@ control of conceal/relaunch transitions and sends a process-directed
 `SIGCONT`, allowing Cobalt's main thread to resume even though the callback
 runs on a worker thread that blocks lifecycle signals.
 
+The SDL archive must be configured with
+`-DSDL_WEBOS_BROKEN_ABI=ON`, matching the webOSbrew `SDL_config.h` shipped
+with the bundle. This adds webOS's `inputSource` member to SDL input events.
+Building the library without the option while compiling Cobalt against the
+webOS headers shifts the keyboard-event fields and makes remote navigation
+unresponsive.
+
 The SDK also contains the public Starfish media header and a link-time
 `libplayerAPIs.so.1` stub. The real implementation is provided by the TV. This
 is important because it gives a starterless port access to LG's hardware video
