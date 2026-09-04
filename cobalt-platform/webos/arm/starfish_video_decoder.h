@@ -42,6 +42,7 @@ class StarfishVideoDecoder
 
  private:
   void InitializePipeline(const SbMediaVideoSampleInfo& sample_info);
+  void ApplyHdrInfo(const SbMediaColorMetadata& color_metadata);
   void FeedBuffer(const scoped_refptr<InputBuffer>& input_buffer);
   void RetryPendingBuffer();
   void EnsurePlayingOnDecoderThread(const char* reason, bool force);
@@ -70,6 +71,7 @@ class StarfishVideoDecoder
   bool eos_output_ = false;
   int video_width_ = 0;
   int video_height_ = 0;
+  std::string last_hdr_payload_;
   bool play_issued_ = false;
   bool pause_issued_ = false;
   bool startup_play_accepted_ = false;

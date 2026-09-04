@@ -2,18 +2,27 @@
 
 #include <inttypes.h>
 
+#include <algorithm>
 #include <cmath>
 #include <cstdlib>
 #include <functional>
+#include <sstream>
 
 #include "starboard/common/log.h"
 #include "starboard/common/string.h"
+#include "starboard/shared/starboard/media/mime_type.h"
 #include "starboard/webos/arm/application_sdl.h"
 
 namespace starboard {
 namespace shared {
 namespace webos {
 namespace {
+
+struct AdaptiveVideoCapabilities {
+  int width;
+  int height;
+  int frame_rate;
+};
 
 const char* CodecName(SbMediaVideoCodec codec) {
   switch (codec) {
@@ -26,6 +35,155 @@ const char* CodecName(SbMediaVideoCodec codec) {
     default:
       return nullptr;
   }
+}
+
+AdaptiveVideoCapabilities GetAdaptiveVideoCapabilities(
+    SbMediaVideoCodec codec,
+    const SbMediaVideoSampleInfo& sample_info) {
+  const int codec_max_width =
+      codec == kSbMediaVideoCodecH264 ? 1920 : 3840;
+  const int codec_max_height =
+      codec == kSbMediaVideoCodecH264 ? 1080 : 2160;
+  int width = codec_max_width;
+  int height = codec_max_height;
+  int frame_rate = 60;
+
+  if (sample_info.max_video_capabilities &&
+      sample_info.max_video_capabilities[0] != '\0') {
+    std::string capabilities(sample_info.max_video_capabilities);
+    if (capabilities.find('/') == std::string::npos) {
+      capabilities.insert(0, "video/webm; ");
+    }
+    ::starboard::shared::starboard::media::MimeType mime_type(capabilities);
+    if (mime_type.is_valid()) {
+      width = mime_type.GetParamIntValue("width", width);
+      height = mime_type.GetParamIntValue("height", height);
+      const float parsed_frame_rate =
+          mime_type.GetParamFloatValue("framerate", frame_rate);
+      if (std::isfinite(parsed_frame_rate) && parsed_frame_rate > 0.0f) {
+        frame_rate = static_cast<int>(std::ceil(parsed_frame_rate));
+      }
+      width = width > 0 ? width : codec_max_width;
+      height = height > 0 ? height : codec_max_height;
+      frame_rate = frame_rate > 0 ? frame_rate : 60;
+    } else {
+      SB_LOG(WARNING) << "Could not parse max video capabilities: "
+                      << sample_info.max_video_capabilities;
+    }
+  }
+
+  width = std::min(codec_max_width, std::max(sample_info.frame_width, width));
+  height =
+      std::min(codec_max_height, std::max(sample_info.frame_height, height));
+  frame_rate = std::max(1, std::min(frame_rate, 60));
+  return {width, height, frame_rate};
+}
+
+const char* HdrType(SbMediaTransferId transfer) {
+  switch (transfer) {
+    case kSbMediaTransferIdSmpteSt2084:
+      return "HDR10";
+    case kSbMediaTransferIdAribStdB67:
+      return "HLG";
+    default:
+      return nullptr;
+  }
+}
+
+bool IsFiniteAndPositive(float value) {
+  return std::isfinite(value) && value > 0.0f;
+}
+
+int ScaleAndRound(float value, float scale) {
+  return static_cast<int>(std::lround(value * scale));
+}
+
+void AppendJsonInteger(std::ostringstream* stream,
+                       bool* has_value,
+                       const char* name,
+                       int value) {
+  if (*has_value) {
+    *stream << ',';
+  }
+  *stream << '\"' << name << "\":" << value;
+  *has_value = true;
+}
+
+std::string BuildHdrInfoPayload(const SbMediaColorMetadata& metadata) {
+  const char* hdr_type = HdrType(metadata.transfer);
+  if (!hdr_type) {
+    return std::string();
+  }
+
+  const SbMediaMasteringMetadata& mastering = metadata.mastering_metadata;
+  const bool has_primaries =
+      IsFiniteAndPositive(mastering.primary_r_chromaticity_x) &&
+      IsFiniteAndPositive(mastering.primary_r_chromaticity_y) &&
+      IsFiniteAndPositive(mastering.primary_g_chromaticity_x) &&
+      IsFiniteAndPositive(mastering.primary_g_chromaticity_y) &&
+      IsFiniteAndPositive(mastering.primary_b_chromaticity_x) &&
+      IsFiniteAndPositive(mastering.primary_b_chromaticity_y) &&
+      IsFiniteAndPositive(mastering.white_point_chromaticity_x) &&
+      IsFiniteAndPositive(mastering.white_point_chromaticity_y);
+  const bool has_luminance =
+      std::isfinite(mastering.luminance_min) &&
+      mastering.luminance_min >= 0.0f &&
+      IsFiniteAndPositive(mastering.luminance_max);
+
+  // webOS TVs are known to crash when setHdrInfo() is called without any SEI
+  // data. If the container supplies no mastering or light-level information,
+  // leave HDR detection to the elementary stream instead.
+  if (!has_primaries && !has_luminance && metadata.max_cll == 0 &&
+      metadata.max_fall == 0) {
+    return std::string();
+  }
+
+  std::ostringstream sei;
+  bool has_sei_value = false;
+  if (has_primaries) {
+    // Starfish expects display primaries in G, B, R order and CTA-861 units.
+    AppendJsonInteger(&sei, &has_sei_value, "displayPrimariesX0",
+                      ScaleAndRound(mastering.primary_g_chromaticity_x, 50000));
+    AppendJsonInteger(&sei, &has_sei_value, "displayPrimariesY0",
+                      ScaleAndRound(mastering.primary_g_chromaticity_y, 50000));
+    AppendJsonInteger(&sei, &has_sei_value, "displayPrimariesX1",
+                      ScaleAndRound(mastering.primary_b_chromaticity_x, 50000));
+    AppendJsonInteger(&sei, &has_sei_value, "displayPrimariesY1",
+                      ScaleAndRound(mastering.primary_b_chromaticity_y, 50000));
+    AppendJsonInteger(&sei, &has_sei_value, "displayPrimariesX2",
+                      ScaleAndRound(mastering.primary_r_chromaticity_x, 50000));
+    AppendJsonInteger(&sei, &has_sei_value, "displayPrimariesY2",
+                      ScaleAndRound(mastering.primary_r_chromaticity_y, 50000));
+    AppendJsonInteger(&sei, &has_sei_value, "whitePointX",
+                      ScaleAndRound(mastering.white_point_chromaticity_x, 50000));
+    AppendJsonInteger(&sei, &has_sei_value, "whitePointY",
+                      ScaleAndRound(mastering.white_point_chromaticity_y, 50000));
+  }
+  if (has_luminance) {
+    AppendJsonInteger(&sei, &has_sei_value, "minDisplayMasteringLuminance",
+                      ScaleAndRound(mastering.luminance_min, 10000));
+    AppendJsonInteger(&sei, &has_sei_value, "maxDisplayMasteringLuminance",
+                      ScaleAndRound(mastering.luminance_max, 10000));
+  }
+  if (metadata.max_cll > 0) {
+    AppendJsonInteger(&sei, &has_sei_value, "maxContentLightLevel",
+                      static_cast<int>(metadata.max_cll));
+  }
+  if (metadata.max_fall > 0) {
+    AppendJsonInteger(&sei, &has_sei_value, "maxPicAverageLightLevel",
+                      static_cast<int>(metadata.max_fall));
+  }
+
+  std::ostringstream payload;
+  payload << "{\"hdrType\":\"" << hdr_type << "\",\"sei\":{" << sei.str()
+          << "},\"vui\":{"
+          << "\"transferCharacteristics\":" << static_cast<int>(metadata.transfer)
+          << ",\"colorPrimaries\":" << static_cast<int>(metadata.primaries)
+          << ",\"matrixCoeffs\":" << static_cast<int>(metadata.matrix)
+          << ",\"videoFullRangeFlag\":"
+          << (metadata.range == kSbMediaRangeIdFull ? "true" : "false")
+          << "}}";
+  return payload.str();
 }
 
 }  // namespace
@@ -99,6 +257,7 @@ void StarfishVideoDecoder::InitializePipeline(
     ApplicationSdl::Get()->ConfigureFullscreenVideo();
   }
   if (pipeline_loaded_) {
+    ApplyHdrInfo(sample_info.color_metadata);
     return;
   }
 
@@ -114,6 +273,8 @@ void StarfishVideoDecoder::InitializePipeline(
   }
 
   const int64_t target_pts_ns = seek_to_time_.load() * 1000;
+  const AdaptiveVideoCapabilities capabilities =
+      GetAdaptiveVideoCapabilities(codec_, sample_info);
   std::string payload = FormatString(
       "{\"args\":[{\"mediaTransportType\":\"BUFFERSTREAM\","
       "\"option\":{\"windowId\":\"%s\",\"appId\":\"%s\","
@@ -132,14 +293,17 @@ void StarfishVideoDecoder::InitializePipeline(
       "\"srcBufferLevelAudio\":{\"minimum\":1024,"
       "\"maximum\":1048576},\"srcBufferLevelVideo\":{"
       "\"minimum\":1024,\"maximum\":8388608}}},"
-      "\"adaptiveStreaming\":{\"audioOnly\":false,\"maxWidth\":%d,"
-      "\"maxHeight\":%d,\"maxFrameRate\":60},"
+      "\"adaptiveStreaming\":{\"audioOnly\":false,"
+      "\"adaptiveResolution\":true,\"maxWidth\":%d,"
+      "\"maxHeight\":%d,\"maxFrameRate\":%d},"
       "\"forcedPrerollOnPause\":true,\"seekMode\":\"keep-rate\"}}]}",
       window_id.c_str(), app_id, codec_name, target_pts_ns, width, height,
-      width, height);
+      capabilities.width, capabilities.height, capabilities.frame_rate);
 
   SB_LOG(INFO) << "Loading Starfish hardware decoder for " << codec_name
                << " at " << width << "x" << height
+               << " with adaptive maximum " << capabilities.width << "x"
+               << capabilities.height << "@" << capabilities.frame_rate
                << " using window " << window_id;
   media_api_->notifyForeground();
   if (!media_api_->Load(payload.c_str(), &StarfishVideoDecoder::PlayerCallback,
@@ -148,10 +312,26 @@ void StarfishVideoDecoder::InitializePipeline(
     return;
   }
   pipeline_loaded_ = true;
+  ApplyHdrInfo(sample_info.color_metadata);
   play_issued_ = false;
   pause_issued_ = false;
   startup_play_accepted_ = false;
   applied_playback_rate_ = -1.0;
+}
+
+void StarfishVideoDecoder::ApplyHdrInfo(
+    const SbMediaColorMetadata& color_metadata) {
+  SB_DCHECK(decoder_thread_->BelongsToCurrentThread());
+  const std::string payload = BuildHdrInfoPayload(color_metadata);
+  if (payload.empty() || payload == last_hdr_payload_) {
+    return;
+  }
+  if (media_api_->setHdrInfo(payload.c_str())) {
+    last_hdr_payload_ = payload;
+    SB_LOG(INFO) << "Applied Starfish HDR metadata: " << payload;
+  } else {
+    SB_LOG(WARNING) << "Starfish setHdrInfo() rejected: " << payload;
+  }
 }
 
 void StarfishVideoDecoder::WriteInputBuffers(
@@ -366,6 +546,7 @@ void StarfishVideoDecoder::ResetOnDecoderThread() {
     pipeline_loaded_ = false;
     video_width_ = 0;
     video_height_ = 0;
+    last_hdr_payload_.clear();
   } else {
     SB_LOG(INFO) << "Flushed Starfish pipeline for seek target "
                  << seek_to_time_.load();

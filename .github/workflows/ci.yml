@@ -50,6 +50,9 @@ jobs:
           grep -F 'RF1705/YouTube-webos-images.git' Makefile
           grep -F 'youtube-official-1.1.5.tar.gz' Makefile
           python3 scripts/verify-pjtr-starter.py --help
+          python3 scripts/normalize-ipk-ownership.py --help
+          python3 scripts/verify-ipk-container.py --help
+          python3 scripts/test-ipk-tools.py
 
       - name: Build injected web app
         working-directory: webapp

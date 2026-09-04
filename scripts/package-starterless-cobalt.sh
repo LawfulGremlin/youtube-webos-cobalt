@@ -61,4 +61,6 @@ if [[ -z "$package_path" ]]; then
   echo "ares-package succeeded but its output IPK was not found." >&2
   exit 5
 fi
-echo "Youtube Cobalt AdFree 2.0 Beta package: $package_path"
+python3 "$repo_root/scripts/normalize-ipk-ownership.py" "$package_path"
+python3 "$repo_root/scripts/verify-ipk-container.py" "$package_path"
+echo "Youtube Cobalt AdFree package: $package_path"
