@@ -455,7 +455,19 @@ $(PACKAGE_TARGET): FORCE $(WORKDIR)/image/usr/palm/applications/$(PACKAGE_NAME_O
 
 .PHONY: docker-make.%
 docker-make.%:
-	docker run --rm -i -u $$(id -u):$$(id -g) -e HOME=/app -e npm_config_cache=/app/.npm -e WEBAPP_DEBUG="$(WEBAPP_DEBUG)" -e IPK_MEMBER_MTIME="$(IPK_MEMBER_MTIME)" -v "$(CURRENT_DIR):/app" -w /app $(NODE_DOCKER_IMAGE) sh -lc 'mkdir -p /app/.webos /app/.npm && make $*'
+	docker run --rm -i \
+		-u $$(id -u):$$(id -g) \
+		-e HOME=/app \
+		-e npm_config_cache=/app/.npm \
+		-e WEBAPP_DEBUG="$(WEBAPP_DEBUG)" \
+		-e IPK_MEMBER_MTIME="$(IPK_MEMBER_MTIME)" \
+		-e PROJECT_VERSION="$(PROJECT_VERSION)" \
+		-e PACKAGE_VERSION="$(PACKAGE_VERSION)" \
+		-e PACKAGE_NAME="$(PACKAGE_NAME)" \
+		-v "$(CURRENT_DIR):/app" \
+		-w /app \
+		$(NODE_DOCKER_IMAGE) \
+		sh -lc 'mkdir -p /app/.webos /app/.npm && make $*'
 .PHONY: npm
 npm:
 	( \
