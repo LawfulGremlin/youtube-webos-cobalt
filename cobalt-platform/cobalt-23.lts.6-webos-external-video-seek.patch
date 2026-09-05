@@ -1,0 +1,28 @@
+diff --git a/starboard/shared/starboard/player/filter/video_decoder_internal.h b/starboard/shared/starboard/player/filter/video_decoder_internal.h
+index f30a84370..3a61c9064 100644
+--- a/starboard/shared/starboard/player/filter/video_decoder_internal.h
++++ b/starboard/shared/starboard/player/filter/video_decoder_internal.h
+@@ -87,6 +87,11 @@ class VideoDecoder {
+   // acceptable playback performance.  A number greater than 6 is recommended.
+   virtual size_t GetMaxNumberOfCachedFrames() const = 0;
+ 
++  // Supplies the target timestamp before a seek reset.  Decoders that present
++  // video outside Cobalt's renderer can override this to synchronize their
++  // platform pipeline.  Frame-based decoders may ignore it.
++  virtual void SetSeekTime(SbTime seek_to_time) {}
++
+   // Send encoded video frames stored in |input_buffers| to decode.
+   virtual void WriteInputBuffers(const InputBuffers& input_buffers) = 0;
+ 
+diff --git a/starboard/shared/starboard/player/filter/video_renderer_internal_impl.cc b/starboard/shared/starboard/player/filter/video_renderer_internal_impl.cc
+index 25c12a6b2..0b67d9de1 100644
+--- a/starboard/shared/starboard/player/filter/video_renderer_internal_impl.cc
++++ b/starboard/shared/starboard/player/filter/video_renderer_internal_impl.cc
+@@ -153,6 +153,7 @@ void VideoRendererImpl::Seek(SbTime seek_to_time) {
+   SB_DCHECK(BelongsToCurrentThread());
+   SB_DCHECK(seek_to_time >= 0);
+ 
++  decoder_->SetSeekTime(seek_to_time);
+   if (first_input_written_) {
+     decoder_->Reset();
+     first_input_written_ = false;

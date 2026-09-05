@@ -1,0 +1,54 @@
+diff --git a/starboard/linux/shared/player_components_factory.cc b/starboard/linux/shared/player_components_factory.cc
+--- a/starboard/linux/shared/player_components_factory.cc
++++ b/starboard/linux/shared/player_components_factory.cc
+@@ -38,6 +38,7 @@
+ #include "starboard/shared/starboard/player/filter/video_render_algorithm.h"
+ #include "starboard/shared/starboard/player/filter/video_render_algorithm_impl.h"
+ #include "starboard/shared/starboard/player/filter/video_renderer_sink.h"
++#include "starboard/webos/arm/starfish_video_decoder.h"
+ 
+ namespace starboard {
+ namespace shared {
+@@ -108,6 +109,8 @@ class PlayerComponentsFactory : public PlayerComponents::Factory {
+       typedef ::starboard::shared::ffmpeg::VideoDecoder FfmpegVideoDecoderImpl;
+       typedef ::starboard::shared::openh264::VideoDecoder
+           Openh264VideoDecoderImpl;
++      typedef ::starboard::shared::webos::StarfishVideoDecoder
++          StarfishVideoDecoderImpl;
+ 
+       const SbTime kVideoSinkRenderInterval = 10 * kSbTimeMillisecond;
+ 
+@@ -118,7 +121,14 @@ class PlayerComponentsFactory : public PlayerComponents::Factory {
+ 
+       video_decoder->reset();
+ 
+-      if (creation_parameters.video_codec() == kSbMediaVideoCodecVp9) {
++      if (creation_parameters.output_mode() == kSbPlayerOutputModePunchOut &&
++          (creation_parameters.video_codec() == kSbMediaVideoCodecH264 ||
++           creation_parameters.video_codec() == kSbMediaVideoCodecVp9 ||
++           creation_parameters.video_codec() == kSbMediaVideoCodecAv1)) {
++        SB_LOG(INFO) << "Playing video using webOS Starfish hardware decoder.";
++        video_decoder->reset(
++            new StarfishVideoDecoderImpl(creation_parameters.video_codec()));
++      } else if (creation_parameters.video_codec() == kSbMediaVideoCodecVp9) {
+         video_decoder->reset(new VpxVideoDecoderImpl(
+             creation_parameters.video_codec(),
+             creation_parameters.output_mode(),
+@@ -190,6 +200,9 @@ scoped_ptr<PlayerComponents::Factory> PlayerComponents::Factory::Create() {
+ bool VideoDecoder::OutputModeSupported(SbPlayerOutputMode output_mode,
+                                        SbMediaVideoCodec codec,
+                                        SbDrmSystem drm_system) {
++#if defined(STARBOARD_WEBOS)
++  return output_mode == kSbPlayerOutputModePunchOut;
++#else
+   bool has_gles_support = SbGetGlesInterface();
+ 
+   if (!has_gles_support) {
+@@ -208,6 +221,7 @@ bool VideoDecoder::OutputModeSupported(SbPlayerOutputMode output_mode,
+   }
+ 
+   return false;
++#endif
+ }
+ 
+ }  // namespace filter

@@ -1,0 +1,16 @@
+import("//starboard/linux/shared/platform_configuration/configuration.gni")
+
+gl_type = "system_gles2"
+arm_float_abi = "softfp"
+sabi_path = "//starboard/sabi/arm/softfp/sabi-v$sb_api_version.json"
+platform_tests_path = "//starboard/linux/shared:starboard_platform_tests"
+
+enable_in_app_dial = false
+sb_is_evergreen = false
+sb_is_evergreen_compatible = false
+sb_evergreen_compatible_use_libunwind = false
+
+# Cobalt's limited package retains Latin, international, compact CJK and
+# monochrome emoji fallback while avoiding the two ~19 MB precompressed font
+# files from the standard desktop-oriented package.
+cobalt_font_package = "limited"

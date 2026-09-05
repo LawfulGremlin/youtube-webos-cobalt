@@ -1,0 +1,16 @@
+{
+  "id": "com.cobalt.youtube.adfree.v2",
+  "version": "2.0.1",
+  "vendor": "LawfulGremlin",
+  "type": "native",
+  "main": "cobalt",
+  "title": "Youtube Cobalt AdFree v2",
+  "icon": "icon.png",
+  "largeIcon": "largeIcon.png",
+  "iconColor": "#173f5f",
+  "spinnerOnLaunch": false,
+  "transparent": true,
+  "handlesRelaunch": true,
+  "nativeLifeCycleInterfaceVersion": 2,
+  "requiredMemory": 512
+}

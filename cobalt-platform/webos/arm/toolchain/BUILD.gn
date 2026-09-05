@@ -1,0 +1,39 @@
+import("//build/config/clang/clang.gni")
+import("//build/toolchain/gcc_toolchain.gni")
+
+webos_sdk_root = getenv("WEBOS_SDK_ROOT")
+webos_sdl2_root = getenv("SDL2_BUNDLE_DIR")
+assert(webos_sdk_root != "", "WEBOS_SDK_ROOT must point to the relocated SDK")
+assert(webos_sdl2_root != "", "SDL2_BUNDLE_DIR must point to webOSbrew SDL")
+webos_tool_prefix = "$webos_sdk_root/bin/arm-webos-linux-gnueabi-"
+
+clang_toolchain("host") {
+  clang_base_path = clang_base_path
+  toolchain_args = {
+    current_os = "linux"
+    # Host snapshot tools must match the 32-bit target pointer width. This is
+    # also how Cobalt's Raspberry Pi ARM toolchain avoids mixing -m32 with
+    # V8's x64-only assembly sources.
+    current_cpu = "x86"
+  }
+}
+
+gcc_toolchain("target") {
+  cc = "${webos_tool_prefix}gcc"
+  cxx = "${webos_tool_prefix}g++"
+  ld = cxx
+  ar = "${webos_tool_prefix}ar"
+  nm = "${webos_tool_prefix}nm"
+  strip = "${webos_tool_prefix}strip"
+  # Static archives must follow their consumers. GN emits config-level libs
+  # before cobalt.rsp, so keep the video decoders, SDL, and their system
+  # dependencies here.
+  dav1d_archive =
+      rebase_path("//out/dav1d-webos-official/src/libdav1d.a", root_build_dir)
+  vpx_archive = rebase_path("//out/libvpx-webos/libvpx.a", root_build_dir)
+  tail_lib_dependencies =
+      "$dav1d_archive $vpx_archive $webos_sdl2_root/lib/libSDL2.a -lplayerAPIs -lasound -lEGL -lGLESv2 -ldl -lm -lpthread -lrt"
+  toolchain_args = {
+    is_clang = false
+  }
+}

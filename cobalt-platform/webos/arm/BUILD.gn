@@ -1,0 +1,35 @@
+static_library("starboard_platform") {
+  check_includes = false
+
+  sources = [
+    "application_sdl.cc",
+    "application_sdl.h",
+    "main.cc",
+    "player_set_bounds.cc",
+    "starfish_video_decoder.cc",
+    "starfish_video_decoder.h",
+    "window_create.cc",
+    "window_destroy.cc",
+    "window_get_platform_handle.cc",
+    "window_get_size.cc",
+    "window_internal.h",
+    "//starboard/linux/x64x11/public_system_properties.cc",
+    "//starboard/linux/x64x11/system_get_property.cc",
+    "//starboard/linux/x64x11/system_get_property_impl.cc",
+    "//starboard/linux/x64x11/system_get_property_impl.h",
+    "//starboard/linux/x64x11/system_properties.h",
+    "//starboard/shared/libjpeg/image_decode.cc",
+    "//starboard/shared/libjpeg/image_is_decode_supported.cc",
+    "//starboard/shared/libjpeg/jpeg_image_decoder.cc",
+    "//starboard/shared/libjpeg/jpeg_image_decoder.h",
+    "//starboard/shared/starboard/link_receiver.cc",
+  ]
+
+  public_deps = [
+    "//starboard/egl_and_gles",
+    "//starboard/linux/shared:starboard_platform",
+    "//starboard/shared/starboard/player:video_dmp",
+  ]
+  deps = [ "//third_party/libjpeg-turbo:libjpeg" ]
+  configs += [ "//starboard/build/config:starboard_implementation" ]
+}

@@ -1,0 +1,48 @@
+diff --git a/starboard/shared/pulse/pulse_audio_sink_type.cc b/starboard/shared/pulse/pulse_audio_sink_type.cc
+--- a/starboard/shared/pulse/pulse_audio_sink_type.cc
++++ b/starboard/shared/pulse/pulse_audio_sink_type.cc
+@@ -55,9 +55,9 @@ const SbTime kAudioRunningSleepInterval = 5 * kSbTimeMillisecond;
+ // The minimum number of frames that can be written to Pulse once. A small
+ // number will lead to more CPU being used as the callbacks will be called more
+ // frequently.
+-const size_t kFramesPerRequest = 512;
++const size_t kFramesPerRequest = 1024;
+ // The size of the audio buffer Pulse allocates internally.
+-const size_t kPulseBufferSizeInFrames = 8192;
++const size_t kPulseBufferSizeInFrames = 16384;
+ 
+ class PulseAudioSinkType;
+ 
+diff --git a/starboard/shared/starboard/audio_sink/audio_sink_get_min_buffer_size_in_frames.cc b/starboard/shared/starboard/audio_sink/audio_sink_get_min_buffer_size_in_frames.cc
+--- a/starboard/shared/starboard/audio_sink/audio_sink_get_min_buffer_size_in_frames.cc
++++ b/starboard/shared/starboard/audio_sink/audio_sink_get_min_buffer_size_in_frames.cc
+@@ -32,6 +32,13 @@ int SbAudioSinkGetMinBufferSizeInFrames(int channels,
+     SB_LOG(ERROR) << "Not support sample frequency " << sampling_frequency_hz;
+     return -1;
+   }
++  // The webOS process cannot acquire real-time scheduling as its sandbox user.
++  // Keep enough decoded PCM queued to ride out compositor/UI scheduling bursts.
++#if defined(STARBOARD_WEBOS)
++  if (sampling_frequency_hz >= 24000) {
++    return 10 * 1024;
++  }
++#endif
+   // Larger buffer size would have more latency when changing playback rate.
+   if (sampling_frequency_hz < 24000) {
+     return 3 * 1024;
+diff --git a/starboard/shared/starboard/audio_sink/audio_sink_is_audio_sample_type_supported_float32_only.cc b/starboard/shared/starboard/audio_sink/audio_sink_is_audio_sample_type_supported_float32_only.cc
+--- a/starboard/shared/starboard/audio_sink/audio_sink_is_audio_sample_type_supported_float32_only.cc
++++ b/starboard/shared/starboard/audio_sink/audio_sink_is_audio_sample_type_supported_float32_only.cc
+@@ -16,5 +16,12 @@
+ 
+ bool SbAudioSinkIsAudioSampleTypeSupported(
+     SbMediaAudioSampleType audio_sample_type) {
++#if defined(STARBOARD_WEBOS)
++  // webOS TV's physical PulseAudio sink is signed 16-bit PCM.  Advertising
++  // float32 makes Pulse convert every sample on the TV CPU and proved prone to
++  // audible gaps when Cobalt's UI is busy.
++  return audio_sample_type == kSbMediaAudioSampleTypeInt16Deprecated;
++#else
+   return audio_sample_type == kSbMediaAudioSampleTypeFloat32;
++#endif
+ }

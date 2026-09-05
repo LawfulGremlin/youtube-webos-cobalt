@@ -12,6 +12,9 @@ import tarfile
 AR_MAGIC = b"!<arch>\n"
 AR_HEADER_SIZE = 60
 EXPECTED_MEMBERS = ("debian-binary", "control.tar.gz", "data.tar.gz")
+EXPECTED_UID = 0
+EXPECTED_GID = 5000
+EXPECTED_DIRECTORY_MODE = 0o775
 
 
 def parse_decimal(field: bytes, label: str) -> int:
@@ -68,6 +71,25 @@ def verify_tar(name: str, contents: bytes) -> None:
         raise ValueError(f"Invalid {name}: {error}") from error
 
 
+def verify_data_metadata(contents: bytes) -> None:
+    try:
+        with tarfile.open(fileobj=io.BytesIO(contents), mode="r:gz") as archive:
+            for member in archive.getmembers():
+                if member.uid != EXPECTED_UID or member.gid != EXPECTED_GID:
+                    raise ValueError(
+                        f"Unexpected ownership for {member.name}: "
+                        f"{member.uid}:{member.gid}; expected "
+                        f"{EXPECTED_UID}:{EXPECTED_GID}"
+                    )
+                if member.isdir() and member.mode != EXPECTED_DIRECTORY_MODE:
+                    raise ValueError(
+                        f"Unexpected directory mode for {member.name}: "
+                        f"{member.mode:04o}; expected {EXPECTED_DIRECTORY_MODE:04o}"
+                    )
+    except (tarfile.TarError, OSError) as error:
+        raise ValueError(f"Invalid data.tar.gz: {error}") from error
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("ipk", type=Path)
@@ -82,6 +104,7 @@ def main() -> None:
             raise ValueError("debian-binary does not contain the IPK format version")
         verify_tar("control.tar.gz", members["control.tar.gz"][1])
         verify_tar("data.tar.gz", members["data.tar.gz"][1])
+        verify_data_metadata(members["data.tar.gz"][1])
     except ValueError as error:
         parser.error(str(error))
 

@@ -1,0 +1,28 @@
+diff --git a/starboard/shared/egl/system_egl.cc b/starboard/shared/egl/system_egl.cc
+index f50562f9b..7e8b3ed2c 100644
+--- a/starboard/shared/egl/system_egl.cc
++++ b/starboard/shared/egl/system_egl.cc
+@@ -18,6 +18,10 @@
+ 
+ #include "starboard/egl.h"
+ 
++#if defined(STARBOARD_WEBOS)
++#include "starboard/webos/arm/application_sdl.h"
++#endif
++
+ #if !defined(EGL_VERSION_1_0) || !defined(EGL_VERSION_1_1) || \
+     !defined(EGL_VERSION_1_2) || !defined(EGL_VERSION_1_3) || \
+     !defined(EGL_VERSION_1_4)
+@@ -54,6 +58,12 @@ SbEglSurface SbEglCreateWindowSurface(SbEglDisplay dpy,
+ }
+ 
+ SbEglDisplay SbEglGetDisplay(SbEglNativeDisplayType display_id) {
++#if defined(STARBOARD_WEBOS)
++  if (!display_id) {
++    display_id = reinterpret_cast<SbEglNativeDisplayType>(
++        starboard::shared::webos::ApplicationSdl::Get()->GetNativeDisplay());
++  }
++#endif
+   return eglGetDisplay((EGLNativeDisplayType)display_id);
+ }
+ 

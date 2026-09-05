@@ -1,0 +1,86 @@
+declare_args() {
+  webos_sdk_root = getenv("WEBOS_SDK_ROOT")
+  webos_sdl2_root = getenv("SDL2_BUNDLE_DIR")
+}
+
+assert(webos_sdk_root != "", "WEBOS_SDK_ROOT must point to the relocated SDK")
+assert(webos_sdl2_root != "", "SDL2_BUNDLE_DIR must point to webOSbrew SDL")
+
+config("compiler_flags") {
+  defines = [
+    "COBALT_LINUX",
+    "MESA_EGL_NO_X11_HEADERS",
+    "STARBOARD_WEBOS",
+    "WL_EGL_PLATFORM",
+    "__STDC_FORMAT_MACROS",
+    "_GNU_SOURCE=1",
+  ]
+  cflags = [
+    "--sysroot=$webos_sdk_root/arm-webos-linux-gnueabi/sysroot",
+    "-mcpu=cortex-a9",
+    "-mfpu=neon",
+    "-mfloat-abi=softfp",
+    "-fsigned-char",
+    "-fno-strict-aliasing",
+    "-fno-pie",
+    "-ffunction-sections",
+    "-fdata-sections",
+    "-I$webos_sdl2_root/include",
+    "-I$webos_sdk_root/arm-webos-linux-gnueabi/sysroot/usr/include",
+    "-Wno-deprecated-declarations",
+    "-Wno-missing-field-initializers",
+    "-Wno-unused-parameter",
+    "-Wno-unused-variable",
+  ]
+  cflags_c = [ "-std=c11" ]
+  cflags_cc = [ "-std=gnu++14" ]
+  ldflags = [
+    "--sysroot=$webos_sdk_root/arm-webos-linux-gnueabi/sysroot",
+    "-no-pie",
+    "-Wl,--gc-sections",
+    "-Wl,--unresolved-symbols=ignore-in-shared-libs",
+    "-Wl,-rpath=\$ORIGIN/lib",
+  ]
+}
+
+config("platform_configuration") {
+  if (current_toolchain == default_toolchain) {
+    configs = [
+      ":compiler_flags",
+      "//build/config/compiler:rtti",
+      "//starboard/build/config/sabi",
+    ]
+    libs = [
+      "asound",
+      "EGL",
+      "GLESv2",
+      "dl",
+      "m",
+      "pthread",
+      "rt",
+    ]
+  } else {
+    # Host tools such as V8's mksnapshot must use the container's headers and
+    # libraries, not the ARM webOS sysroot or target-specific compiler flags.
+    cflags = [ "-O2" ]
+  }
+}
+
+config("speed") {
+  cflags = [ "-O2" ]
+}
+
+config("size") {
+  cflags = [ "-Os" ]
+}
+
+config("pedantic_warnings") {
+  cflags = [
+    "-Wall",
+    "-Wextra",
+  ]
+}
+
+config("no_pedantic_warnings") {
+  cflags = [ "-Wno-conversion" ]
+}

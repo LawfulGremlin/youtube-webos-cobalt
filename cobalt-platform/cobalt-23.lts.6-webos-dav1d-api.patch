@@ -1,0 +1,40 @@
+diff --git a/starboard/shared/libdav1d/dav1d_video_decoder.cc b/starboard/shared/libdav1d/dav1d_video_decoder.cc
+--- a/starboard/shared/libdav1d/dav1d_video_decoder.cc
++++ b/starboard/shared/libdav1d/dav1d_video_decoder.cc
+@@ -23,10 +23,10 @@
+ #include "starboard/memory.h"
+ #include "starboard/shared/starboard/player/filter/cpu_video_frame.h"
+ #include "starboard/shared/starboard/player/job_queue.h"
+-#include "third_party/libdav1d/include/dav1d/common.h"
+-#include "third_party/libdav1d/include/dav1d/data.h"
+-#include "third_party/libdav1d/include/dav1d/headers.h"
+-#include "third_party/libdav1d/include/dav1d/picture.h"
++#include "out/dav1d-webos-official/public/dav1d/common.h"
++#include "out/dav1d-webos-official/public/dav1d/data.h"
++#include "out/dav1d-webos-official/public/dav1d/headers.h"
++#include "out/dav1d-webos-official/public/dav1d/picture.h"
+ 
+ namespace starboard {
+ namespace shared {
+@@ -172,7 +172,8 @@ void VideoDecoder::InitializeCodec() {
+   Dav1dSettings dav1d_settings{0};
+   dav1d_default_settings(&dav1d_settings);
+   // TODO: Verify this setting is optimal.
+-  dav1d_settings.n_threads = 8;
++  dav1d_settings.n_frame_threads = 2;
++  dav1d_settings.n_tile_threads = 2;
+ 
+   dav1d_settings.frame_size_limit =
+       kMaxDecodedFrameHeight * kMaxDecodedFrameWidth;
+diff --git a/starboard/shared/libdav1d/dav1d_video_decoder.h b/starboard/shared/libdav1d/dav1d_video_decoder.h
+--- a/starboard/shared/libdav1d/dav1d_video_decoder.h
++++ b/starboard/shared/libdav1d/dav1d_video_decoder.h
+@@ -15,7 +15,7 @@
+ #ifndef STARBOARD_SHARED_LIBDAV1D_DAV1D_VIDEO_DECODER_H_
+ #define STARBOARD_SHARED_LIBDAV1D_DAV1D_VIDEO_DECODER_H_
+ 
+-#include "third_party/libdav1d/include/dav1d/dav1d.h"
++#include "out/dav1d-webos-official/public/dav1d/dav1d.h"
+ 
+ #include <queue>
+ #include <string>

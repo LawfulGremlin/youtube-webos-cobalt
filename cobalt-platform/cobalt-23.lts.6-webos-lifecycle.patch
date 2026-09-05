@@ -1,0 +1,51 @@
+diff --git a/cobalt/system_window/system_window.cc b/cobalt/system_window/system_window.cc
+index d50749f2c..b9ac62cbd 100644
+--- a/cobalt/system_window/system_window.cc
++++ b/cobalt/system_window/system_window.cc
+@@ -276,7 +276,10 @@ void HandleInputEvent(const SbEvent* event) {
+     return;
+   }
+ 
++#if !defined(STARBOARD_WEBOS)
+   DCHECK(g_the_window);
++#endif
++
+   if (g_the_window != nullptr) {
+     g_the_window->HandleInputEvent(event);
+   } else {
+diff --git a/starboard/shared/signal/system_request_freeze.cc b/starboard/shared/signal/system_request_freeze.cc
+index 0aeda27ee..285954743 100644
+--- a/starboard/shared/signal/system_request_freeze.cc
++++ b/starboard/shared/signal/system_request_freeze.cc
+@@ -31,6 +31,17 @@ void FreezeDone(void* /*context*/) {
+   raise(SIGSTOP);
+ }
+ 
++void RequestFreeze() {
++#if defined(STARBOARD_WEBOS)
++  // Stay Concealed so the main event loop continues servicing SDL's Luna
++  // relaunch callback. The normal Frozen state stops that dispatch path,
++  // leaving SAM unable to bring the retained process to the foreground.
++  return;
++#else
++  starboard::shared::starboard::Application::Get()->Freeze(NULL, &FreezeDone);
++#endif
++}
++
+ void SbSystemRequestFreeze() {
+ #if SB_IS(EVERGREEN_COMPATIBLE) && !SB_IS(EVERGREEN_COMPATIBLE_LITE)
+   if (starboard::loader_app::IsPendingRestart()) {
+@@ -39,11 +50,11 @@ void SbSystemRequestFreeze() {
+     starboard::shared::starboard::Application::Get()->Stop(0);
+   } else {
+     // Let the platform decide if directly transit into Frozen.
+-    starboard::shared::starboard::Application::Get()->Freeze(NULL, &FreezeDone);
++    RequestFreeze();
+   }
+ #else
+   // Let the platform decide if directly transit into Frozen.
+-  starboard::shared::starboard::Application::Get()->Freeze(NULL, &FreezeDone);
++  RequestFreeze();
+ #endif  // SB_IS(EVERGREEN_COMPATIBLE) && !SB_IS(EVERGREEN_COMPATIBLE_LITE)
+ }
+ #endif  // SB_API_VERSION >= 13

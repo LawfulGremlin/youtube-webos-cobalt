@@ -1,0 +1,58 @@
+diff --git a/starboard/linux/shared/media_is_video_supported.cc b/starboard/linux/shared/media_is_video_supported.cc
+--- a/starboard/linux/shared/media_is_video_supported.cc
++++ b/starboard/linux/shared/media_is_video_supported.cc
+@@ -51,6 +51,11 @@
+   }
+ 
+   if (decode_to_texture_required) {
++#if defined(STARBOARD_WEBOS)
++    // The webOS port sends compressed video to Starfish and exposes it through
++    // a punch-out window. It cannot return decoded frames as GLES textures.
++    return false;
++#else
+     bool has_gles_support = SbGetGlesInterface();
+ 
+     if (!has_gles_support) {
+@@ -58,23 +63,32 @@
+     }
+     // Assume that all GLES2 Linux platforms can play decode-to-texture video
+     // just as well as normal video.
++#endif
+   }
+ 
+-  return (
+ #if defined(STARBOARD_WEBOS)
+-             // Keep software codec support explicit: FFmpeg handles AVC,
+-             // VP9-only libvpx handles VP9 and dav1d handles AV1.
+-             video_codec == kSbMediaVideoCodecAv1 ||
+-             video_codec == kSbMediaVideoCodecH264 ||
+-             video_codec == kSbMediaVideoCodecVp9
++  // The webOS player uses the TV's Starfish hardware pipeline rather than the
++  // Linux software decoders selected by the fallback implementation. Keep AVC
++  // conservative, while advertising the UHD codecs confirmed by hardware
++  // playback on webOS 6.5 devices. A zero dimension means "not constrained".
++  const bool is_avc = video_codec == kSbMediaVideoCodecH264;
++  const bool is_uhd_codec = video_codec == kSbMediaVideoCodecVp9 ||
++                            video_codec == kSbMediaVideoCodecAv1;
++  if (!is_avc && !is_uhd_codec) {
++    return false;
++  }
++
++  const int max_width = is_avc ? 1920 : 3840;
++  const int max_height = is_avc ? 1080 : 2160;
++  return frame_width <= max_width && frame_height <= max_height &&
++         bitrate <= kSbMediaMaxVideoBitrateInBitsPerSecond && fps <= 60;
+ #else
+-             video_codec == kSbMediaVideoCodecAv1 ||
++  return (video_codec == kSbMediaVideoCodecAv1 ||
+           video_codec == kSbMediaVideoCodecH264 ||
+           (video_codec == kSbMediaVideoCodecH265 && is_de265_supported()) ||
+           (video_codec == kSbMediaVideoCodecVp8) ||
+-          (video_codec == kSbMediaVideoCodecVp9)
+-#endif
+-         ) &&
++          (video_codec == kSbMediaVideoCodecVp9)) &&
+          frame_width <= 1920 && frame_height <= 1080 &&
+          bitrate <= kSbMediaMaxVideoBitrateInBitsPerSecond && fps <= 60;
++#endif
+ }

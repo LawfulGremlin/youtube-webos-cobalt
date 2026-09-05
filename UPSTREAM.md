@@ -32,11 +32,32 @@ _Updated 2026-09-03._
 | Merged in | `5bdac4d` (2026-09-03) |
 | Upstream since then | nothing on main; v2.0.0-beta (2026-08-30) stays on a side branch |
 | Our latest release | v1.2.1 (2026-09-02); the merged tree is not released yet |
+| Experimental 2.0 branch | `v2`, started 2026-09-05 from `main` + upstream `d00b2db`; see [The 2.0 branch](#the-20-branch-v2) |
 | Shipping base | official YouTube 1.1.7 IPK (Starboard 12 starter) + Cobalt 23.lts.6-12 built from source with upstream's early-preload hook; `cobalt-23.lts.6.patch` is upstream's current one minus the VP9 hunk |
 | Fork edits inside upstream files | 46 hunks in 9 files, each marked `fork:` (`git grep -c 'fork:' -- ':!webapp/src/fork' ':!tools'`) |
 
 Version numbers are ours, not upstream's. Our v1.2.1 and their v1.2.1 are unrelated releases
 that share a number. See [Tag hygiene](#tag-hygiene).
+
+## The 2.0 branch (`v2`)
+
+_Started 2026-09-05. Experimental; `main` stays the shipping line._
+
+Upstream's 2.0 is a runtime swap, not an app change: the same web bundle runs in a self-built
+Cobalt 23.lts.6 / Starboard 13 executable (SDL2 window and input, Starfish hardware decoding)
+instead of LG's proprietary starter. Branch `v2` is `main` plus a merge of upstream's
+`starterless-cobalt-playback` branch, so every fork feature rides along unchanged and `main`
+merges into it at each sync.
+
+| | |
+|---|---|
+| Upstream commit merged | `d00b2db` (2026-09-05), the branch tip after their PR #75. Not the `v2.0.1-beta` tag: the tag lacks PR #64 and the app-resume fix (`e0ff8e4`) for the webOS 6 second-launch freeze (their #74), which is our TV generation. |
+| Conflicts | Two. `Makefile`: kept our `&&` chaining and `COBALT_DEBUG` forwarding, added their ownership normalizer and version env vars. `cobalt-23.lts.6.patch`: took their `media_module.cc` VP9/UHD capability hunk, which the fork had removed from the 1.x patch (see the VP9 rows). The runtime is theirs, so its capability path is theirs too; the quality ladder decides on hardware. |
+| Fork edits on the branch | App id `com.cobalt.youtube.adfree.v2` in `starterless-cobalt/appinfo.json`, so it installs beside the 1.x app and never replaces stock YouTube (the Starfish decoder reads the id from `APPID`; upstream's stock-id fallback is untouched). `build-sdl-webos-docker.sh`: three cmake flags pointing SDL at the container's `gawk` and `wayland-scanner` and disabling the SDK `ccache`, because the SDK's host tools need a newer glibc than the Cobalt build image has. Same three lines as their `b390c3a` and `16313e7`; drop ours when those merge. |
+| Deliberately behind upstream | The early preload bundle (`adblock-preload.js`, the `web_module.cc` hook) is gone on this branch because the tip removed it (`468cb09`); the fork's JSON.parse chain filters Shorts without it. Upstream is re-adding it on `fix/starterless-shorts-preload` together with an asset installer script; take that as a normal merge when it lands. |
+| Not yet done | Debug builds (`tools/tv-*.sh` expect the devtools port from the starter's `switches` file; the starterless binary passes argv straight to Cobalt). A release workflow (needs the full Cobalt build; upstream's own `build-starterless-cobalt.yml` was red all day 2026-09-05). Keyboard support (was a starter switch, now their SDL layer). Casting and DRM are off in the runtime itself (`enable_in_app_dial = false`, no Starboard DRM). |
+| Local build | SDK: openlgtv `buildroot-nc4` release `webos-a38c582`, staged in the docker volume `ytaf-webos-linux-sdk` with `bin/wayland-scanner`, `bin/gawk` and `bin/awk` removed. Cobalt tree: `workdir/cobalt-starterless` (a `--shared` clone of `workdir/cobalt-23.lts.6` at `007628df7`) with the shared patch applied and `webapp/output/adblockMain.{js,css}` copied to `cobalt/adblock/content/`. Then `COBALT_SOURCE_DIR=$PWD/workdir/cobalt-starterless scripts/build-starterless-cobalt-docker.sh` and `scripts/package-starterless-cobalt.sh`. |
+| Hardware | Not verified. Both TVs were unavailable on 2026-09-05. First test: install on lg48 beside the 1.x app; check launch, second launch, the quality ladder against a desktop browser, and the shortcut keys. |
 
 ## Waiting for a decision
 
@@ -58,7 +79,7 @@ Newest first.
 | Language strings, `checkboxTools.setCallback`, config defaults (v1.2.2) | **Taken** | Additive. | Never. |
 | Release IPK build workflow, `build-release-ipks.yml` (v1.2.2) | **Rejected** | Our `release.yml` builds against our checked-in binaries. Deleted in the merge; delete again on every sync. | Never. |
 | VP9 test-base bump (`51d897f`) and Shorts recycled-node resync (`4e79719`) (v1.2.2) | **Rejected** | `vp9-4k-test.yml` stays deleted; the DOM blocker the resync patched is gone upstream too. | Never. |
-| Starterless 2.0 line (`starterless-cobalt-playback`, v2.0.0-beta, 2026-08-30) | **Watching** | Self-built Cobalt starter with SDL2 and Starfish decoding. Replaces the stock `youtube.leanback.v4` app instead of installing beside it. Tested by upstream on one webOS 6.5 TV; their #68 reports it as the only build that starts on a k7lp/webOS 6.5 set. | Our TVs (webOS 2021) stop launching the 1.x line, or YouTube drops Cobalt 23.lts. |
+| Starterless 2.0 line (`starterless-cobalt-playback`, v2.0.0-beta, 2026-08-30) | **Watching** on `main`; **merged on branch `v2`** (2026-09-05) | Self-built Cobalt starter with SDL2 and Starfish decoding. Replaces the stock `youtube.leanback.v4` app instead of installing beside it (the `v2` branch uses its own id). Tested by upstream on one webOS 6.5 TV; their #68 reports it as the only build that starts on a k7lp/webOS 6.5 set. See [The 2.0 branch](#the-20-branch-v2). | `main` adopts it when the `v2` branch passes hardware verification and playback parity with 1.x, or when our TVs stop launching the 1.x line, or YouTube drops Cobalt 23.lts. |
 | Makefile `$$` to `$` regressions (v1.2.1) | **Fixed with `fork:` markers** | Broke the docker build (`$PWD`) and skipped the package check (`$aresCmd`). | Upstream fixes them differently: take theirs, drop ours. |
 | `vp9-4k-test.yml` (v1.2.1) | **Rejected** | Deleted 2026-08-15. 4K works without the experiment. | Never. |
 | Starboard 13 starter as shipping base (v1.2.x) | **Rejected** | Their v1.2.x launch-crash wave (#36, #37, #41) is tied to this base. We ship the SB12 official 1.1.7 IPK. Their SB13 IPK is archived in `ipks-official/` for a future Cobalt 24.lts experiment. | Crash wave resolved, or we need Cobalt 24.lts (needs SB13 or newer). |
