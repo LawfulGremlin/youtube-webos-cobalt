@@ -29,6 +29,13 @@ if [[ ! -d "$sdl_root/include/SDL2" || ! -f "$sdl_root/lib/libSDL2.a" ]]; then
   exit 2
 fi
 
+echo "Building webOS VP9/AV1 codec bundles."
+COBALT_SOURCE_DIR="$cobalt_root" \
+WEBOS_LINUX_SDK_VOLUME="$sdk_volume" \
+VPX_PARALLEL="$parallel" \
+DAV1D_PARALLEL="$parallel" \
+  "$repo_root/scripts/build-webos-video-codecs-docker.sh"
+
 "$repo_root/scripts/install-webos-starboard-platform.sh" "$cobalt_root"
 mkdir -p "$(dirname "$build_log")"
 

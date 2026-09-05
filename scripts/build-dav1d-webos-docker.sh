@@ -42,6 +42,7 @@ fi
 
 if [[ ! -f "$build_dir/build.ninja" ]]; then
   docker run --rm --platform linux/amd64 \
+    --user "$(id -u):$(id -g)" -e HOME=/tmp \
     -v "$repo_root:/workspace:ro" \
     -v "$cobalt_root:/code" \
     -v "$sdk_volume:/sdk" \
@@ -59,6 +60,7 @@ if [[ ! -f "$build_dir/build.ninja" ]]; then
 fi
 
 docker run --rm --platform linux/amd64 \
+  --user "$(id -u):$(id -g)" -e HOME=/tmp \
   -v "$repo_root:/workspace:ro" \
   -v "$cobalt_root:/code" \
   -v "$sdk_volume:/sdk" \
