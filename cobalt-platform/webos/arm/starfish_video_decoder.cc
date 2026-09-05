@@ -456,9 +456,10 @@ void StarfishVideoDecoder::ApplyPlaybackStateOnDecoderThread() {
 
   const bool should_pause = pause_requested_.load() || playback_rate <= 0.0;
   if (should_pause) {
-    // pauseAtDecodeTime needs one real frame to finish the platform preroll.
-    // Pausing earlier can leave the decoder permanently in LoadingState.
-    if (first_frame_presented_.load() && !pause_issued_) {
+    // During a seek Cobalt holds playback at rate 0 until video preroll reaches
+    // the target timestamp.  Pausing on an earlier decoded frame deadlocks the
+    // pipeline: no later frame can reach the target and release the preroll.
+    if (preroll_frame_sent_.load() && !pause_issued_) {
       const bool accepted = media_api_->Pause();
       SB_LOG(INFO) << "Starfish Pause() -> "
                    << (accepted ? "accepted" : "refused");
@@ -612,6 +613,10 @@ void StarfishVideoDecoder::HandlePlayerEvent(int type,
                    << frame_time << " target=" << target_time;
       Schedule(std::bind(decoder_status_cb_, kNeedMoreInput,
                          scoped_refptr<VideoFrame>(new VideoFrame(frame_time))));
+      if (decoder_thread_) {
+        decoder_thread_->Schedule(std::bind(
+            &StarfishVideoDecoder::ApplyPlaybackStateOnDecoderThread, this));
+      }
     }
     return;
   }
