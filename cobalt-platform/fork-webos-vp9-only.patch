@@ -1,0 +1,18 @@
+diff --git a/starboard/linux/shared/media_is_video_supported.cc b/starboard/linux/shared/media_is_video_supported.cc
+--- a/starboard/linux/shared/media_is_video_supported.cc
++++ b/starboard/linux/shared/media_is_video_supported.cc
+@@ -72,8 +72,12 @@
+   // conservative, while advertising the UHD codecs confirmed by hardware
+   // playback on webOS 6.5 devices. A zero dimension means "not constrained".
+   const bool is_avc = video_codec == kSbMediaVideoCodecH264;
+-  const bool is_uhd_codec = video_codec == kSbMediaVideoCodecVp9 ||
+-                            video_codec == kSbMediaVideoCodecAv1;
++  // fork: AV1 through Starfish stalls on the 2021 NanoCell lm21a (lg75,
++  // 75NANO756PA): the pipeline accepts Play() and never presents a frame,
++  // while VP9 plays at 2160p on the same set (measured 2026-09-06). Advertise
++  // VP9 only; YouTube serves VP9 for every video. Revisit when upstream's
++  // Starfish AV1 path is confirmed on this hardware.
++  const bool is_uhd_codec = video_codec == kSbMediaVideoCodecVp9;
+   if (!is_avc && !is_uhd_codec) {
+     return false;
+   }

@@ -110,6 +110,13 @@ if ! grep -q "TV's Starfish hardware pipeline" \
   git -C "$cobalt_root" apply "$hardware_video_capabilities_patch"
 fi
 
+# fork: hide AV1 so YouTube falls back to VP9 (see the patch header).
+if ! grep -q 'fork: AV1 through Starfish stalls' \
+  "$cobalt_root/starboard/linux/shared/media_is_video_supported.cc"; then
+  git -C "$cobalt_root" apply --check "$repo_root/cobalt-platform/fork-webos-vp9-only.patch"
+  git -C "$cobalt_root" apply "$repo_root/cobalt-platform/fork-webos-vp9-only.patch"
+fi
+
 if ! grep -q 'kPulseLibraryName.*libpulse.so.0' \
   "$cobalt_root/starboard/shared/pulse/pulse_dynamic_load_dispatcher.cc"; then
   git -C "$cobalt_root" apply --check "$pulse_soname_patch"
