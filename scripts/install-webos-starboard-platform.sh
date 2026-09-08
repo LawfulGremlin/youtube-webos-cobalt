@@ -22,6 +22,7 @@ pulse_soname_patch="$repo_root/cobalt-platform/cobalt-23.lts.6-webos-pulse-sonam
 pulse_tuning_patch="$repo_root/cobalt-platform/cobalt-23.lts.6-webos-pulse-tuning.patch"
 external_video_seek_patch="$repo_root/cobalt-platform/cobalt-23.lts.6-webos-external-video-seek.patch"
 external_video_controls_patch="$repo_root/cobalt-platform/cobalt-23.lts.6-webos-external-video-controls.patch"
+external_video_preroll_sync_patch="$repo_root/cobalt-platform/cobalt-23.lts.6-webos-external-video-preroll-sync.patch"
 lifecycle_patch="$repo_root/cobalt-platform/cobalt-23.lts.6-webos-lifecycle.patch"
 demuxer_stop_race_patch="$repo_root/cobalt-platform/cobalt-23.lts.6-demuxer-stop-race.patch"
 
@@ -132,6 +133,12 @@ if ! grep -q 'virtual void SetPlaybackRate' \
   "$cobalt_root/starboard/shared/starboard/player/filter/video_decoder_internal.h"; then
   git -C "$cobalt_root" apply --check "$external_video_controls_patch"
   git -C "$cobalt_root" apply "$external_video_controls_patch"
+fi
+
+if ! grep -q 'Hold an external video pipeline at its preroll target' \
+  "$cobalt_root/starboard/shared/starboard/player/filter/filter_based_player_worker_handler.cc"; then
+  git -C "$cobalt_root" apply --check "$external_video_preroll_sync_patch"
+  git -C "$cobalt_root" apply "$external_video_preroll_sync_patch"
 fi
 
 if ! grep -q 'Stay Concealed so the main event loop' \
