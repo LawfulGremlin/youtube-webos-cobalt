@@ -171,8 +171,40 @@ function getClosest(element, selector) {
   return null;
 }
 
-function getMarkerHost(progressBar) {
+function getMarkerHost(progressBar, track) {
+  // Marker direkt im Track verankern. Der aeussere Wrapper verliert sein
+  // inline "position: relative", sobald YouTube die Leiste neu rendert; die
+  // absolut positionierten Marker springen dann an eine falsche Stelle.
+  // Im Track selbst ist der Versatz konstant 0/0.
+  if (track) return track;
   return getClosest(progressBar, 'ytlr-multi-markers-player-bar-renderer') || progressBar;
+}
+
+// Volle Breite der Fortschrittsleiste. Aktuelle YouTube-TV-Builds liefern
+// kein "segment" mehr, sondern "cue-ranges" bzw. "slider" mit gleicher
+// Geometrie. Reihenfolge = Prioritaet, damit aeltere DOMs unveraendert bleiben.
+const TRACK_IDOM_KEYS = ['segment', 'cue-ranges', 'slider'];
+
+function findTrackElement(progressBar) {
+  const children = progressBar.children || [];
+
+  for (let keyIndex = 0; keyIndex < TRACK_IDOM_KEYS.length; keyIndex += 1) {
+    const trackKey = TRACK_IDOM_KEYS[keyIndex];
+
+    // Der aktuelle YouTube-DOM:
+    // progress-bar enthält den Track als direktes Kind.
+    for (let childIndex = 0; childIndex < children.length; childIndex += 1) {
+      if (children[childIndex].getAttribute?.('idomkey') === trackKey) {
+        return children[childIndex];
+      }
+    }
+
+    // Fallback, falls YouTube noch einen Wrapper ergänzt.
+    const nested = progressBar.querySelector(`[idomkey="${trackKey}"]`);
+    if (nested) return nested;
+  }
+
+  return null;
 }
 
 function findProgressBarParts() {
@@ -194,22 +226,7 @@ function findProgressBarParts() {
       if (visited.includes(progressBar)) continue;
       visited.push(progressBar);
 
-      let segment = null;
-      const children = progressBar.children || [];
-
-      // Der aktuelle YouTube-DOM:
-      // progress-bar enthält segment als direktes Kind.
-      for (let childIndex = 0; childIndex < children.length; childIndex += 1) {
-        if (children[childIndex].getAttribute?.('idomkey') === 'segment') {
-          segment = children[childIndex];
-          break;
-        }
-      }
-
-      // Fallback, falls YouTube noch einen Wrapper ergänzt.
-      if (!segment) {
-        segment = progressBar.querySelector('[idomkey="segment"]');
-      }
+      const segment = findTrackElement(progressBar);
       if (!segment) continue;
 
       const rect = progressBar.getBoundingClientRect();
@@ -491,7 +508,7 @@ class SponsorBlockController {
   }
 
   findExistingOverlay(progressBar) {
-    const host = getMarkerHost(progressBar);
+    const host = getMarkerHost(progressBar, this.progressSegment);
     const connected =
       this.markerNodes.length &&
       this.markerHost === host &&
@@ -657,7 +674,7 @@ class SponsorBlockController {
       return;
     }
 
-    const host = getMarkerHost(this.progressBar);
+    const host = getMarkerHost(this.progressBar, this.progressSegment);
     if (!host) {
       this.markerStatus = 'waiting-for-stable-anchor';
       return;
