@@ -39,6 +39,7 @@ export function userScriptStartUI() {
   let heldDirection = null;
   let heldDirectionAt = 0;
   let directionMoveFrame = null;
+  let heldActivationControl = null;
 
   function getDirectionFromEvent(evt) {
     const key = (evt.key || '').toLowerCase();
@@ -602,6 +603,33 @@ export function userScriptStartUI() {
     const menuOpen = isContainerOpen();
     const focusInsideMenu = menuOpen && menuHasFocus();
     const eventDirection = menuOpen ? getDirectionFromEvent(evt) : null;
+    const isActivationKey =
+      evt.key === 'Enter' ||
+      evt.key === ' ' ||
+      evt.code === 'Space' ||
+      evt.keyCode === 13 ||
+      evt.keyCode === 32 ||
+      evt.which === 13 ||
+      evt.which === 32;
+
+    // Cobalt may send repeated presses without setting KeyboardEvent.repeat.
+    // Keep the control latched until release, including during guide rerenders.
+    if (isActivationKey && heldActivationControl) {
+      const wrapper = heldActivationControl.parentElement;
+      if (wrapper) {
+        wrapper.dataset.ytafIgnoreClickUntil = String(Date.now() + 1000);
+      }
+      if (evt.type === 'keyup') heldActivationControl = null;
+      evt.preventDefault();
+      evt.stopPropagation();
+      return false;
+    }
+
+    if (menuOpen && isActivationKey && evt.type !== 'keydown') {
+      evt.preventDefault();
+      evt.stopPropagation();
+      return false;
+    }
 
     if (evt.type === 'keyup' && eventDirection) {
       if (heldDirection === eventDirection) {
@@ -636,19 +664,13 @@ export function userScriptStartUI() {
         return false;
       }
 
-      if (
-        evt.key === 'Enter' ||
-        evt.key === ' ' ||
-        evt.code === 'Space' ||
-        evt.keyCode === 13 ||
-        evt.keyCode === 32 ||
-        evt.which === 13 ||
-        evt.which === 32
-      ) {
+      if (isActivationKey) {
         evt.preventDefault();
         evt.stopPropagation();
+        if (evt.repeat) return false;
         const focusedElement = document.querySelector(':focus');
         if (focusedElement && focusedElement.id) {
+          heldActivationControl = focusedElement;
           // prevent the synthetic click from toggling again
           const wrapper = focusedElement.parentElement;
           if (wrapper) {
