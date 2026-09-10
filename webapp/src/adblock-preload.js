@@ -185,11 +185,21 @@ if (!window.__ytafPreloadExecuted) {
         }
       } catch (error) {
         console.error('[ytaf shorts] discovered guide apply path threw', error);
+        const invokedName = guideApplyHandler.callerArgc === 1
+          ? guideApplyHandler.callerName
+          : guideApplyHandler.name;
+        const errorMessage = error && error.message ? error.message : String(error);
+        console.error(
+          '[ytaf shorts] invoked=' + invokedName +
+          ' caller=' + Function.prototype.toString.call(guideApplyHandler.callerFn) +
+          ' target=' + Function.prototype.toString.call(guideApplyHandler.fn)
+        );
         return (
           'handler-threw:' +
           guideApplyHandler.callerName +
           '->' +
-          guideApplyHandler.name
+          guideApplyHandler.name +
+          ' invoked=' + invokedName + ': ' + errorMessage
         );
       }
 
