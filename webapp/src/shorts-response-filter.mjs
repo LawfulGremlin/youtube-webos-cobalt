@@ -2,7 +2,8 @@ const SHORTS_RESPONSE_KEYS = [
   'reelShelfRenderer',
   'reelShelfViewModel',
   'shortsShelfRenderer',
-  'shortsLockupViewModel'
+  'shortsLockupViewModel',
+  'reelItemRenderer'
 ];
 
 const TV_SHORTS_SHELF_RENDERER_TYPE = 'TVHTML5_SHELF_RENDERER_TYPE_SHORTS';
@@ -12,7 +13,7 @@ const TV_SHORTS_GUIDE_SOURCE =
 const TV_SHORTS_OVERLAY_STYLE = 'REEL_PLAYER_OVERLAY_STYLE_SHORTS';
 
 export function isShortsPath(value) {
-  if (!value) return false;
+  if (typeof value !== 'string') return false;
 
   const path = value.split(/[?#]/, 1)[0];
   return (
@@ -36,14 +37,24 @@ function getShortsLinkNode(value) {
     value.onSelectCommand,
     value.command,
     value.tileRenderer?.onSelectCommand,
+    value.tileRenderer?.navigationEndpoint,
+    value.videoRenderer?.navigationEndpoint,
     value.richItemRenderer?.content?.shortsLockupViewModel?.onTap
   ];
 
   return endpoints.find((endpoint) => {
     const path = endpoint?.commandMetadata?.webCommandMetadata?.url;
     const browseId = endpoint?.browseEndpoint?.browseId;
-    return isShortsPath(path) || browseId === 'FEshorts';
+    return isShortsPath(path) || browseId === 'FEshorts' ||
+      isShortsReelEndpoint(endpoint?.reelWatchEndpoint);
   });
+}
+
+function isShortsReelEndpoint(endpoint) {
+  return Boolean(
+    endpoint?.watchEndpointSource === TV_SHORTS_GUIDE_SOURCE ||
+      endpoint?.overlay?.reelPlayerOverlayRenderer?.style === TV_SHORTS_OVERLAY_STYLE
+  );
 }
 
 function isTvShortsShelf(value) {
@@ -68,9 +79,7 @@ function isTvShortsGuideEntry(value) {
 
   return Boolean(
     entry.icon?.iconType === TV_SHORTS_ICON_TYPE ||
-      reelWatchEndpoint?.watchEndpointSource === TV_SHORTS_GUIDE_SOURCE ||
-      reelWatchEndpoint?.overlay?.reelPlayerOverlayRenderer?.style ===
-        TV_SHORTS_OVERLAY_STYLE
+      isShortsReelEndpoint(reelWatchEndpoint)
   );
 }
 
@@ -152,6 +161,7 @@ export function isBrowseResponse(value) {
     !value.videoDetails &&
       !value.streamingData &&
       (value.contents ||
+        value.continuationContents ||
         value.onResponseReceivedActions ||
         value.onResponseReceivedEndpoints)
   );
