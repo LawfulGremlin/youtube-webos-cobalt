@@ -71,17 +71,12 @@ export function configWrite(key, value) {
   let applyResult = null;
 
   if (key === 'enableShorts') {
-    console.error('[ytaf shorts] config persisted enableShorts=' + value);
-
     if (typeof window.__ytafApplyShortsState === 'function') {
       try {
         applyResult = window.__ytafApplyShortsState();
-        console.error('[ytaf shorts] live apply returned ' + applyResult);
       } catch (err) {
         console.error('[ytaf shorts] live apply threw', err);
       }
-    } else {
-      console.error('[ytaf shorts] live apply function is missing');
     }
   }
 

@@ -21,22 +21,6 @@ export function userScriptStartShortsBlockUI() {
   }
 
   checkboxTools.setCallback('__shorts', (newState) => {
-    const enableShorts = !newState;
-
-    if (description) {
-      description.textContent = `${label} [callback]`;
-    }
-
-    try {
-      const applyResult = configWrite('enableShorts', enableShorts);
-      if (description) {
-        description.textContent = `${label} [saved apply=${String(applyResult)}]`;
-      }
-    } catch (err) {
-      const message = err && err.message ? err.message : String(err);
-      if (description) {
-        description.textContent = `${label} [ERROR: ${message}]`;
-      }
-    }
+    configWrite('enableShorts', !newState);
   });
 }

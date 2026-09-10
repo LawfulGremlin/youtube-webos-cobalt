@@ -64,7 +64,7 @@ for (const failInCaller of [true, false]) {
     vm.runInContext(source.slice(source.indexOf('if (!window.__ytafPreloadExecuted)')), context);
     vm.runInContext('JSON.parse(\'{"items":[{"guideSectionRenderer":{"items":[]}}]}\')', context);
     const result = vm.runInContext('window.__ytafApplyShortsState()', context);
-    assert.equal(result, 'handler-threw:Z->J invoked=J: missing renderer context');
-    assert.ok(logs.some(([message]) => message.includes('caller=Z(response)') && message.includes('target=J(state)')));
+    assert.equal(result, 'handler-threw:Z->J');
+    assert.ok(logs.some(([, error]) => error?.message === 'missing renderer context'));
   });
 }
