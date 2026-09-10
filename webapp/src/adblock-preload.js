@@ -92,7 +92,6 @@ if (!window.__ytafPreloadExecuted) {
               name: targetName,
               callerFn: caller,
               callerName,
-              callerArgc: caller.length,
               depth,
               callerSourceLength: source.length
             });
@@ -178,16 +177,12 @@ if (!window.__ytafPreloadExecuted) {
       }
 
       try {
-        if (guideApplyHandler.callerArgc === 1) {
-          guideApplyHandler.callerFn.call(app, guideResponse);
-        } else {
-          guideApplyHandler.fn.call(app, { guideResponse });
-        }
+        // The caller only identifies the target and its argument shape. It may
+        // be a class constructor (e.g. Z/VUb), not a callable guide callback.
+        guideApplyHandler.fn.call(app, { guideResponse });
       } catch (error) {
         console.error('[ytaf shorts] discovered guide apply path threw', error);
-        const invokedName = guideApplyHandler.callerArgc === 1
-          ? guideApplyHandler.callerName
-          : guideApplyHandler.name;
+        const invokedName = guideApplyHandler.name;
         const errorMessage = error && error.message ? error.message : String(error);
         console.error(
           '[ytaf shorts] invoked=' + invokedName +
