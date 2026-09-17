@@ -71,12 +71,13 @@ jobs:
           source_sha="$(sed -n 's/^source_sha=//p' "$metadata")"
           cobalt_ref="$(sed -n 's/^cobalt_ref=//p' "$metadata")"
           build_type="$(sed -n 's/^build_type=//p' "$metadata")"
-          test "$source_ref" = "main"
+          test -n "$source_ref"
           test -n "$source_sha"
           test -n "$cobalt_ref"
           test -n "$build_type"
           echo "artifact_name=$artifact_name" >> "$GITHUB_OUTPUT"
           echo "archive=$archive" >> "$GITHUB_OUTPUT"
+          echo "source_ref=$source_ref" >> "$GITHUB_OUTPUT"
           echo "source_sha=$source_sha" >> "$GITHUB_OUTPUT"
           echo "cobalt_ref=$cobalt_ref" >> "$GITHUB_OUTPUT"
           echo "build_type=$build_type" >> "$GITHUB_OUTPUT"
@@ -131,6 +132,7 @@ jobs:
           test "$(jq -r '.version' starterless-cobalt/appinfo.json)" = "${{ steps.version.outputs.version }}"
           echo "Packaging SHA: $(git rev-parse HEAD)"
           echo "Package version: ${{ steps.version.outputs.version }}"
+          echo "Runtime source ref: ${{ steps.cobalt.outputs.source_ref }}"
           echo "Runtime source SHA: ${{ steps.cobalt.outputs.source_sha }}"
           echo "Cobalt ref: ${{ steps.cobalt.outputs.cobalt_ref }}"
           echo "Build type: ${{ steps.cobalt.outputs.build_type }}"
@@ -215,7 +217,7 @@ jobs:
           repository=$GITHUB_REPOSITORY
           cobalt_run_id=$COBALT_RUN_ID
           cobalt_artifact=${{ steps.cobalt.outputs.artifact_name }}
-          cobalt_source_ref=main
+          cobalt_source_ref=${{ steps.cobalt.outputs.source_ref }}
           cobalt_source_sha=${{ steps.cobalt.outputs.source_sha }}
           cobalt_ref=${{ steps.cobalt.outputs.cobalt_ref }}
           cobalt_build_type=${{ steps.cobalt.outputs.build_type }}
