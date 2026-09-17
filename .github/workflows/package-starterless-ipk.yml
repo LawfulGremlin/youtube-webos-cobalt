@@ -8,7 +8,7 @@ on:
         required: true
         type: string
       version:
-        description: Package version (empty = highest semantic version tag)
+        description: Package version (empty = version from appinfo.json)
         required: false
         default: ""
         type: string
@@ -85,7 +85,7 @@ jobs:
         uses: actions/checkout@v5
         with:
           ref: main
-          fetch-depth: 0
+          fetch-depth: 1
 
       - name: Resolve package version
         id: version
@@ -97,18 +97,8 @@ jobs:
           source="workflow input"
 
           if [[ -z "$version" ]]; then
-            version="$(
-              git tag --list \
-                | sed -nE 's/^v?([0-9]+\.[0-9]+\.[0-9]+)$/\1/p' \
-                | sort -V \
-                | tail -n 1
-            )"
-            source="highest semantic version tag"
-          fi
-
-          if [[ -z "$version" ]]; then
             version="$(jq -r '.version' starterless-cobalt/appinfo.json)"
-            source="starterless-cobalt/appinfo.json fallback"
+            source="starterless-cobalt/appinfo.json"
           fi
 
           version="${version#v}"
@@ -118,9 +108,11 @@ jobs:
             exit 4
           fi
 
-          jq --arg version "$version" '.version = $version' \
-            starterless-cobalt/appinfo.json > starterless-cobalt/appinfo.json.tmp
-          mv starterless-cobalt/appinfo.json.tmp starterless-cobalt/appinfo.json
+          if [[ -n "$REQUESTED_VERSION" ]]; then
+            jq --arg version "$version" '.version = $version' \
+              starterless-cobalt/appinfo.json > starterless-cobalt/appinfo.json.tmp
+            mv starterless-cobalt/appinfo.json.tmp starterless-cobalt/appinfo.json
+          fi
 
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "source=$source" >> "$GITHUB_OUTPUT"
