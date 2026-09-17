@@ -43,7 +43,7 @@ jobs:
           gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --pattern '*.ipk' --dir release
           test -n "$(find release -maxdepth 1 -type f -name '*.ipk' -print -quit)"
 
-      - name: Check IPK and Cobalt binary compatibility
+      - name: Check IPK compatibility
         run: |
           : > compatibility-report.md
 
@@ -62,7 +62,7 @@ jobs:
             done
 
           cat compatibility-report.md >> "$GITHUB_STEP_SUMMARY"
-          echo "Compatibility gaps are reported as warnings because one LG starter cannot satisfy every historical and future firmware ABI." >> "$GITHUB_STEP_SUMMARY"
+          echo "Compatibility gaps are reported as warnings because webOS firmware ABIs differ between device generations." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload compatibility report
         if: ${{ always() }}
