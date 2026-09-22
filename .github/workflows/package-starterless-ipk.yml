@@ -52,7 +52,7 @@ jobs:
             jq -r '.artifacts[] | select(.expired == false) | select((.name | startswith("cobalt-")) or (.name | startswith("starterless-cobalt-"))) | select((.name | contains("build-log")) | not) | .name' <<<"$artifacts_json"
           )
           if [[ "${#artifact_names[@]}" -ne 1 ]]; then
-            echo "Expected exactly one starterless Cobalt runtime artifact in run $COBALT_RUN_ID." >&2
+            echo "Expected exactly one Cobalt runtime artifact in run $COBALT_RUN_ID." >&2
             jq -r '.artifacts[] | "  - \(.name) (expired=\(.expired))"' <<<"$artifacts_json" >&2
             exit 3
           fi
