@@ -30,6 +30,9 @@ class StarfishVideoDecoder
   size_t GetPrerollFrameCount() const override { return 1; }
   SbTime GetPrerollTimeout() const override { return 2 * kSbTimeSecond; }
   size_t GetMaxNumberOfCachedFrames() const override { return 12; }
+  // Reset retains a native pipeline with its own seek target, even before
+  // another compressed packet arrives. Every subsequent seek must retarget it.
+  bool NeedsResetOnEverySeek() const override { return true; }
   void SetSeekTime(SbTime seek_to_time) override {
     seek_to_time_.store(seek_to_time);
   }
