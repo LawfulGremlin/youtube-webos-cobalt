@@ -7,11 +7,6 @@ import './fork.css';
 import { showNotification } from '../ui.js';
 import { text as languageText } from '../languages/index.js';
 import { toggleSubtitles } from '../subtitle-shortcut.js';
-import { filterTvResponse } from './filters.mjs';
-import {
-  isBrowseResponse,
-  stripShortsFromBrowseResponse
-} from '../shorts-response-filter.mjs';
 import { stepTarget } from './frame-step.mjs';
 import { nextPlaybackRate } from './playback-speed.mjs';
 import {
@@ -164,37 +159,8 @@ window.ytafKeyboardLayout = function (id) {
   return id;
 };
 
-// Chain onto JSON.parse after upstream adblock.js — same interception point
-// upstream uses, without editing upstream code. Feed-ad item removal rides
-// the existing adblock toggle.
-const prevParse = JSON.parse;
-JSON.parse = function () {
-  const result = prevParse.apply(this, arguments);
-  try {
-    const removed = filterTvResponse(result, {
-      removeAds: configRead('enableAdBlock')
-    });
-    if (removed) {
-      console.info('[ytaf-fork] filtered ' + removed + ' feed item(s)');
-    }
-    // fork: upstream runs its Shorts filter only from adblockPreload.js, which
-    // the Cobalt runtime executes before the document loads. On a runtime
-    // without that hook (older binary, or the preload failed) nothing would
-    // filter Shorts at all, so run the same filter from here in that case.
-    // Same guard flag as the preload, so it never runs twice.
-    if (
-      !window.__ytafShortsResponseFilterInstalled &&
-      !configRead('enableShorts') &&
-      isBrowseResponse(result) &&
-      stripShortsFromBrowseResponse(result)
-    ) {
-      console.info('[ytaf-fork] Shorts filtered without preload');
-    }
-  } catch (err) {
-    console.warn('[ytaf-fork] filter failed:', err);
-  }
-  return result;
-};
+// The fork response filters (feed ads, Shorts safety net) run from inside
+// upstream adblock.js's JSON.parse wrapper — see ./parse-hook.js for why.
 
 // fork: an XHR responseText-shadow feed filter used to live here. Removed
 // 2026-08-15 as measured dead code: instrumenting XMLHttpRequest.open on

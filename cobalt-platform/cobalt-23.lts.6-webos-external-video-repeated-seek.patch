@@ -1,0 +1,24 @@
+--- a/starboard/shared/starboard/player/filter/video_decoder_internal.h
++++ b/starboard/shared/starboard/player/filter/video_decoder_internal.h
+@@ -87,6 +87,10 @@
+   // acceptable playback performance.  A number greater than 6 is recommended.
+   virtual size_t GetMaxNumberOfCachedFrames() const = 0;
+ 
++  // External pipelines retain a native seek target after Reset(), even without
++  // new input. Allow them to reset again for consecutive seeks.
++  virtual bool NeedsResetOnEverySeek() const { return false; }
++
+   // Supplies the target timestamp before a seek reset.  Decoders that present
+   // video outside Cobalt's renderer can override this to synchronize their
+   // platform pipeline.  Frame-based decoders may ignore it.
+--- a/starboard/shared/starboard/player/filter/video_renderer_internal_impl.cc
++++ b/starboard/shared/starboard/player/filter/video_renderer_internal_impl.cc
+@@ -154,7 +154,7 @@
+   SB_DCHECK(seek_to_time >= 0);
+ 
+   decoder_->SetSeekTime(seek_to_time);
+-  if (first_input_written_) {
++  if (first_input_written_ || decoder_->NeedsResetOnEverySeek()) {
+     decoder_->Reset();
+     first_input_written_ = false;
+   }

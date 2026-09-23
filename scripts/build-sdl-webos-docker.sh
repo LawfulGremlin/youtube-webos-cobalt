@@ -128,6 +128,9 @@ docker run --rm --platform linux/amd64 \
 
     cmake -S /src -B /build -G Ninja \
       -DCMAKE_TOOLCHAIN_FILE="'"$toolchain_file"'" \
+      -DWAYLAND_SCANNER=/usr/bin/wayland-scanner \
+      -DGAWK=/usr/bin/gawk \
+      -DSDL_CCACHE=OFF \
       -DCMAKE_INSTALL_PREFIX=/out \
       -DCMAKE_BUILD_TYPE=Release \
       -DWEBOS=ON \
@@ -135,10 +138,7 @@ docker run --rm --platform linux/amd64 \
       -DSDL_SHARED=OFF \
       -DSDL_STATIC=ON \
       -DSDL_TEST=OFF \
-      -DSDL_TESTS=OFF \
-      -DSDL_CCACHE=OFF \
-      -DWAYLAND_SCANNER=/usr/bin/wayland-scanner \
-      -DGAWK=/usr/bin/gawk
+      -DSDL_TESTS=OFF
 
     ninja -C /build -j "$SDL_BUILD_PARALLEL" install
   '

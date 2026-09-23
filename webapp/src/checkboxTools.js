@@ -67,8 +67,9 @@ function add(name, label, checked = false, callback = null, color = null) {
     'click',
     (evt) => {
       // If a keyboard handler just toggled this control, ignore the synthesized click
-      if (wrapper.dataset.ytafSkipClick === '1') {
-        delete wrapper.dataset.ytafSkipClick;
+      if (Number(wrapper.dataset.ytafIgnoreClickUntil || 0) > Date.now()) {
+        evt.preventDefault();
+        evt.stopPropagation();
         return;
       }
       cb(evt);

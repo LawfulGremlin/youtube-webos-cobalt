@@ -18,15 +18,19 @@ const defaultConfig = {
   enableShorts: true
 };
 
-let localConfig;
+let localConfig = window.__ytafConfigState;
 
-try {
-  localConfig = JSON.parse(
-    window.localStorage[CONFIG_KEY] || JSON.stringify(defaultConfig)
-  );
-} catch (err) {
-  console.warn('Config read failed:', err);
-  localConfig = { ...defaultConfig };
+if (!localConfig || typeof localConfig !== 'object') {
+  try {
+    localConfig = JSON.parse(
+      window.localStorage[CONFIG_KEY] || JSON.stringify(defaultConfig)
+    );
+  } catch (err) {
+    console.warn('Config read failed:', err);
+    localConfig = { ...defaultConfig };
+  }
+
+  window.__ytafConfigState = localConfig;
 }
 
 export function configRead(key) {
@@ -43,13 +47,9 @@ export function configRead(key) {
   return localConfig[key];
 }
 
-export function configWrite(key, value) {
-  console.info('Setting key', key, 'to', value);
-  localConfig[key] = value;
-  window.localStorage[CONFIG_KEY] = JSON.stringify(localConfig);
-
+function dispatchConfigChanged(target, key, value) {
   try {
-    document.dispatchEvent(
+    target.dispatchEvent(
       new CustomEvent('ytaf-config-changed', {
         detail: { key, value }
       })
@@ -58,6 +58,30 @@ export function configWrite(key, value) {
     const event = document.createEvent('Event');
     event.initEvent('ytaf-config-changed', true, true);
     event.detail = { key, value };
-    document.dispatchEvent(event);
+    target.dispatchEvent(event);
   }
+}
+
+export function configWrite(key, value) {
+  console.info('Setting key', key, 'to', value);
+  localConfig[key] = value;
+  window.__ytafConfigState = localConfig;
+  window.localStorage[CONFIG_KEY] = JSON.stringify(localConfig);
+
+  let applyResult = null;
+
+  if (key === 'enableShorts') {
+    if (typeof window.__ytafApplyShortsState === 'function') {
+      try {
+        applyResult = window.__ytafApplyShortsState();
+      } catch (err) {
+        console.error('[ytaf shorts] live apply threw', err);
+      }
+    }
+  }
+
+  dispatchConfigChanged(document, key, value);
+  dispatchConfigChanged(window, key, value);
+
+  return applyResult;
 }

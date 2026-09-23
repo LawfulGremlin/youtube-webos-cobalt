@@ -33,6 +33,7 @@ export function userScriptStartUI() {
   // playback-speed shortcuts. Not taken — digits 48-57 are bindable slots in
   // this fork's shortcut registry (webapp/src/fork/shortcut-registry.mjs).
   let lastGreenKeyAt = 0;
+  let heldActivationControl = null;
 
   function getDirectionFromEvent(evt) {
     const key = (evt.key || '').toLowerCase();
@@ -476,6 +477,33 @@ export function userScriptStartUI() {
   const eventHandler = (evt) => {
     const menuOpen = isContainerOpen();
     const focusInsideMenu = menuOpen && menuHasFocus();
+    const isActivationKey =
+      evt.key === 'Enter' ||
+      evt.key === ' ' ||
+      evt.code === 'Space' ||
+      evt.keyCode === 13 ||
+      evt.keyCode === 32 ||
+      evt.which === 13 ||
+      evt.which === 32;
+
+    // Cobalt may send repeated presses without setting KeyboardEvent.repeat.
+    // Keep the control latched until release, including during guide rerenders.
+    if (isActivationKey && heldActivationControl) {
+      const wrapper = heldActivationControl.parentElement;
+      if (wrapper) {
+        wrapper.dataset.ytafIgnoreClickUntil = String(Date.now() + 1000);
+      }
+      if (evt.type === 'keyup') heldActivationControl = null;
+      evt.preventDefault();
+      evt.stopPropagation();
+      return false;
+    }
+
+    if (menuOpen && isActivationKey && evt.type !== 'keydown') {
+      evt.preventDefault();
+      evt.stopPropagation();
+      return false;
+    }
 
     if (evt.type === 'keydown' && menuOpen) {
       if (!focusInsideMenu) {
@@ -493,24 +521,17 @@ export function userScriptStartUI() {
         return false;
       }
 
-      if (
-        evt.key === 'Enter' ||
-        evt.key === ' ' ||
-        evt.code === 'Space' ||
-        evt.keyCode === 13 ||
-        evt.keyCode === 32 ||
-        evt.which === 13 ||
-        evt.which === 32
-      ) {
+      if (isActivationKey) {
         evt.preventDefault();
         evt.stopPropagation();
+        if (evt.repeat) return false;
         const focusedElement = document.querySelector(':focus');
         if (focusedElement && focusedElement.id) {
+          heldActivationControl = focusedElement;
           // prevent the synthetic click from toggling again
           const wrapper = focusedElement.parentElement;
           if (wrapper) {
-            wrapper.dataset.ytafSkipClick = '1';
-            setTimeout(() => delete wrapper.dataset.ytafSkipClick, 300);
+            wrapper.dataset.ytafIgnoreClickUntil = String(Date.now() + 1000);
           }
           checkboxTools.toggleCheck(focusedElement.id);
         }

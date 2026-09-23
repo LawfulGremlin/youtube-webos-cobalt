@@ -17,15 +17,19 @@ vp9_patch="$repo_root/cobalt-platform/cobalt-23.lts.6-webos-vp9.patch"
 av1_patch="$repo_root/cobalt-platform/cobalt-23.lts.6-webos-av1.patch"
 dav1d_api_patch="$repo_root/cobalt-platform/cobalt-23.lts.6-webos-dav1d-api.patch"
 starfish_patch="$repo_root/cobalt-platform/cobalt-23.lts.6-webos-starfish.patch"
+shared_av_patch="$repo_root/cobalt-platform/cobalt-23.lts.6-webos-shared-av.patch"
 hardware_video_capabilities_patch="$repo_root/cobalt-platform/cobalt-23.lts.6-webos-hardware-video-capabilities.patch"
 pulse_soname_patch="$repo_root/cobalt-platform/cobalt-23.lts.6-webos-pulse-soname.patch"
 pulse_tuning_patch="$repo_root/cobalt-platform/cobalt-23.lts.6-webos-pulse-tuning.patch"
 external_video_seek_patch="$repo_root/cobalt-platform/cobalt-23.lts.6-webos-external-video-seek.patch"
 external_video_controls_patch="$repo_root/cobalt-platform/cobalt-23.lts.6-webos-external-video-controls.patch"
+external_video_preroll_sync_patch="$repo_root/cobalt-platform/cobalt-23.lts.6-webos-external-video-preroll-sync.patch"
+external_video_repeated_seek_patch="$repo_root/cobalt-platform/cobalt-23.lts.6-webos-external-video-repeated-seek.patch"
 lifecycle_patch="$repo_root/cobalt-platform/cobalt-23.lts.6-webos-lifecycle.patch"
 demuxer_stop_race_patch="$repo_root/cobalt-platform/cobalt-23.lts.6-demuxer-stop-race.patch"
 
-if [[ ! -d "$cobalt_root/.git" || ! -f "$platforms_file" ]]; then
+if ! git -C "$cobalt_root" rev-parse --is-inside-work-tree >/dev/null 2>&1 ||
+   [[ ! -f "$platforms_file" ]]; then
   echo "Not a Cobalt source tree: $cobalt_root" >&2
   exit 2
 fi
@@ -104,6 +108,15 @@ if ! grep -q 'Playing video using webOS Starfish hardware decoder' \
   git -C "$cobalt_root" apply "$starfish_patch"
 fi
 
+if ! grep -q 'TryCreateStarfishAvComponents' \
+    "$cobalt_root/starboard/linux/shared/player_components_factory.cc" ||
+   ! grep -q 'kWebosStarfishAudioTiming' "$cobalt_root/starboard/player.h" ||
+   ! grep -q 'webos_audio_timing' \
+    "$cobalt_root/starboard/shared/starboard/player/input_buffer_internal.h"; then
+  git -C "$cobalt_root" apply --check "$shared_av_patch"
+  git -C "$cobalt_root" apply "$shared_av_patch"
+fi
+
 if ! grep -q "TV's Starfish hardware pipeline" \
   "$cobalt_root/starboard/linux/shared/media_is_video_supported.cc"; then
   git -C "$cobalt_root" apply --check "$hardware_video_capabilities_patch"
@@ -139,6 +152,18 @@ if ! grep -q 'virtual void SetPlaybackRate' \
   "$cobalt_root/starboard/shared/starboard/player/filter/video_decoder_internal.h"; then
   git -C "$cobalt_root" apply --check "$external_video_controls_patch"
   git -C "$cobalt_root" apply "$external_video_controls_patch"
+fi
+
+if ! grep -q 'first_input_written_ || decoder_->NeedsResetOnEverySeek()' \
+  "$cobalt_root/starboard/shared/starboard/player/filter/video_renderer_internal_impl.cc"; then
+  git -C "$cobalt_root" apply --check "$external_video_repeated_seek_patch"
+  git -C "$cobalt_root" apply "$external_video_repeated_seek_patch"
+fi
+
+if ! grep -q 'Hold an external video pipeline at its preroll target' \
+  "$cobalt_root/starboard/shared/starboard/player/filter/filter_based_player_worker_handler.cc"; then
+  git -C "$cobalt_root" apply --check "$external_video_preroll_sync_patch"
+  git -C "$cobalt_root" apply "$external_video_preroll_sync_patch"
 fi
 
 if ! grep -q 'Stay Concealed so the main event loop' \

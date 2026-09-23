@@ -3,6 +3,8 @@
 import { configRead } from './config';
 import { stripSponsoredQrCodePopups } from './sponsored-qr-code-block.mjs';
 import './adblock.css';
+// fork: fork response filters, called from this file's JSON.parse wrapper
+import { forkParseHook } from './fork/parse-hook.js';
 
 const AD_RENDERER_SELECTOR = [
   'ytlr-ad-slot-renderer',
@@ -265,6 +267,9 @@ JSON.parse = function () {
   ) {
     console.log('Adblock Removed sponsored QR code popups !');
   }
+
+  // fork: see fork/parse-hook.js — one JSON.parse assigner, not two
+  forkParseHook(r);
 
   return r;
 };
