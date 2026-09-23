@@ -11,6 +11,10 @@ webapp_output="${WEBAPP_OUTPUT_DIR:-$repo_root/webapp/output}"
 # replaces the 1.x debug app and keeps that app's signed-in storage).
 package_id="${STARTERLESS_APP_ID:-$(jq -r '.id' "$repo_root/starterless-cobalt/appinfo.json")}"
 package_title="${STARTERLESS_APP_TITLE:-$(jq -r '.title' "$repo_root/starterless-cobalt/appinfo.json")}"
+# fork: STARTERLESS_SWITCHES names a file packaged as `switches` (one Cobalt
+# switch per line, read by main.cc); the debug build uses
+# starterless-cobalt/debug.switches to open devtools on 0.0.0.0:9222.
+package_switches="${STARTERLESS_SWITCHES:-}"
 package_version="$(jq -r '.version' "$repo_root/starterless-cobalt/appinfo.json")"
 ares_package="$(command -v ares-package || true)"
 
@@ -61,6 +65,7 @@ trap 'rm -rf "$package_root"' EXIT
 jq --arg id "$package_id" --arg title "$package_title" '.id = $id | .title = $title' \
   "$repo_root/starterless-cobalt/appinfo.json" > "$package_root/appinfo.json" # fork: see package_id
 cp "$build_dir/cobalt" "$package_root/cobalt"
+if [[ -n "$package_switches" ]]; then cp "$package_switches" "$package_root/switches"; fi # fork: see package_switches
 cp -R "$build_dir/content" "$package_root/content"
 
 # Always overlay the selected web assets at packaging time. For artifact-based
@@ -75,7 +80,10 @@ cp -p "$webapp_output/adblockPreload.js" "$adblock_target/adblockPreload.js"
 
 # Development-only resources are not needed by the TV application. Leaving
 # them out saves roughly 8 MB installed without removing runtime fonts or ICU.
-rm -rf "$package_root/content/web/debug_remote" "$package_root/content/test"
+rm -rf "$package_root/content/test"
+# fork: a package with switches (the debug build) keeps debug_remote/, which
+# serves the /json devtools discovery file that tools/tv-*.sh probe.
+[[ -n "$package_switches" ]] || rm -rf "$package_root/content/web/debug_remote"
 # Incremental GN builds do not delete fonts from an earlier package profile.
 # Keep only files referenced by the newly generated filtered fonts.xml so a
 # previous standard-font build cannot silently add ~20 MB back to the IPK.

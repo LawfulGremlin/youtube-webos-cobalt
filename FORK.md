@@ -31,8 +31,11 @@ adding features itself.
   upstream files. Pure logic goes in `filters.mjs` with node-runnable tests in
   `test.mjs` (run by `fork-ci.yml`).
 - Current fork features: **feed ad item removal** (adSlotRenderer/reel ads,
-  rides the existing AdBlock toggle — via the JSON.parse chain in
-  fork/index.js plus upstream's DOM hider. Shorts removal and the in-video
+  rides the existing AdBlock toggle — via the fork's JSON.parse filters in
+  `fork/parse-hook.js` plus upstream's DOM hider. The filters run from inside upstream
+  adblock.js's JSON.parse wrapper (one `fork:` line) rather than as a second assignment:
+  upstream's preload makes JSON.parse an accessor that keeps only one downstream parser,
+  so a second assignment would replace adblock.js's ad filter. Shorts removal and the in-video
   shopping QR card used to be fork features here too; both were replaced by
   upstream's own versions in the 2026-09-03 sync — see UPSTREAM.md. Two
   safety nets stay in fork code: the JSON.parse chain runs upstream's Shorts
