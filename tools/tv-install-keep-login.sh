@@ -46,7 +46,26 @@ tv_ssh "$DEVICE" "
   [ -s \"\$other\" ] && cp -p \"\$other\" \"\$d/other$STORAGE\" || true"
 
 ares-install --device "$DEVICE" -r "$APP_ID" >/dev/null 2>&1 || true
-ares-install --device "$DEVICE" "$IPK"
+if ares-install --device "$DEVICE" -l 2>/dev/null | grep -qx "$APP_ID"; then
+  echo "ERROR: $APP_ID is still installed after the uninstall; nothing installed"; exit 1
+fi
+# Not `ares-install <ipk>`: on lg75 (2026-09-23) it uploaded the IPK and then
+# failed with "Unable to exec" twice in a row, while the same install through
+# appInstallService over root ssh worked. Upload and install that way.
+IP=$(tv_resolve_ip "$DEVICE"); KEY=$(tv_resolve_key "$DEVICE")
+REMOTE_IPK="/media/developer/temp/$(basename "$IPK")"
+tv_ssh "$DEVICE" "mkdir -p /media/developer/temp" >/dev/null
+scp -q -O -i "$KEY" -o StrictHostKeyChecking=no -o BatchMode=yes "$IPK" "root@$IP:$REMOTE_IPK" 2>/dev/null ||
+  scp -q -i "$KEY" -o StrictHostKeyChecking=no -o BatchMode=yes "$IPK" "root@$IP:$REMOTE_IPK"
+echo "installing $(basename "$IPK")..."
+tv_ssh "$DEVICE" "luna-send -n 8 -f luna://com.webos.appInstallService/dev/install '{\"id\":\"com.ares.defaultName\",\"ipkUrl\":\"$REMOTE_IPK\",\"subscribe\":true}'" >/dev/null
+installed=no
+for i in $(seq 1 40); do
+  ares-install --device "$DEVICE" -l 2>/dev/null | grep -qx "$APP_ID" && { installed=yes; break; }
+  sleep 3
+done
+[ "$installed" = yes ] || { echo "ERROR: $APP_ID did not register after install; the saved login is in $SAVES on the TV"; exit 1; }
+tv_ssh "$DEVICE" "rm -f '$REMOTE_IPK'" >/dev/null
 
 tv_ssh "$DEVICE" "
   f='${LOGIN_FILE:-}'
