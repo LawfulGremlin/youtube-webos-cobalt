@@ -64,6 +64,8 @@ each sync.
 ## Waiting for a decision
 
 - **`main`'s 1.x sync from the archive**: v1.2.3 to v1.2.5 and `45645bc` (our issues #3 to #5).
+  **On hold (user, 2026-09-23): `main` is not synced until the v2 debug build has been used on
+  the TVs for a while.** The notes below are for when it resumes.
   A trial merge conflicts in `vp9-4k-test.yml`, `Makefile`, `cobalt-23.lts.6.patch` (includes
   `e4c1b48`, "Restrict VP9 UHD capability override") and `sponsorblock.js`, and lands upstream's
   starterless workflows cleanly, which need a keep-or-delete call. Worth taking: the #82 IPK
