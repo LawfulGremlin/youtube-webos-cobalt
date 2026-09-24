@@ -14,6 +14,8 @@ export function liftAutoQuality(player, schedule = setTimeout) {
   player.setPlaybackQualityRange(top, top);
   let tries = 40; // hand back after the switch, or after 10 s regardless
   const handBack = () => {
+    // The viewer chose another quality in the meantime: leave it alone.
+    if (player.getPreferredQuality() !== top) return;
     if (player.getPlaybackQuality() === top || --tries <= 0) {
       player.setPlaybackQualityRange('auto', 'auto');
     } else {

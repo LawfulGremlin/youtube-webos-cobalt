@@ -262,8 +262,10 @@ function fakePlayer(pref, playing, levels = ['hd2160', 'hd1080', 'auto']) {
     getPlaybackQuality: () => playing,
     setPlaybackQualityRange(min, max) {
       calls.push(min + '-' + max);
+      pref = min;
       if (min !== 'auto') playing = min;
-    }
+    },
+    choose(level) { pref = level; }
   };
 }
 const queue = [];
@@ -277,11 +279,19 @@ assert.equal(liftAutoQuality(fp, later), false);
 fp = fakePlayer('auto', 'hd2160');
 assert.equal(liftAutoQuality(fp, later), false);
 fp = fakePlayer('auto', 'hd1080');
-fp.setPlaybackQualityRange = (min) => fp.calls.push(min); // switch never lands
+const pinned = fp.setPlaybackQualityRange;
+fp.setPlaybackQualityRange = (min, max) => { pinned(min, max); fp.choose(min); }; // keep pref
+fp.getPlaybackQuality = () => 'hd1080'; // switch never lands
 liftAutoQuality(fp, later);
 while (queue.length) queue.shift()();
 assert.equal(fp.calls.length, 2);
-assert.equal(fp.calls[1], 'auto');
+assert.equal(fp.calls[1], 'auto-auto');
+fp = fakePlayer('auto', 'hd1080');
+fp.getPlaybackQuality = () => 'hd1080'; // still switching...
+liftAutoQuality(fp, later);
+fp.choose('hd720'); // ...when the viewer picks 720p by hand
+while (queue.length) queue.shift()();
+assert.deepEqual(fp.calls, ['hd2160-hd2160']);
 assert.equal(liftAutoQuality(fakePlayer('auto', 'hd720', []), later), false);
 
 console.log(
