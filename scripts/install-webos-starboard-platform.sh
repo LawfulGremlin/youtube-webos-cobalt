@@ -123,11 +123,11 @@ if ! grep -q "TV's Starfish hardware pipeline" \
   git -C "$cobalt_root" apply "$hardware_video_capabilities_patch"
 fi
 
-# fork: hide AV1 unless /tmp/ytaf-av1.enable says 1 (see the patch).
-if ! grep -q 'fork: AV1 is hidden unless' \
+# fork: per-TV AV1 off switch, /tmp/ytaf-av1.enable = 0 (see the patch).
+if ! grep -q 'fork: AV1 is advertised unless' \
   "$cobalt_root/starboard/linux/shared/media_is_video_supported.cc"; then
-  git -C "$cobalt_root" apply --check "$repo_root/cobalt-platform/fork-webos-vp9-only.patch"
-  git -C "$cobalt_root" apply "$repo_root/cobalt-platform/fork-webos-vp9-only.patch"
+  git -C "$cobalt_root" apply --check "$repo_root/cobalt-platform/fork-webos-av1-switch.patch"
+  git -C "$cobalt_root" apply "$repo_root/cobalt-platform/fork-webos-av1-switch.patch"
 fi
 
 if ! grep -q 'kPulseLibraryName.*libpulse.so.0' \

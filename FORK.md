@@ -476,6 +476,20 @@ on the TV). Two things cost real time to learn: `luna-send` prints nothing at
 all without a pty, and remote buttons are plain-text frames written to the
 TV-local `/tmp/netinput.pointer.sock` that `getPointerInputSocket` creates.
 
+Playback on the starterless runtime (branch `v2`) is judged with a few more.
+`tools/tv-codec.sh <tv>` reports the playing codec and size (stats for nerds)
+and the runtime's 2160p answers for VP9, VP9.2 and AV1.
+`tools/tv-screenshot.sh <tv> <out.jpg> <WxH> SOURCE` captures the hardware
+video plane, which a DISPLAY capture always shows as black.
+`tools/tv-stream-logs.sh <tv> <dir>` streams the kernel log, the system logs,
+the runtime log and memory samples off the TV for a whole session, because the
+TV's own copies start over at every boot. `tools/tv-install-keep-login.sh <tv>
+<ipk>` installs either runtime over the debug app without losing its sign-in;
+v2 plays nothing signed out. AV1 is advertised on `v2` by default; writing `0`
+to `/tmp/ytaf-av1.enable` on a TV and restarting the app sends YouTube to VP9
+there until the next reboot. On lg75 that costs something: on auto quality
+YouTube picks AV1 at 1080p but VP9 at 2160p (UPSTREAM.md, 2026-09-24).
+
 How it has to work on this Cobalt build (each alternative tested live and
 ignored): launch params / `contentTarget` deep links do nothing (cold or warm),
 plain hash mutation doesn't route, and `resume_time` in the watch hash isn't

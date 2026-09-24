@@ -16,18 +16,18 @@ diff --git a/starboard/linux/shared/media_is_video_supported.cc b/starboard/linu
    const bool is_avc = video_codec == kSbMediaVideoCodecH264;
 -  const bool is_uhd_codec = video_codec == kSbMediaVideoCodecVp9 ||
 -                            video_codec == kSbMediaVideoCodecAv1;
-+  // fork: AV1 is hidden unless /tmp/ytaf-av1.enable starts with "1". AV1
-+  // through Starfish stalled on the 2021 NanoCell lm21a (lg75, 75NANO756PA):
-+  // Play() accepted, no frame ever presented, while VP9 played at 2160p on
-+  // the same set (measured 2026-09-06, legacy decoder path). The marker lets
-+  // one binary test AV1 per TV; /tmp is cleared on reboot, so a hang falls
-+  // back to VP9. Read once so a process never mixes codec answers.
++  // fork: AV1 is advertised unless /tmp/ytaf-av1.enable starts with "0", a
++  // per-TV off switch that sends YouTube to VP9. Read once so a process never
++  // mixes codec answers; /tmp is cleared on reboot. AV1 stalled on the 2021
++  // NanoCell lm21a (lg75) through the old decoder path on 2026-09-06, before
++  // upstream's preroll sync; on 2026-09-24 the same set played 2160p AV1 on
++  // that path and on the shared backend.
 +  static const bool av1_enabled = [] {
 +    FILE* marker = fopen("/tmp/ytaf-av1.enable", "r");
-+    if (!marker) return false;
++    if (!marker) return true;
 +    const int first = fgetc(marker);
 +    fclose(marker);
-+    return first == '1';
++    return first != '0';
 +  }();
 +  const bool is_uhd_codec =
 +      video_codec == kSbMediaVideoCodecVp9 ||

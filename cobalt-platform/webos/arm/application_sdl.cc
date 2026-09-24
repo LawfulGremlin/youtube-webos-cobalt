@@ -43,6 +43,10 @@ SbKey SdlKeyToSbKey(const SDL_Keysym& keysym) {
       return kSbKeyHome;
     case SDL_SCANCODE_AUDIOPLAY:
       return kSbKeyMediaPlayPause;
+    // fork: the remote's PAUSE (IR_KEY_PAUSE, xkb 127 = KEY_PAUSE) reached
+    // no case and was dropped; only the PLAY toggle paused (lg75, 2026-09-24).
+    case SDL_SCANCODE_PAUSE:
+      return kSbKeyPause;
     case SDL_SCANCODE_AUDIOREWIND:
       return kSbKeyMediaRewind;
     case SDL_SCANCODE_AUDIOFASTFORWARD:
