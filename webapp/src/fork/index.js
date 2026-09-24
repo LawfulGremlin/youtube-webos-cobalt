@@ -9,6 +9,7 @@ import { text as languageText } from '../languages/index.js';
 import { toggleSubtitles } from '../subtitle-shortcut.js';
 import { stepTarget } from './frame-step.mjs';
 import { nextPlaybackRate } from './playback-speed.mjs';
+import { liftAutoQuality } from './auto-quality.mjs';
 import {
   SLOTS,
   registerShortcutAction,
@@ -434,3 +435,23 @@ function appendForkUI() {
   container.appendChild(shortcuts);
 }
 appendForkUI();
+
+// Auto quality starts each watched video at its top level (auto-quality.mjs).
+// Media events do not bubble; a capture listener still sees them.
+let autoQualityVideoId = null;
+document.addEventListener(
+  'playing',
+  () => {
+    if (location.hash.indexOf('/watch') < 0) return;
+    const player = document.getElementById('ytlr-player__player-container-player');
+    const data = player && player.getVideoData && player.getVideoData();
+    if (!data || !data.video_id || data.video_id === autoQualityVideoId) return;
+    autoQualityVideoId = data.video_id;
+    try {
+      liftAutoQuality(player);
+    } catch (e) {
+      console.warn('[fork] auto quality:', e);
+    }
+  },
+  true
+);

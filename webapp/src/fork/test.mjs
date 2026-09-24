@@ -15,6 +15,7 @@ import {
   cycleLayout
 } from './keyboard-layout.mjs';
 import { LAYOUTS } from './keyboard-layouts.mjs';
+import { liftAutoQuality } from './auto-quality.mjs';
 import {
   SLOTS,
   registerShortcutAction,
@@ -251,6 +252,38 @@ assert.equal(cycleLayout('us', -1), LAYOUT_IDS[LAYOUT_IDS.length - 1]);
 assert.equal(cycleLayout('', 1), LAYOUT_IDS[1]);
 assert.equal(cycleLayout('bogus', 1), LAYOUT_IDS[1]);
 
+// Auto quality: top level once, then auto again; a manual choice is left alone.
+function fakePlayer(pref, playing, levels = ['hd2160', 'hd1080', 'auto']) {
+  const calls = [];
+  return {
+    calls,
+    getPreferredQuality: () => pref,
+    getAvailableQualityLevels: () => levels,
+    getPlaybackQuality: () => playing,
+    setPlaybackQualityRange(min, max) {
+      calls.push(min + '-' + max);
+      if (min !== 'auto') playing = min;
+    }
+  };
+}
+const queue = [];
+const later = (fn) => queue.push(fn);
+let fp = fakePlayer('auto', 'hd1080');
+assert.equal(liftAutoQuality(fp, later), true);
+while (queue.length) queue.shift()();
+assert.deepEqual(fp.calls, ['hd2160-hd2160', 'auto-auto']);
+fp = fakePlayer('hd1080', 'hd1080');
+assert.equal(liftAutoQuality(fp, later), false);
+fp = fakePlayer('auto', 'hd2160');
+assert.equal(liftAutoQuality(fp, later), false);
+fp = fakePlayer('auto', 'hd1080');
+fp.setPlaybackQualityRange = (min) => fp.calls.push(min); // switch never lands
+liftAutoQuality(fp, later);
+while (queue.length) queue.shift()();
+assert.equal(fp.calls.length, 2);
+assert.equal(fp.calls[1], 'auto');
+assert.equal(liftAutoQuality(fakePlayer('auto', 'hd720', []), later), false);
+
 console.log(
-  'fork filters + frame step + shortcut registry + playback speed + keyboard layout: all tests passed'
+  'fork filters + frame step + shortcut registry + playback speed + keyboard layout + auto quality: all tests passed'
 );

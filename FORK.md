@@ -487,8 +487,11 @@ TV's own copies start over at every boot. `tools/tv-install-keep-login.sh <tv>
 <ipk>` installs either runtime over the debug app without losing its sign-in;
 v2 plays nothing signed out. AV1 is advertised on `v2` by default; writing `0`
 to `/tmp/ytaf-av1.enable` on a TV and restarting the app sends YouTube to VP9
-there until the next reboot. On lg75 that costs something: on auto quality
-YouTube picks AV1 at 1080p but VP9 at 2160p (UPSTREAM.md, 2026-09-24).
+there until the next reboot. On lg75 YouTube's server picks AV1 at 1080p on
+auto quality (VP9 got 2160p), and auto keeps whatever level is playing when
+it is selected, so `fork/auto-quality.mjs` selects a watched video's top
+level once at its start and hands straight back to auto: AV1 starts at 2160p
+and the setting stays auto (UPSTREAM.md, 2026-09-24).
 
 How it has to work on this Cobalt build (each alternative tested live and
 ignored): launch params / `contentTarget` deep links do nothing (cold or warm),
