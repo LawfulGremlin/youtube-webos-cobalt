@@ -24,6 +24,7 @@ import {
   layoutLabel,
   cycleLayout
 } from './keyboard-layout.mjs';
+import { createSearchTyping } from './search-typing.mjs';
 
 function bindingConfigKey(slotId) {
   return 'forkShortcut_' + slotId;
@@ -152,6 +153,44 @@ function onLayoutKey(evt) {
 }
 window.addEventListener('keydown', onLayoutKey, true);
 window.addEventListener('keyup', onLayoutKey, true);
+
+// Typing into the search bar before its keyboard is open (search-typing.mjs).
+// Registered after the layout hook, so a held key already carries the
+// layout's character. Element has no closest() on Cobalt — walk up by hand.
+function focusPath() {
+  const path = [];
+  for (let el = document.activeElement; el; el = el.parentElement) path.push(el.tagName);
+  return path;
+}
+function sendKey(keyCode, init) {
+  const target = document.activeElement || document.body;
+  ['keydown', 'keyup'].forEach((type) => {
+    const evt = new KeyboardEvent(type, {
+      bubbles: true,
+      cancelable: true,
+      keyCode: keyCode,
+      which: keyCode,
+      key: init.key || '',
+      shiftKey: !!init.shiftKey,
+      altKey: !!init.altKey
+    });
+    evt.ytafReplay = true;
+    target.dispatchEvent(evt);
+  });
+}
+const onSearchTypingKey = createSearchTyping({
+  focusPath: focusPath,
+  keyboardOpen: () => !!document.querySelector('ytlr-search-keyboard'),
+  send: sendKey,
+  later: (fn, ms) => setTimeout(fn, ms)
+});
+function onSearchTyping(evt) {
+  if (!onSearchTypingKey(evt)) return;
+  evt.preventDefault();
+  evt.stopImmediatePropagation();
+}
+window.addEventListener('keydown', onSearchTyping, true);
+window.addEventListener('keyup', onSearchTyping, true);
 
 // Read (no argument) or set the layout over the debug build's CDP.
 window.ytafKeyboardLayout = function (id) {

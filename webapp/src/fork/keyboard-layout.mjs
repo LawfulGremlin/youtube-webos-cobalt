@@ -87,18 +87,42 @@ export function layoutKey(layoutId, keyCode, shift, altgr) {
 }
 
 // YouTube's key normaliser (`vXb` in the kabuki bundle) re-dispatches a key
-// as a plain Event carrying only keyCode/which/charCode plus `he`, the
-// original KeyboardEvent, whenever its focus manager is locked — which on the
-// search page is most of the time while suggestions render. The search box
-// types the copy from keyCode + shiftKey/altKey (it ignores `key` for letters
-// and digits), and the copy has neither, so Shift and AltGr were lost on 1–3
-// keys of every burst (measured on lg75 2026-09-02 from a virtual keyboard;
-// a physical one goes through the same code). Give the copy the original's
-// modifiers and key as own enumerable properties — what Closure's for-in
-// event wrapper reads — before the layout lookup and before YouTube sees it.
+// as a plain Event carrying only keyCode/which/charCode plus the original
+// KeyboardEvent under a minified property name, whenever its focus manager is
+// locked — which on the search page is most of the time while suggestions
+// render. The search box types the copy from keyCode + shiftKey/altKey (it
+// ignores `key` for letters and digits), and the copy has neither, so Shift
+// and AltGr were lost on 1–3 keys of every burst (measured on lg75 2026-09-02
+// from a virtual keyboard; a physical one goes through the same code). Give
+// the copy the original's modifiers and key as own enumerable properties —
+// what Closure's for-in event wrapper reads — before the layout lookup and
+// before YouTube sees it.
+//
+// The property was `he` until a YouTube release renamed it `be` (found on
+// lg75 2026-10-06: the second key of every quick pair lost Shift again on
+// both app lines), so the original is found by shape — an own property
+// holding an object with a numeric keyCode and a boolean shiftKey — not by name.
+export function originalOf(copy) {
+  for (const name in copy) {
+    if (!Object.prototype.hasOwnProperty.call(copy, name)) continue;
+    const value = copy[name];
+    if (
+      value &&
+      value !== copy &&
+      typeof value === 'object' &&
+      typeof value.keyCode === 'number' &&
+      typeof value.shiftKey === 'boolean'
+    ) {
+      return value;
+    }
+  }
+  return null;
+}
+
 export function inheritOriginal(copy) {
-  const orig = copy.he;
-  if (!orig || copy.shiftKey !== undefined) return false;
+  if (copy.shiftKey !== undefined) return false;
+  const orig = originalOf(copy);
+  if (!orig) return false;
   ['shiftKey', 'altKey', 'ctrlKey', 'metaKey', 'key'].forEach((name) => {
     copy[name] = orig[name];
   });

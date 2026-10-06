@@ -16,6 +16,7 @@ import {
 } from './keyboard-layout.mjs';
 import { LAYOUTS } from './keyboard-layouts.mjs';
 import { liftAutoQuality } from './auto-quality.mjs';
+import { isTypingKey, createSearchTyping } from './search-typing.mjs';
 import {
   SLOTS,
   registerShortcutAction,
@@ -225,14 +226,19 @@ assert.equal(layoutKey('pl', 65, false, true), 'ą');
 // YouTube's re-dispatched copies get the original's modifiers and key once;
 // real events (which have shiftKey) and copies without an original are left.
 {
-  const copy = { keyCode: 67, he: { shiftKey: true, altKey: false, ctrlKey: false, metaKey: false, key: 'C' } };
-  assert.equal(inheritOriginal(copy), true);
-  assert.equal(copy.shiftKey, true);
-  assert.equal(copy.key, 'C');
-  assert.equal(Object.keys(copy).includes('shiftKey'), true, 'own enumerable, for Closure\'s for-in wrapper');
-  assert.equal(inheritOriginal(copy), false);
+  // the original sits under whatever name the minifier picked: he, then be
+  for (const name of ['he', 'be', 'zQ']) {
+    const copy = { keyCode: 67, DW: true, jN: undefined };
+    copy[name] = { keyCode: 67, shiftKey: true, altKey: false, ctrlKey: false, metaKey: false, key: 'C' };
+    assert.equal(inheritOriginal(copy), true, name);
+    assert.equal(copy.shiftKey, true);
+    assert.equal(copy.key, 'C');
+    assert.equal(Object.keys(copy).includes('shiftKey'), true, 'own enumerable, for Closure\'s for-in wrapper');
+    assert.equal(inheritOriginal(copy), false);
+  }
   assert.equal(inheritOriginal({ keyCode: 67 }), false);
-  assert.equal(inheritOriginal({ keyCode: 67, shiftKey: false, he: { shiftKey: true } }).valueOf(), false);
+  assert.equal(inheritOriginal({ keyCode: 67, detail: { x: 1 } }), false); // an object, but no key event
+  assert.equal(inheritOriginal({ keyCode: 67, shiftKey: false, be: { keyCode: 67, shiftKey: true } }), false);
 }
 // No dead keys survive generation: every stored character is printable text.
 Object.keys(LAYOUTS).forEach((id) => {
@@ -294,6 +300,110 @@ while (queue.length) queue.shift()();
 assert.deepEqual(fp.calls, ['hd2160-hd2160']);
 assert.equal(liftAutoQuality(fakePlayer('auto', 'hd720', []), later), false);
 
+// --- Search typing -------------------------------------------------------------
+// A fake search bar that behaves as measured on lg75 (2026-10-06): Right moves
+// mic -> text box, Enter on the box opens the keyboard and focus reaches a key
+// two polls later, Down from the mic enters an open keyboard, and letters only
+// type while a keyboard key has focus.
+assert.ok(isTypingKey(65) && isTypingKey(32) && isTypingKey(186) && isTypingKey(222) && isTypingKey(48));
+assert.ok(!isTypingKey(13) && !isTypingKey(8) && !isTypingKey(37) && !isTypingKey(461) && !isTypingKey(403));
+
+function fakeBar(focus, kb) {
+  const bar = { focus, kb, typed: '', sent: [], timers: [] };
+  const PATHS = {
+    mic: ['YTLR-SEARCH-VOICE-MIC-BUTTON', 'YTLR-SEARCH-VOICE', 'YTLR-SEARCH-BAR', 'YTLR-APP'],
+    box: ['YTLR-TEXT-BOX', 'YTLR-SEARCH-TEXT-BOX', 'YTLR-SEARCH-BAR', 'YTLR-APP'],
+    key: ['YT-KEYBOARD-KEY', 'YTLR-SEARCH-KEYBOARD', 'YTLR-APP'],
+    body: ['BODY', 'HTML'],
+    tile: ['YTLR-TILE-RENDERER', 'YTLR-APP']
+  };
+  let opening = 0;
+  bar.deps = {
+    focusPath: () => {
+      if (opening && --opening === 0) bar.focus = 'key';
+      return PATHS[bar.focus];
+    },
+    keyboardOpen: () => bar.kb,
+    send: (code, init) => {
+      bar.sent.push(code);
+      if (code === 39 && bar.focus === 'mic') bar.focus = 'box';
+      else if (code === 13 && bar.focus === 'box') { bar.kb = true; bar.focus = 'body'; opening = 3; }
+      else if (code === 40 && bar.kb && bar.focus === 'mic') bar.focus = 'key';
+      else if (bar.focus === 'key' && init.key) bar.typed += init.key;
+    },
+    later: (fn) => bar.timers.push(fn)
+  };
+  bar.run = () => { while (bar.timers.length) bar.timers.shift()(); };
+  return bar;
+}
+const keyEvt = (type, ch, extra) =>
+  Object.assign({ type, keyCode: ch.toUpperCase().charCodeAt(0), key: ch }, extra);
+function typeInto(bar, text, beforeRun) {
+  const onKey = createSearchTyping(bar.deps);
+  const taken = [];
+  for (const ch of text) {
+    taken.push(onKey(keyEvt('keydown', ch)));
+    taken.push(onKey(keyEvt('keyup', ch)));
+  }
+  if (beforeRun) beforeRun(onKey);
+  bar.run();
+  return { onKey, taken };
+}
+
+// mic focused, keyboard closed: Right, Enter, then the held keys in order
+let bar = fakeBar('mic', false);
+let r = typeInto(bar, 'cat');
+assert.deepEqual(bar.sent, [39, 13, 67, 65, 84]);
+assert.equal(bar.typed, 'cat');
+assert.ok(r.taken.every(Boolean)); // every original key and keyup swallowed
+// text box focused: just Enter
+bar = fakeBar('box', false);
+typeInto(bar, 'dog');
+assert.deepEqual(bar.sent, [13, 68, 79, 71]);
+assert.equal(bar.typed, 'dog');
+// search page with the keyboard already open but focus on the mic: Down
+// (focus moves at once here, so 'b' is not held: it reaches YouTube as is)
+bar = fakeBar('mic', true);
+r = typeInto(bar, 'ab');
+assert.deepEqual(bar.sent, [40, 65]);
+assert.equal(bar.typed, 'a');
+assert.deepEqual(r.taken, [true, false, false, false]);
+// once on the keyboard, keys pass straight through
+r = typeInto(bar, 'c');
+assert.deepEqual(r.taken, [false, false]);
+// modifiers and the layout's key survive the hold (Shift+a -> A, Danish æ)
+bar = fakeBar('box', false);
+const onKey = createSearchTyping(bar.deps);
+onKey(keyEvt('keydown', 'A', { shiftKey: true }));
+onKey({ type: 'keydown', keyCode: 186, key: 'æ' });
+const seen = [];
+const send = bar.deps.send;
+bar.deps.send = (code, init) => { seen.push(init); send(code, init); };
+bar.run();
+assert.equal(bar.typed, 'Aæ');
+assert.equal(seen[0].shiftKey, true);
+// not in the search bar, or not a typing key, or our own replay: untouched
+bar = fakeBar('tile', false);
+assert.deepEqual(typeInto(bar, 'x').taken, [false, false]);
+assert.deepEqual(bar.sent, []);
+bar = fakeBar('mic', false);
+const plain = createSearchTyping(bar.deps);
+assert.equal(plain({ type: 'keydown', keyCode: 13 }), false); // Enter on the mic stays the remote's
+assert.equal(plain({ type: 'keydown', keyCode: 65, key: 'a', ytafReplay: true }), false);
+assert.equal(plain({ type: 'keydown', keyCode: 65, key: 'a', be: { keyCode: 65, shiftKey: false } }), false);
+assert.equal(plain({ type: 'keydown', keyCode: 65, key: 'a', ctrlKey: true }), false);
+assert.deepEqual(bar.sent, []);
+// the bar never opens: give up after the poll budget, drop the keys, and the
+// next key starts over instead of being held forever
+bar = fakeBar('box', false);
+bar.deps.send = (code) => bar.sent.push(code); // Enter does nothing
+const stuck = createSearchTyping(bar.deps);
+stuck(keyEvt('keydown', 'q'));
+bar.run();
+assert.deepEqual(bar.sent, [13]);
+assert.equal(stuck(keyEvt('keydown', 'w')), true);
+assert.deepEqual(bar.sent, [13, 13]);
+
 console.log(
-  'fork filters + frame step + shortcut registry + playback speed + keyboard layout + auto quality: all tests passed'
+  'fork filters + frame step + shortcut registry + playback speed + keyboard layout + auto quality + search typing: all tests passed'
 );
