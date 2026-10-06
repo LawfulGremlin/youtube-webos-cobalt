@@ -47,6 +47,39 @@ SbKey SdlKeyToSbKey(const SDL_Keysym& keysym) {
     // no case and was dropped; only the PLAY toggle paused (lg75, 2026-09-24).
     case SDL_SCANCODE_PAUSE:
       return kSbKeyPause;
+    // fork: keyboard keys other than letters, digits and Space had no case and
+    // reached the page as keyCode 0 — Backspace did nothing, and the
+    // punctuation row, where layouts put æ ø å, typed nothing (lg75 2.0.5,
+    // 2026-10-06). Mapped by position to the US virtual-key codes the 1.x
+    // starter sends, which the fork's layout tables are keyed on.
+    case SDL_SCANCODE_BACKSPACE:
+      return kSbKeyBack;
+    case SDL_SCANCODE_TAB:
+      return kSbKeyTab;
+    case SDL_SCANCODE_DELETE:
+      return kSbKeyDelete;
+    case SDL_SCANCODE_SEMICOLON:
+      return kSbKeyOem1;
+    case SDL_SCANCODE_EQUALS:
+      return kSbKeyOemPlus;
+    case SDL_SCANCODE_COMMA:
+      return kSbKeyOemComma;
+    case SDL_SCANCODE_MINUS:
+      return kSbKeyOemMinus;
+    case SDL_SCANCODE_PERIOD:
+      return kSbKeyOemPeriod;
+    case SDL_SCANCODE_SLASH:
+      return kSbKeyOem2;
+    case SDL_SCANCODE_GRAVE:
+      return kSbKeyOem3;
+    case SDL_SCANCODE_LEFTBRACKET:
+      return kSbKeyOem4;
+    case SDL_SCANCODE_BACKSLASH:
+      return kSbKeyOem5;
+    case SDL_SCANCODE_RIGHTBRACKET:
+      return kSbKeyOem6;
+    case SDL_SCANCODE_APOSTROPHE:
+      return kSbKeyOem7;
     case SDL_SCANCODE_AUDIOREWIND:
       return kSbKeyMediaRewind;
     case SDL_SCANCODE_AUDIOFASTFORWARD:

@@ -21,6 +21,7 @@ import {
   decideLayout,
   layoutKey,
   inheritOriginal,
+  searchKeyCode,
   layoutLabel,
   cycleLayout
 } from './keyboard-layout.mjs';
@@ -140,16 +141,27 @@ decideLayoutOnce();
 // AltGr arrives as altKey and is looked up as level 3; YouTube types those
 // keydowns as-is (verified live: Danish AltGr+2 typed @).
 function onLayoutKey(evt) {
-  inheritOriginal(evt); // YouTube's re-dispatched copies carry no modifiers
+  // YouTube's re-dispatched copies: the original already went through here,
+  // so its key is the layout's character — take it, never look the copy up
+  // again (its keyCode may be the remapped one below).
+  if (inheritOriginal(evt)) return;
+  const code = evt.keyCode || evt.which || 0;
   const layout = configRead(LAYOUT_KEY);
-  if (!layout) return;
-  const ch = layoutKey(layout, evt.keyCode || evt.which || 0, evt.shiftKey, evt.altKey);
-  if (ch === null) return;
+  const ch = layout ? layoutKey(layout, code, evt.shiftKey, evt.altKey) : null;
   try {
-    Object.defineProperty(evt, 'key', { value: ch, configurable: true });
+    if (ch !== null) Object.defineProperty(evt, 'key', { value: ch, configurable: true });
+    const typed = searchKeyCode(code);
+    if (typed !== code && onSearchKeyboard()) {
+      Object.defineProperty(evt, 'keyCode', { value: typed, configurable: true });
+      Object.defineProperty(evt, 'which', { value: typed, configurable: true });
+    }
   } catch (err) {
     // Non-extensible event: the key stays US for this press.
   }
+}
+function onSearchKeyboard() {
+  const path = focusPath();
+  return path[0] === 'YT-KEYBOARD-KEY' || path.indexOf('YTLR-SEARCH-KEYBOARD') !== -1;
 }
 window.addEventListener('keydown', onLayoutKey, true);
 window.addEventListener('keyup', onLayoutKey, true);

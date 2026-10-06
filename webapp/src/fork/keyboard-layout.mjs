@@ -129,6 +129,21 @@ export function inheritOriginal(copy) {
   return true;
 }
 
+// keyCode 191 ('/' on US keyboards) is YouTube's voice-search hotkey: it opens
+// the "Allow YouTube to access microphone" prompt with Allow focused, or
+// starts listening once allowed, and focus leaves the search keyboard (keys
+// typed in between are lost). Most European layouts put '-' on that key
+// (da, de, no, se, fi …), so typing a hyphen into search did exactly that
+// (lg75, both app lines, 2026-10-06). While typing into the search keyboard
+// the key is presented as 189, another punctuation key that YouTube types by
+// `key` and binds to nothing — after the layout lookup, which needs the real
+// position. Measured live: 191 opened the prompt in ~300 ms, 189 did not.
+const SEARCH_KEYCODES = { 191: 189 };
+
+export function searchKeyCode(keyCode) {
+  return SEARCH_KEYCODES[keyCode] || keyCode;
+}
+
 export function layoutLabel(layoutId) {
   return LAYOUT_NAMES[layoutId] || layoutId || 'undecided';
 }
