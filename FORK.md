@@ -438,6 +438,17 @@ letters, `keyCode` from the init dict). Verified on lg75 (v2 debug 2.0.5,
 2026-10-06) from webos-webui with focus on the mic and on the box:
 `MixedCase AbCdEf 42` and `HELLO World` arrived verbatim.
 
+**The voice-search hotkey.** keyCode 191 (`/` on US keyboards) is YouTube's
+voice-search hotkey: it opens the "Allow YouTube to access microphone" prompt
+with Allow focused (or starts listening once allowed), and focus leaves the
+search keyboard, so the keys after it are lost. Most European layouts put `-`
+on that key, so every hyphen typed into search did this (lg75, both lines,
+2026-10-06). While focus is on the search keyboard the layout hook now
+presents 191 as 189, after looking the character up by the real position;
+YouTube types punctuation by `key`, so the text is unchanged. YouTube's
+re-dispatched copies take the original's key and are not looked up again
+(their keyCode may be the remapped one).
+
 **Virtual keyboards (webos-webui).** The household web remote types into the
 foreground app through `kb/kbinject.c`, a uinput device it starts over root
 ssh; the TV-side recipe (LSM opens new input devices only after a

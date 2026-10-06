@@ -11,6 +11,7 @@ import {
   decideLayout,
   layoutKey,
   inheritOriginal,
+  searchKeyCode,
   layoutLabel,
   cycleLayout
 } from './keyboard-layout.mjs';
@@ -239,6 +240,13 @@ assert.equal(layoutKey('pl', 65, false, true), 'ą');
   assert.equal(inheritOriginal({ keyCode: 67, detail: { x: 1 } }), false); // an object, but no key event
   assert.equal(inheritOriginal({ keyCode: 67, shiftKey: false, be: { keyCode: 67, shiftKey: true } }), false);
 }
+// The voice-search hotkey position is presented as plain punctuation while
+// typing; every other key keeps its code. The Danish '-' still comes from 191.
+assert.equal(searchKeyCode(191), 189);
+assert.equal(searchKeyCode(189), 189);
+assert.equal(searchKeyCode(65), 65);
+assert.equal(layoutKey('dk', 191, false, false), '-');
+assert.equal(layoutKey('dk', 189, false, false), '+');
 // No dead keys survive generation: every stored character is printable text.
 Object.keys(LAYOUTS).forEach((id) => {
   Object.keys(LAYOUTS[id]).forEach((code) => {
